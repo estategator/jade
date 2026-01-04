@@ -16,6 +16,7 @@ import {
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import Link from "next/link";
+import { subscribeUser } from "@/app/actions";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -89,13 +90,27 @@ const Navbar = () => {
 
 const Hero = () => {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("loading");
-    // Simulate API call
-    setTimeout(() => setStatus("success"), 1500);
+    setErrorMessage("");
+    
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('source', 'hero_section');
+
+    const result = await subscribeUser(formData);
+
+    if (result.success) {
+      setStatus("success");
+      setEmail("");
+    } else {
+      setStatus("error");
+      setErrorMessage(result.error || "Something went wrong");
+    }
   };
 
   return (
@@ -161,7 +176,7 @@ const Hero = () => {
               </div>
               <button
                 type="submit"
-                disabled={status !== "idle"}
+                disabled={status === "loading" || status === "success"}
                 className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
               >
                 {status === "loading" ? (
@@ -178,6 +193,11 @@ const Hero = () => {
             {status === "success" && (
               <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
                 {"Thanks! We've added you to the list."}
+              </p>
+            )}
+            {status === "error" && (
+              <p className="mt-4 text-sm text-red-600 dark:text-red-400 font-medium">
+                {errorMessage}
               </p>
             )}
           </motion.div>
@@ -390,12 +410,27 @@ const PoweredBy = () => {
 
 const CTASection = () => {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("loading");
-    setTimeout(() => setStatus("success"), 1500);
+    setErrorMessage("");
+
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('source', 'cta_section');
+
+    const result = await subscribeUser(formData);
+
+    if (result.success) {
+      setStatus("success");
+      setEmail("");
+    } else {
+      setStatus("error");
+      setErrorMessage(result.error || "Something went wrong");
+    }
   };
 
   return (
@@ -446,7 +481,7 @@ const CTASection = () => {
               </div>
               <button
                 type="submit"
-                disabled={status !== "idle"}
+                disabled={status === "loading" || status === "success"}
                 className="inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white text-base font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-stone-900 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
               >
                 {status === "loading" ? (
@@ -467,6 +502,15 @@ const CTASection = () => {
               className="mt-4 text-center text-emerald-400 font-medium"
             >
               Welcome aboard! Check your inbox for next steps.
+            </motion.p>
+          )}
+          {status === "error" && (
+            <motion.p 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 text-center text-red-400 font-medium"
+            >
+              {errorMessage}
             </motion.p>
           )}
           

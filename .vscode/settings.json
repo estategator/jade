@@ -1,0 +1,4 @@
+{
+    "github.copilot.chat.copilotMemory.enabled": true,
+    "github.copilot.chat.tools.defaultToolsGrouped": true
+}

@@ -17,6 +17,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import Link from "next/link";
 import { subscribeUser } from "@/app/actions";
+import { Navbar } from "@/app/components/navbar";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -70,23 +71,7 @@ const Countdown = () => {
   );
 };
 
-const Navbar = () => {
-  return (
-    <nav className="sticky top-0 left-0 right-0 z-40 bg-stone-50/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-stone-200/50 dark:border-zinc-800/50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-stone-900 dark:bg-white rounded-lg flex items-center justify-center text-white dark:text-stone-900 font-bold">C</div>
-            <span className="text-xl font-bold text-stone-900 dark:text-white tracking-tight">Curator</span>
-          </div>
-          <div className="text-sm font-medium text-stone-500">
-            Launching Feb 2026
-          </div>
-        </div>
-      </div>
-    </nav>
-  );
-};
+// Navbar component is now in components/navbar.tsx
 
 const Hero = () => {
   const [email, setEmail] = useState("");
@@ -537,12 +522,54 @@ const CTASection = () => {
 const Footer = () => {
   return (
     <footer className="bg-stone-50 dark:bg-zinc-950 border-t border-stone-200 dark:border-zinc-800 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-stone-900 dark:bg-white rounded flex items-center justify-center text-white dark:text-stone-900 text-xs font-bold">C</div>
-          <span className="font-bold text-stone-900 dark:text-white">Curator</span>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          {/* Brand */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-stone-900 dark:bg-white rounded flex items-center justify-center text-white dark:text-stone-900 text-xs font-bold">
+                C
+              </div>
+              <span className="font-bold text-stone-900 dark:text-white">Curator</span>
+            </div>
+            <p className="text-sm text-stone-500 dark:text-zinc-400">AI-powered estate sales management</p>
+          </div>
+
+          {/* Product */}
+          <div className="flex flex-col gap-3">
+            <h4 className="font-semibold text-stone-900 dark:text-white">Product</h4>
+            <Link href="/#features" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+              Features
+            </Link>
+            <Link href="/pricing" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+              Pricing
+            </Link>
+          </div>
+
+          {/* Company */}
+          <div className="flex flex-col gap-3">
+            <h4 className="font-semibold text-stone-900 dark:text-white">Company</h4>
+            <Link href="/" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+              About
+            </Link>
+          </div>
+
+          {/* Legal */}
+          <div className="flex flex-col gap-3">
+            <h4 className="font-semibold text-stone-900 dark:text-white">Legal</h4>
+            <Link href="/privacy" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+              Terms of Service
+            </Link>
+          </div>
         </div>
-        <p className="text-sm text-stone-500">© 2026 Curator Inc. All rights reserved.</p>
+
+        {/* Bottom bar */}
+        <div className="border-t border-stone-200 dark:border-zinc-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-sm text-stone-500 dark:text-zinc-400">© 2026 Curator Inc. All rights reserved.</p>
+        </div>
       </div>
     </footer>
   );
@@ -551,7 +578,7 @@ const Footer = () => {
 export default function Home() {
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
-      <Navbar />
+      <Navbar launchBadge="Launching Feb 2026" />
       <main>
         <Hero />
         <Features />

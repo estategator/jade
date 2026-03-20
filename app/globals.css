@@ -1,8 +1,49 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --brand-primary: #6366f1;
+  --brand-accent: #10b981;
+  --app-font-size: 16px;
+
+  /* Semantic interaction tokens (light mode) */
+  --color-focus-ring: #6366f1;
+  --color-brand-primary: #6366f1;
+  --color-brand-primary-hover: #4f46e5;
+  --color-brand-subtle: rgb(224 242 254 / 0.1);
+  --color-success: #10b981;
+}
+
+/* Explicit theme attribute selectors (replaces complex media-query negation) */
+:root[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* Semantic interaction tokens (dark mode) */
+  --color-brand-primary-hover: #4f46e5;
+  --color-brand-subtle: rgb(79 70 229 / 0.2);
+}
+
+:root[data-theme="system"][data-system-dark="true"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* Semantic interaction tokens (system dark) */
+  --color-brand-primary-hover: #4f46e5;
+  --color-brand-subtle: rgb(79 70 229 / 0.2);
+}
+
+/* System light (explicit, prevents media-query override) */
+:root[data-theme="system"][data-system-dark="false"] {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Semantic interaction tokens (system light) */
+  --color-brand-primary-hover: #4f46e5;
+  --color-brand-subtle: rgb(224 242 254 / 0.1);
 }
 
 @theme inline {
@@ -12,15 +53,25 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
+  font-size: var(--app-font-size);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fade-in-up 0.5s ease-out forwards;
 }

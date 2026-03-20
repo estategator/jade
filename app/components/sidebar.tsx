@@ -14,6 +14,7 @@ import {
   PanelLeftOpen,
   TrendingUp,
   Bell,
+  Megaphone,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { OrgSwitcher } from "@/app/components/org-switcher";
@@ -96,6 +97,7 @@ export function Sidebar() {
         { label: "Dashboard", href: "/dashboard", icon: BarChart3 },
         { label: "Inventory", href: "/inventory", icon: Package },
         { label: "Pricing", href: "/pricing-optimization", icon: TrendingUp },
+        { label: "Marketing", href: "/marketing", icon: Megaphone },
       ],
     },
     {

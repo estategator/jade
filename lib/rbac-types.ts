@@ -19,7 +19,11 @@ export type Permission =
   | 'settings:manage'
   | 'settings:view'
   | 'analytics:view'
-  | 'sales:view';
+  | 'sales:view'
+  | 'marketing:view'
+  | 'marketing:create'
+  | 'marketing:update'
+  | 'marketing:delete';
 
 export type OrgRole = 'superadmin' | 'admin' | 'member';
 
@@ -41,4 +45,7 @@ export type AuditAction =
   | 'billing.stripe_connected'
   | 'inventory.created'
   | 'inventory.updated'
-  | 'inventory.deleted';
+  | 'inventory.deleted'
+  | 'marketing.created'
+  | 'marketing.updated'
+  | 'marketing.deleted';

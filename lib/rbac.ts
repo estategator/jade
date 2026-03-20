@@ -16,6 +16,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:view',
     'settings:manage', 'settings:view',
     'analytics:view', 'sales:view',
+    'marketing:view', 'marketing:create', 'marketing:update', 'marketing:delete',
   ],
   admin: [
     'org:update',
@@ -24,6 +25,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:view',
     'settings:manage', 'settings:view',
     'analytics:view', 'sales:view',
+    'marketing:view', 'marketing:create', 'marketing:update', 'marketing:delete',
   ],
   member: [
     'members:view',
@@ -31,6 +33,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:view',
     'settings:view',
     'analytics:view', 'sales:view',
+    'marketing:view', 'marketing:create',
   ],
 } as const;
 

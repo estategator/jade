@@ -1097,3 +1097,120 @@ select
   now()
 from organizations o
 on conflict (org_id) do nothing;
+
+-- =========================
+-- 15. Marketing assets (org-scoped generated materials)
+-- =========================
+create table if not exists marketing_assets (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations (id) on delete cascade,
+  project_id        uuid references projects (id) on delete set null,
+  created_by        uuid not null references auth.users (id) on delete cascade,
+  template_id       text not null,
+  title             text not null default '',
+  headline          text not null default '',
+  body              text not null default '',
+  cta               text not null default '',
+  source_image_url  text,
+  generated_image_url text,
+  status            text not null default 'draft'
+                      check (status in ('draft', 'generating', 'ready', 'failed')),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+create index if not exists idx_marketing_assets_org
+  on marketing_assets (org_id, created_at desc);
+
+create index if not exists idx_marketing_assets_project
+  on marketing_assets (project_id)
+  where project_id is not null;
+
+-- ---- marketing_assets RLS ----
+alter table marketing_assets enable row level security;
+
+-- Org members can view marketing assets in their orgs
+create policy "Org members can view marketing assets"
+  on marketing_assets for select
+  to authenticated
+  using (
+    exists (
+      select 1 from org_members
+      where org_members.org_id = marketing_assets.org_id
+        and org_members.user_id = auth.uid()
+    )
+  );
+
+-- Org members can create marketing assets in their orgs
+create policy "Org members can create marketing assets"
+  on marketing_assets for insert
+  to authenticated
+  with check (
+    auth.uid() = created_by
+    and exists (
+      select 1 from org_members
+      where org_members.org_id = marketing_assets.org_id
+        and org_members.user_id = auth.uid()
+    )
+  );
+
+-- Creators, admins, and superadmins can update marketing assets
+create policy "Creators and admins can update marketing assets"
+  on marketing_assets for update
+  to authenticated
+  using (
+    auth.uid() = created_by
+    or exists (
+      select 1 from org_members
+      where org_members.org_id = marketing_assets.org_id
+        and org_members.user_id = auth.uid()
+        and org_members.role in ('superadmin', 'admin')
+    )
+  );
+
+-- Creators, admins, and superadmins can delete marketing assets
+create policy "Creators and admins can delete marketing assets"
+  on marketing_assets for delete
+  to authenticated
+  using (
+    auth.uid() = created_by
+    or exists (
+      select 1 from org_members
+      where org_members.org_id = marketing_assets.org_id
+        and org_members.user_id = auth.uid()
+        and org_members.role in ('superadmin', 'admin')
+    )
+  );
+
+-- Seed marketing permissions into the global permissions table
+insert into permissions (id) values
+  ('marketing:view'),
+  ('marketing:create'),
+  ('marketing:update'),
+  ('marketing:delete')
+on conflict (id) do nothing;
+
+-- Grant marketing permissions to default roles
+insert into role_permissions (org_role_id, permission_id)
+select r.id, p.id
+from org_roles r
+cross join permissions p
+where r.name = 'superadmin' and r.org_id is null
+  and p.id in ('marketing:view', 'marketing:create', 'marketing:update', 'marketing:delete')
+on conflict (org_role_id, permission_id) do nothing;
+
+insert into role_permissions (org_role_id, permission_id)
+select r.id, p.id
+from org_roles r
+cross join permissions p
+where r.name = 'admin' and r.org_id is null
+  and p.id in ('marketing:view', 'marketing:create', 'marketing:update', 'marketing:delete')
+on conflict (org_role_id, permission_id) do nothing;
+
+insert into role_permissions (org_role_id, permission_id)
+select r.id, p.id
+from org_roles r
+cross join permissions p
+where r.name = 'member' and r.org_id is null
+  and p.id in ('marketing:view', 'marketing:create')
+on conflict (org_role_id, permission_id) do nothing;

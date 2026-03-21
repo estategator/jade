@@ -118,7 +118,7 @@ export default function NotificationsPage() {
     <div>
       <PageHeader
         title="Notifications"
-        description="Stay up to date with organization invites and activity."
+        description={unreadCount > 0 ? `You have ${unreadCount} unread ${unreadCount === 1 ? "notification" : "notifications"} — manage invites, updates, and team activity.` : "You’re all caught up — no unread notifications."}
       />
 
       {error && (

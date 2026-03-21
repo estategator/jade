@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { SettingsProvider } from "@/app/components/settings-provider";
 import { DashboardLayoutWrapper } from "@/app/components/dashboard-layout-wrapper";
@@ -110,6 +111,7 @@ export default async function RootLayout({
             children
           )}
         </SettingsProvider>
+        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );

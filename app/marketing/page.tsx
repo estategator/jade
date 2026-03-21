@@ -26,7 +26,7 @@ export default async function MarketingPage() {
       <main className="px-4 py-12 sm:px-6 lg:px-8">
         <PageHeader
           title="Marketing"
-          description="Create marketing materials for your estate sales."
+          description="Generate AI-powered flyers, social posts, and signage for your estate sales."
         />
         <div className="rounded-2xl border border-stone-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-stone-500 dark:text-zinc-400">
@@ -47,7 +47,7 @@ export default async function MarketingPage() {
     <main className="px-4 py-12 sm:px-6 lg:px-8">
       <PageHeader
         title="Marketing"
-        description="Create and manage marketing materials for your estate sales."
+        description="Create and manage AI-powered flyers, social posts, and signage for your estate sales."
       />
       <MarketingDashboard
         assets={assetsResult.data ?? []}

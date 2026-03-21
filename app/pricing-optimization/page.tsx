@@ -29,7 +29,7 @@ export default async function PricingOptimizationPage({}: PageProps) {
     <main className="px-4 sm:px-6 lg:px-8 py-12">
       <PageHeader
         title="Pricing Optimization"
-        description="Upload item images and get AI-powered price suggestions for each condition. Add results directly to your inventory."
+        description="Upload item photos to get AI-powered pricing across Fair, Good, and Excellent conditions — then add results directly to your inventory."
         backLink={{ href: '/inventory', label: 'Back to inventory' }}
       />
 

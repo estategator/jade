@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import {
   ScanLine,
@@ -25,6 +26,7 @@ import {
   DashboardRevenueChart,
   DashboardCategoryChart,
 } from "./_components/dashboard-charts";
+import { DashboardErrorToast } from "./_components/dashboard-error-toast";
 
 export default async function DashboardPage({
   searchParams,
@@ -41,8 +43,8 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  // ── Subscription debug logging ──────────────────────────
-  if (params.subscription === 'success') {
+  // ── Subscription debug logging (dev only) ──────────────
+  if (process.env.NODE_ENV === 'development' && params.subscription === 'success') {
     console.log('[dashboard] ?subscription=success — checking subscription state for user:', user.id);
 
     // Find all orgs the user belongs to
@@ -70,14 +72,27 @@ export default async function DashboardPage({
     }
   }
 
+  const cookieStore = await cookies();
+  const activeOrgId = cookieStore.get("curator_active_org")?.value ?? null;
+
   const [statsRes, catRes, revRes, salesRes, salesRevRes] = await Promise.all([
-    getDashboardStats(user.id),
-    getCategoryBreakdown(user.id),
-    getRevenueByMonth(user.id),
-    getRecentSales(user.id),
-    getSalesRevenue(user.id),
+    getDashboardStats(user.id, activeOrgId),
+    getCategoryBreakdown(user.id, activeOrgId),
+    getRevenueByMonth(user.id, activeOrgId),
+    getRecentSales(user.id, activeOrgId),
+    getSalesRevenue(user.id, activeOrgId),
   ]);
 
+  // ── Aggregate errors ────────────────────────────────────
+  const errors: string[] = [
+    statsRes.error,
+    catRes.error,
+    revRes.error,
+    salesRes.error,
+    salesRevRes.error,
+  ].filter((e): e is string => !!e);
+
+  const statsLoaded = !statsRes.error;
   const stats = statsRes.data;
   const categories = catRes.data || [];
   const revenueData = revRes.data || [];
@@ -167,13 +182,14 @@ export default async function DashboardPage({
     },
   ];
 
-  const hasData = (stats?.totalItems ?? 0) > 0;
+  const hasData = statsLoaded && (stats?.totalItems ?? 0) > 0;
 
   return (
     <>
+      <DashboardErrorToast errors={errors} />
       <PageHeader
         title={`Welcome back, ${displayName}`}
-        description="Here's an overview of your estate sales workspace."
+        description="Track inventory, sales, and revenue across your estate sales at a glance."
       />
 
       {/* Stats */}
@@ -308,8 +324,8 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* Empty state — only when no inventory exists */}
-      {!hasData && (
+      {/* Empty state — only when data loaded successfully and actual counts are zero */}
+      {!hasData && statsLoaded && (
         <div className="mt-10 rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900 animate-fade-in-up [animation-delay:400ms] fill-mode-both">
           <ScanLine className="mx-auto mb-4 h-10 w-10 text-stone-400 dark:text-zinc-600" />
           <h3 className="text-lg font-bold text-stone-900 dark:text-white">

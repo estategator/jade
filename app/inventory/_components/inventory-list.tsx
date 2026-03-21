@@ -21,6 +21,7 @@ import {
   ImageOff,
   MoreHorizontal,
   QrCode,
+  Images,
 } from "lucide-react";
 import { PageHeader } from "@/app/components/page-header";
 import {
@@ -322,9 +323,9 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
     <main className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <PageHeader
         title="Inventory"
-        description={`${items.length} ${items.length === 1 ? "item" : "items"} total`}
+        description={`Manage and track all your estate sale items — ${items.length} ${items.length === 1 ? "item" : "items"} across all projects.`}
         actions={[
-          { label: "Bulk add", href: "/inventory/bulk", variant: "secondary" },
+          { label: "Bulk add", href: "/inventory/bulk", icon: Images, variant: "secondary" },
           { label: "Add item", href: "/inventory/add", icon: Plus, variant: "primary" },
         ]}
       />

@@ -319,7 +319,7 @@ export default function OrganizationDetailPage() {
               <div className="flex items-center gap-2">
                 {canManage && (
                   <Link
-                    href="/settings"
+                    href={`/organizations/${orgId}/settings`}
                     className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-all hover:border-stone-300 hover:bg-stone-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
                   >
                     <Settings className="h-4 w-4" />

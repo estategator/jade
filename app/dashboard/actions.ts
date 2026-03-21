@@ -210,8 +210,13 @@ export type Sale = {
   inventory_items?: { name: string } | null;
 };
 
-export async function getRecentSales(userId: string) {
+export async function getRecentSales(userId: string, orgId?: string | null) {
   try {
+    if (orgId) {
+      const membership = await requireOrgMembership(orgId, userId);
+      if ('error' in membership) return { error: membership.error };
+    }
+
     // Get orgs the user belongs to
     const { data: memberships, error: memErr } = await supabase
       .from('org_members')
@@ -223,7 +228,8 @@ export async function getRecentSales(userId: string) {
       return { error: 'Failed to load sales.' };
     }
 
-    const orgIds = (memberships ?? []).map((m) => m.org_id);
+    let orgIds = (memberships ?? []).map((m) => m.org_id);
+    if (orgId) orgIds = orgIds.filter((id) => id === orgId);
     if (orgIds.length === 0) return { data: [] };
 
     const { data, error } = await supabase
@@ -245,8 +251,13 @@ export async function getRecentSales(userId: string) {
   }
 }
 
-export async function getSalesRevenue(userId: string) {
+export async function getSalesRevenue(userId: string, orgId?: string | null) {
   try {
+    if (orgId) {
+      const membership = await requireOrgMembership(orgId, userId);
+      if ('error' in membership) return { error: membership.error };
+    }
+
     const { data: memberships, error: memErr } = await supabase
       .from('org_members')
       .select('org_id')
@@ -257,7 +268,8 @@ export async function getSalesRevenue(userId: string) {
       return { error: 'Failed to load sales revenue.' };
     }
 
-    const orgIds = (memberships ?? []).map((m) => m.org_id);
+    let orgIds = (memberships ?? []).map((m) => m.org_id);
+    if (orgId) orgIds = orgIds.filter((id) => id === orgId);
     if (orgIds.length === 0) return { data: { total: 0, count: 0 } };
 
     const { data, error } = await supabase

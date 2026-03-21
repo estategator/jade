@@ -1396,7 +1396,7 @@ export async function createBillingPortalSession(orgId: string, userId: string) 
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/settings`,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/organizations/${orgId}/settings/billing`,
     });
 
     return { success: true, url: portalSession.url };

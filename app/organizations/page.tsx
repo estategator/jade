@@ -77,7 +77,7 @@ export default function OrganizationsPage() {
     <>
       <PageHeader
           title="Organizations"
-          description={`${orgs.length} ${orgs.length === 1 ? "organization" : "organizations"}`}
+          description={`Manage your teams, projects, and billing — ${orgs.length} ${orgs.length === 1 ? "organization" : "organizations"}.`}
           actions={[
             { label: "New organization", href: "/organizations/new", icon: Plus, variant: "primary" },
           ]}

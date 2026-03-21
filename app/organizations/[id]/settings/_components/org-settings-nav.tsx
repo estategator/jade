@@ -15,7 +15,10 @@ export function OrgSettingsNav({ orgId }: Readonly<{ orgId: string }>) {
   const base = `/organizations/${orgId}/settings`;
 
   return (
-    <div className="mt-6 grid grid-cols-2 gap-1 rounded-xl border border-stone-200 bg-stone-100 p-1 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-4">
+    <nav
+      aria-label="Settings sections"
+      className="mt-6 grid grid-cols-2 gap-1 rounded-xl border border-stone-200 bg-stone-100 p-1 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-4"
+    >
       {tabs.map((t) => {
         const href = `${base}${t.segment}`;
         const isActive =
@@ -27,6 +30,7 @@ export function OrgSettingsNav({ orgId }: Readonly<{ orgId: string }>) {
           <Link
             key={t.key}
             href={href}
+            aria-current={isActive ? "page" : undefined}
             className={`flex-1 rounded-lg px-4 py-2 text-center text-sm font-medium transition-all ${
               isActive
                 ? "bg-white text-stone-900 shadow-sm dark:bg-zinc-800 dark:text-white"
@@ -37,6 +41,6 @@ export function OrgSettingsNav({ orgId }: Readonly<{ orgId: string }>) {
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

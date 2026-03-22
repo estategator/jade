@@ -130,7 +130,7 @@ export function Sidebar() {
     {
       title: "Support",
       items: [
-        { label: "Help", href: "/help", icon: HelpCircle },
+        { label: "Help", href: "/dashboard/help", icon: HelpCircle },
         { label: "Tickets", href: "/tickets", icon: Ticket },
       ],
     },

@@ -58,7 +58,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   high: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20",
 };
 
-export default function TicketDetailPage() {
+export default function DashboardTicketDetailPage() {
   const params = useParams();
   const router = useRouter();
   const ticketId = params.id as string;
@@ -123,7 +123,6 @@ export default function TicketDetailPage() {
 
     setReplyText("");
     setReplySubmitting(false);
-    // Reload ticket
     loadTicket(orgId);
   }
 

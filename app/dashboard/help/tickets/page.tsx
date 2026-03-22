@@ -45,7 +45,7 @@ const STATUS_CONFIG: Record<
   },
 };
 
-export default function TicketsPage() {
+export default function DashboardTicketsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);

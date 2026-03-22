@@ -11,7 +11,7 @@ export function isAppRoute(pathname: string): boolean {
     "/organizations",
     "/upgrade",
     "/notifications",
-    "/help",
+    "/dashboard/help",
     "/tickets",
     "/developer",
   ];

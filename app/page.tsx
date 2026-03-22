@@ -30,8 +30,8 @@ const Countdown = () => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    // Set launch date to 30 days from Jan 4, 2026 -> Feb 3, 2026
-    const launchDate = new Date("2026-02-03T00:00:00").getTime();
+    // Set launch date to April 15, 2026
+    const launchDate = new Date("2026-04-15T00:00:00").getTime();
 
     const interval = setInterval(() => {
       const now = new Date().getTime();

@@ -1,4 +1,4 @@
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'dark';
 export type FontSize = 'sm' | 'base' | 'lg' | 'xl';
 
 export type AppSettings = {
@@ -18,7 +18,7 @@ export const SETTING_KEYS: (keyof AppSettings)[] = [
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'system',
+  theme: 'light',
   fontSize: 'base',
   brandPrimary: null,
   brandAccent: null,
@@ -78,6 +78,11 @@ export function resolveSettings(
         (effective as Record<string, unknown>)[key] = val;
       }
     }
+  }
+
+  // Coerce legacy "system" theme to "light"
+  if ((effective.theme as string) === 'system') {
+    effective.theme = 'light';
   }
 
   // Layer 2: Force org-enforced keys (overrides user prefs)

@@ -36,8 +36,8 @@ const statusConfig: Record<
   reserved: {
     label: "Reserved",
     className:
-      "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-400 dark:ring-indigo-400/20",
-    dot: "bg-indigo-500",
+      "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)] ring-1 ring-[var(--color-brand-primary)]/20",
+    dot: "bg-[var(--color-brand-primary)]",
   },
 };
 
@@ -146,7 +146,7 @@ export default async function PublicItemPage({
               {insights && (
                 <div className="hidden lg:block rounded-2xl border border-stone-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
                   <div className="mb-3 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-indigo-500" />
+                    <Sparkles className="h-4 w-4 text-[var(--color-brand-primary)]" />
                     <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
                       AI Price Analysis
                     </h3>
@@ -165,7 +165,7 @@ export default async function PublicItemPage({
                           key={label}
                           className={`rounded-xl px-3 py-2.5 text-center ${
                             item.condition === label
-                              ? "bg-indigo-50 ring-2 ring-indigo-500/30 dark:bg-indigo-900/30 dark:ring-indigo-400/30"
+                              ? "bg-[var(--color-brand-subtle)] ring-2 ring-[var(--color-brand-primary)]/30"
                               : "bg-stone-50 dark:bg-zinc-800"
                           }`}
                         >

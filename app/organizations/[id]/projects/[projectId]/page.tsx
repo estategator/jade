@@ -65,6 +65,7 @@ export default function ProjectEditPage() {
   const [zipCode, setZipCode] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [published, setPublished] = useState(false);
@@ -121,6 +122,7 @@ export default function ProjectEditPage() {
     }
     setError("");
     setImageFile(file);
+    setImageRemoved(false);
     setImagePreview(URL.createObjectURL(file));
   }
 
@@ -139,6 +141,7 @@ export default function ProjectEditPage() {
   function removeImage() {
     setImageFile(null);
     setImagePreview(null);
+    setImageRemoved(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -163,6 +166,8 @@ export default function ProjectEditPage() {
     formData.append("zip_code", zipCode);
     if (imageFile) {
       formData.append("image", imageFile);
+    } else if (imageRemoved) {
+      formData.append("remove_image", "true");
     }
 
     const result = await updateProject(projectId, formData);
@@ -175,6 +180,7 @@ export default function ProjectEditPage() {
       }
       setSuccess(result.warning ? "" : "Project updated.");
       setImageFile(null);
+      setImageRemoved(false);
       // Refresh project data
       const refreshed = await getProject(projectId);
       if (refreshed.data) {

@@ -35,8 +35,8 @@ const statusConfig: Record<
   reserved: {
     label: "Reserved",
     className:
-      "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-400 dark:ring-indigo-400/20",
-    dot: "bg-indigo-500",
+      "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)] ring-1 ring-[var(--color-brand-primary)]/20",
+    dot: "bg-[var(--color-brand-primary)]",
   },
 };
 
@@ -69,7 +69,7 @@ function ItemCard({ item }: Readonly<{ item: PublicProjectItem }>) {
   return (
     <Link
       href={`/items/${item.id}`}
-      className="group overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all hover:border-indigo-200 hover:shadow-xl dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-800"
+      className="group overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all hover:border-[var(--color-brand-primary)]/20 hover:shadow-xl dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-[var(--color-brand-primary)]/40"
     >
       {/* Image */}
       <div className="relative aspect-square w-full overflow-hidden bg-stone-100 dark:bg-zinc-800">
@@ -173,7 +173,7 @@ export default async function PublicProjectSalePage({
             </div>
           </>
         ) : (
-          <div className="bg-gradient-to-b from-indigo-50 via-stone-50 to-stone-50 dark:from-indigo-950/20 dark:via-zinc-950 dark:to-zinc-950">
+          <div className="bg-gradient-to-b from-[var(--color-brand-subtle)] via-stone-50 to-stone-50 dark:from-[var(--color-brand-primary)]/5 dark:via-zinc-950 dark:to-zinc-950">
             <div className="mx-auto max-w-5xl px-4 pb-16 pt-20 sm:px-6 sm:pb-20 sm:pt-28 lg:px-8">
               <HeroContent project={project} address={address} itemCount={availableItems.length} />
             </div>
@@ -337,7 +337,7 @@ function HeroContent({
           className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm ${
             hasImage
               ? "bg-white text-stone-900 hover:bg-stone-50"
-              : "bg-indigo-600 text-white hover:bg-indigo-700"
+              : "bg-[var(--color-brand-primary)] text-white hover:bg-[var(--color-brand-primary-hover)]"
           }`}
         >
           <Store className="h-4 w-4" />

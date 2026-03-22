@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sun, Moon, Monitor } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useSettings } from "@/app/components/settings-provider";
 import type { ThemeMode } from "@/lib/settings";
 
-const CYCLE: ThemeMode[] = ["light", "dark", "system"];
+const CYCLE: ThemeMode[] = ["light", "dark"];
 
 const ICONS: Record<ThemeMode, typeof Sun> = {
   light: Sun,
   dark: Moon,
-  system: Monitor,
 };
 
 export function ThemeToggle() {

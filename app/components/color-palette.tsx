@@ -121,7 +121,7 @@ export function ColorPalette({
           ${
             value === null || disabled
               ? "text-stone-400 dark:text-zinc-600 cursor-not-allowed"
-              : "text-stone-500 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+              : "text-stone-500 dark:text-zinc-400 hover:text-[var(--color-brand-primary)] cursor-pointer"
           }
         `}
       >

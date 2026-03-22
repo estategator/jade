@@ -22,7 +22,7 @@ export default function CheckoutSuccessPage() {
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-stone-50 dark:bg-zinc-950">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-brand-primary)]" />
       </div>
     );
   }

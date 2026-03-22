@@ -51,21 +51,12 @@ export function useSettings() {
 function applyThemeToDOM(theme: AppSettings["theme"]) {
   const root = document.documentElement;
   
-  // Set explicit theme attribute and system dark state
   if (theme === "dark") {
     root.setAttribute("data-theme", "dark");
-    root.removeAttribute("data-system-dark");
     root.classList.add("dark");
-  } else if (theme === "light") {
-    root.setAttribute("data-theme", "light");
-    root.removeAttribute("data-system-dark");
-    root.classList.remove("dark");
   } else {
-    // system: follow OS preference
-    root.setAttribute("data-theme", "system");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    root.setAttribute("data-system-dark", prefersDark ? "true" : "false");
-    root.classList.toggle("dark", prefersDark);
+    root.setAttribute("data-theme", "light");
+    root.classList.remove("dark");
   }
 }
 
@@ -210,15 +201,6 @@ export function SettingsProvider({
     init();
     return () => { cancelled = true; };
   }, [userId, activeOrgId]);
-
-  // Listen for system theme changes when mode is "system"
-  useEffect(() => {
-    if (resolved.effective.theme !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => applyThemeToDOM("system");
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [resolved.effective.theme]);
 
   // Apply settings to DOM whenever they change
   useEffect(() => {

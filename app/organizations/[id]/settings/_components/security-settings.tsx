@@ -143,8 +143,8 @@ function SettingToggleRow({
         disabled={disabled}
         role="switch"
         aria-checked={enabled}
-        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-          enabled ? "bg-indigo-600" : "bg-stone-200 dark:bg-zinc-700"
+        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+          enabled ? "bg-[var(--color-brand-primary)]" : "bg-stone-200 dark:bg-zinc-700"
         }`}
       >
         <span
@@ -159,7 +159,7 @@ function SettingToggleRow({
 
 function EnterpriseBadge() {
   return (
-    <span className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+    <span className="inline-flex items-center gap-0.5 rounded bg-[var(--color-brand-subtle)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--color-brand-primary)]">
       <Lock className="h-2 w-2" />
       Pro
     </span>

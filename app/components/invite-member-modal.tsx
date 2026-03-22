@@ -94,7 +94,7 @@ export function InviteMemberModal({
 
             <div className="mb-6">
               <div className="mb-3 flex items-center gap-2">
-                <Mail className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <Mail className="h-5 w-5 text-[var(--color-brand-primary)]" />
                 <h2 className="text-2xl font-bold text-stone-900 dark:text-white">
                   Invite member
                 </h2>
@@ -123,7 +123,7 @@ export function InviteMemberModal({
                   }}
                   placeholder="member@example.com"
                   disabled={isLoading}
-                  className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+                  className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
                 />
               </div>
 
@@ -139,7 +139,7 @@ export function InviteMemberModal({
                   value={role}
                   onChange={(e) => setRole(e.target.value as "admin" | "member")}
                   disabled={isLoading}
-                  className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                  className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
@@ -173,10 +173,10 @@ export function InviteMemberModal({
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/40"
+                  className="flex items-start gap-3 rounded-lg border border-[var(--color-brand-primary)]/20 bg-[var(--color-brand-subtle)] p-3"
                 >
-                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
-                  <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-brand-primary)]" />
+                  <p className="text-sm text-[var(--color-brand-primary)]">
                     {warning}
                   </p>
                 </motion.div>
@@ -200,7 +200,7 @@ export function InviteMemberModal({
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--color-brand-primary)] px-6 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-[var(--color-brand-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] focus:ring-offset-2"
                   >
                     Done
                   </button>
@@ -209,7 +209,7 @@ export function InviteMemberModal({
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--color-brand-primary)] px-6 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-[var(--color-brand-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                       {isLoading ? "Sending..." : "Send invite"}

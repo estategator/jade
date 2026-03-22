@@ -94,11 +94,11 @@ export function TutorialsPageContent({ basePath }: Readonly<TutorialsPageContent
             {TUTORIALS.filter((t) => t.category === category).map((tut) => (
               <div
                 key={tut.title}
-                className="group relative overflow-hidden rounded-xl border border-stone-200 bg-white transition-colors hover:border-indigo-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-indigo-700"
+                className="group relative overflow-hidden rounded-xl border border-stone-200 bg-white transition-colors hover:border-[var(--color-brand-primary)]/30 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-[var(--color-brand-primary)]/40"
               >
                 {/* Placeholder thumbnail */}
                 <div className="flex h-40 items-center justify-center bg-stone-100 dark:bg-zinc-800">
-                  <PlayCircle className="h-12 w-12 text-stone-300 transition-colors group-hover:text-indigo-500 dark:text-zinc-600 dark:group-hover:text-indigo-400" />
+                  <PlayCircle className="h-12 w-12 text-stone-300 transition-colors group-hover:text-[var(--color-brand-primary)] dark:text-zinc-600" />
                 </div>
                 <div className="p-4">
                   <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ export function TutorialsPageContent({ basePath }: Readonly<TutorialsPageContent
         More tutorials coming soon. Have a suggestion?{" "}
         <Link
           href={basePath}
-          className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+          className="text-[var(--color-brand-primary)] hover:opacity-80"
         >
           Let us know
         </Link>

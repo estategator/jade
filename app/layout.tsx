@@ -43,33 +43,23 @@ export default async function RootLayout({
               (function() {
                 try {
                   // 1. Get active org from cookie
-                  const match = document.cookie.match(/(?:^|; )curator_active_org=([^;]*)/);
-                  const orgId = match ? decodeURIComponent(match[1]) : null;
+                  var match = document.cookie.match(/(?:^|; )curator_active_org=([^;]*)/);
+                  var orgId = match ? decodeURIComponent(match[1]) : null;
                   
                   // 2. Check localStorage for cached settings
-                  const cacheKey = 'curator_settings_' + (orgId || 'default');
-                  const cached = localStorage.getItem(cacheKey);
+                  var cacheKey = 'curator_settings_' + (orgId || 'default');
+                  var cached = localStorage.getItem(cacheKey);
                   
                   if (cached) {
                     try {
-                      const parsed = JSON.parse(cached);
-                      const theme = parsed.theme || 'system';
+                      var parsed = JSON.parse(cached);
+                      var theme = parsed.theme === 'dark' ? 'dark' : 'light';
                       
-                      // Apply explicit theme attributes and dark class
+                      document.documentElement.setAttribute('data-theme', theme);
                       if (theme === 'dark') {
-                        document.documentElement.setAttribute('data-theme', 'dark');
-                        document.documentElement.removeAttribute('data-system-dark');
                         document.documentElement.classList.add('dark');
-                      } else if (theme === 'light') {
-                        document.documentElement.setAttribute('data-theme', 'light');
-                        document.documentElement.removeAttribute('data-system-dark');
-                        document.documentElement.classList.remove('dark');
                       } else {
-                        // system theme: detect and set
-                        document.documentElement.setAttribute('data-theme', 'system');
-                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                        document.documentElement.setAttribute('data-system-dark', prefersDark ? 'true' : 'false');
-                        document.documentElement.classList.toggle('dark', prefersDark);
+                        document.documentElement.classList.remove('dark');
                       }
                       
                       // Apply CSS variables
@@ -84,15 +74,13 @@ export default async function RootLayout({
                       }
                       return;
                     } catch (e) {
-                      // Invalid cache, fall through to system preference
+                      // Invalid cache, fall through to default
                     }
                   }
                   
-                  // 3. Fallback: Apply system preference (no cached theme found)
-                  document.documentElement.setAttribute('data-theme', 'system');
-                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  document.documentElement.setAttribute('data-system-dark', prefersDark ? 'true' : 'false');
-                  document.documentElement.classList.toggle('dark', prefersDark);
+                  // 3. Fallback: light theme
+                  document.documentElement.setAttribute('data-theme', 'light');
+                  document.documentElement.classList.remove('dark');
                 } catch (e) {
                   // Silently fail; hydration will apply correct theme
                 }

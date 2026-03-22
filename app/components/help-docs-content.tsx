@@ -162,7 +162,7 @@ export function DocsPageContent({ basePath }: Readonly<DocsPageContentProps>) {
               <li key={section.id}>
                 <a
                   href={`#${section.id}`}
-                  className="inline-flex items-center gap-2 text-sm text-indigo-600 transition-colors hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                  className="inline-flex items-center gap-2 text-sm text-[var(--color-brand-primary)] transition-colors hover:opacity-80"
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {section.title}
@@ -180,7 +180,7 @@ export function DocsPageContent({ basePath }: Readonly<DocsPageContentProps>) {
           return (
             <section key={section.id} id={section.id}>
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]">
                   <Icon className="h-5 w-5" />
                 </div>
                 <h2 className="text-xl font-bold text-stone-900 dark:text-white">

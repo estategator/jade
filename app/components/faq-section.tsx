@@ -45,7 +45,7 @@ export function FaqSection({ tier = "free" }: FaqSectionProps) {
             setSearchQuery(e.target.value);
             setExpandedId(null);
           }}
-          className="w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-10 pr-4 text-sm text-stone-900 placeholder:text-stone-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500 dark:focus:border-indigo-500"
+          className="w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-10 pr-4 text-sm text-stone-900 placeholder:text-stone-400 focus:border-[var(--color-brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)]/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500 dark:focus:border-[var(--color-brand-primary)]"
         />
       </div>
 
@@ -61,7 +61,7 @@ export function FaqSection({ tier = "free" }: FaqSectionProps) {
             className={cn(
               "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
               activeCategory === null
-                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
                 : "text-stone-500 hover:bg-stone-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
             )}
           >
@@ -78,7 +78,7 @@ export function FaqSection({ tier = "free" }: FaqSectionProps) {
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 activeCategory === cat.id
-                  ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                  ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
                   : "text-stone-500 hover:bg-stone-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
               )}
             >

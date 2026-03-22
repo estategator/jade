@@ -173,14 +173,14 @@ function DocsContent({ basePath }: { basePath: string }) {
           <Link
             key={doc.title}
             href={doc.href}
-            className="group rounded-xl border border-stone-200 bg-white p-5 transition-colors hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/20"
+            className="group rounded-xl border border-stone-200 bg-white p-5 transition-colors hover:border-[var(--color-brand-primary)]/30 hover:bg-[var(--color-brand-subtle)] dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-[var(--color-brand-primary)]/40 dark:hover:bg-[var(--color-brand-subtle)]"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]">
                 <Icon className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="font-medium text-stone-900 group-hover:text-indigo-700 dark:text-white dark:group-hover:text-indigo-400">
+                <h3 className="font-medium text-stone-900 group-hover:text-[var(--color-brand-primary)] dark:text-white">
                   {doc.title}
                 </h3>
                 <p className="mt-0.5 text-sm text-stone-500 dark:text-zinc-400">
@@ -242,7 +242,7 @@ function TutorialsContent() {
           >
             {/* Placeholder thumbnail */}
             <div className="flex h-36 items-center justify-center bg-stone-100 dark:bg-zinc-800">
-              <PlayCircle className="h-10 w-10 text-stone-300 transition-colors group-hover:text-indigo-500 dark:text-zinc-600 dark:group-hover:text-indigo-400" />
+              <PlayCircle className="h-10 w-10 text-stone-300 transition-colors group-hover:text-[var(--color-brand-primary)] dark:text-zinc-600" />
             </div>
             <div className="p-4">
               <div className="flex items-center justify-between">

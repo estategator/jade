@@ -34,7 +34,7 @@ const STATUS_CONFIG: Record<
   open: {
     label: "Open",
     icon: CircleDot,
-    color: "text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/20",
+    color: "text-[var(--color-brand-primary)] bg-[var(--color-brand-subtle)]",
   },
   in_progress: {
     label: "In Progress",
@@ -126,7 +126,7 @@ export default function DeveloperPortalPage() {
       {/* Stats cards */}
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {([
-          { label: "Open", value: stats.open, color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-50 dark:bg-indigo-900/20" },
+          { label: "Open", value: stats.open, color: "text-[var(--color-brand-primary)]", bg: "bg-[var(--color-brand-subtle)]" },
           { label: "In Progress", value: stats.in_progress, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20" },
           { label: "Resolved", value: stats.resolved, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
           { label: "Total", value: stats.total, color: "text-stone-700 dark:text-zinc-300", bg: "bg-stone-50 dark:bg-zinc-800/50" },
@@ -164,7 +164,7 @@ export default function DeveloperPortalPage() {
                 className={cn(
                   "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                   filter === status
-                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                    ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
                     : "text-stone-500 hover:bg-stone-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                 )}
               >
@@ -240,7 +240,7 @@ export default function DeveloperPortalPage() {
                           title={`${ticket.priority} priority`}
                         />
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-stone-900 group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-400">
+                          <p className="truncate font-medium text-stone-900 group-hover:text-[var(--color-brand-primary)] dark:text-white">
                             {ticket.title}
                           </p>
                           <p className="truncate text-xs text-stone-400 dark:text-zinc-500">

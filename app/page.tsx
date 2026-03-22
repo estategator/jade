@@ -103,7 +103,7 @@ const Hero = () => {
     <section className="relative pt-24 pb-20 lg:pt-32 lg:pb-32 overflow-hidden">
       {/* Background Gradients */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
-        <div className="absolute top-20 left-20 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen animate-blob"></div>
+        <div className="absolute top-20 left-20 w-72 h-72 bg-[var(--color-brand-primary)]/10 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen animate-blob"></div>
         <div className="absolute top-20 right-20 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen animate-blob animation-delay-2000"></div>
       </div>
 
@@ -119,7 +119,7 @@ const Hero = () => {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6">
               Estate sales management,{" "}
               <br></br>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">10x faster.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-brand-primary)] to-violet-600">10x faster.</span>
             </h1>
             
             <p className="text-lg text-stone-600 dark:text-zinc-400 mb-6 leading-relaxed max-w-xl mx-auto lg:mx-0">
@@ -157,13 +157,13 @@ const Hero = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email address"
-                  className="block w-full pl-10 pr-3 py-3 border border-stone-300 dark:border-zinc-800 rounded-xl leading-5 bg-white dark:bg-zinc-900 text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm transition-all shadow-sm"
+                  className="block w-full pl-10 pr-3 py-3 border border-stone-300 dark:border-zinc-800 rounded-xl leading-5 bg-white dark:bg-zinc-900 text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] sm:text-sm transition-all shadow-sm"
                 />
               </div>
               <button
                 type="submit"
                 disabled={status === "loading" || status === "success"}
-                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
               >
                 {status === "loading" ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -210,7 +210,7 @@ const Hero = () => {
                 <motion.div 
                   animate={{ y: [0, 450, 0] }}
                   transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-                  className="absolute top-4 left-4 right-4 h-0.5 bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.8)]"
+                  className="absolute top-4 left-4 right-4 h-0.5 bg-[var(--color-brand-primary)] shadow-[0_0_15px_var(--color-brand-primary)]"
                 />
                 
                 {/* Price Tag - appears after scan completes */}
@@ -272,8 +272,8 @@ const Hero = () => {
               className="absolute -right-4 bottom-32 bg-white dark:bg-zinc-800 p-4 rounded-xl shadow-xl border border-stone-200 dark:border-zinc-700 hidden sm:block"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-indigo-600" />
+                <div className="w-10 h-10 bg-[var(--color-brand-subtle)] rounded-lg flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-[var(--color-brand-primary)]" />
                 </div>
                 <div>
                   <p className="text-xs text-stone-500">Total Value</p>
@@ -331,12 +331,12 @@ const Features = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group"
+              className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 hover:shadow-lg hover:border-[var(--color-brand-primary)]/20 dark:hover:border-[var(--color-brand-primary)]/40 transition-all group"
             >
-              <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center mb-4 text-indigo-600 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-[var(--color-brand-subtle)] flex items-center justify-center mb-4 text-[var(--color-brand-primary)] group-hover:bg-[var(--color-brand-subtle)] transition-colors">
                 {feature.icon}
               </div>
-              <span className="inline-block text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-full mb-3">{feature.highlight}</span>
+              <span className="inline-block text-xs font-semibold text-[var(--color-brand-primary)] bg-[var(--color-brand-subtle)] px-2 py-1 rounded-full mb-3">{feature.highlight}</span>
               <h3 className="text-lg font-bold text-stone-900 dark:text-white mb-2">{feature.title}</h3>
               <p className="text-sm text-stone-600 dark:text-zinc-400 leading-relaxed">
                 {feature.description}
@@ -423,7 +423,7 @@ const CTASection = () => {
     <section className="py-24 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-stone-900 dark:bg-black"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-stone-900 to-stone-900"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[var(--color-brand-primary)]/40 via-stone-900 to-stone-900"></div>
       
       {/* Grid pattern overlay */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50"></div>
@@ -435,7 +435,7 @@ const CTASection = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 text-indigo-400 text-sm font-medium mb-6 border border-indigo-500/20">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] text-sm font-medium mb-6 border border-[var(--color-brand-primary)]/20">
               <Zap className="w-4 h-4" />
               Limited Early Access
             </span>
@@ -462,13 +462,13 @@ const CTASection = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your work email"
-                  className="block w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base backdrop-blur-sm transition-all"
+                  className="block w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] focus:border-transparent text-base backdrop-blur-sm transition-all"
                 />
               </div>
               <button
                 type="submit"
                 disabled={status === "loading" || status === "success"}
-                className="inline-flex items-center justify-center px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white text-base font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-stone-900 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
+                className="inline-flex items-center justify-center px-8 py-4 bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)] text-white text-base font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-stone-900 focus:ring-[var(--color-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[var(--color-brand-primary)]/25 hover:shadow-[var(--color-brand-primary)]/40"
               >
                 {status === "loading" ? (
                   <Loader2 className="w-5 h-5 animate-spin" />

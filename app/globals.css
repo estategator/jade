@@ -10,45 +10,38 @@
   --app-font-size: 16px;
 
   /* Semantic interaction tokens (light mode) */
-  --color-focus-ring: #6366f1;
-  --color-brand-primary: #6366f1;
-  --color-brand-primary-hover: #4f46e5;
-  --color-brand-subtle: rgb(224 242 254 / 0.1);
+  --color-focus-ring: var(--brand-primary);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: color-mix(in srgb, var(--brand-primary) 85%, black);
+  --color-brand-subtle: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-hover: color-mix(in srgb, var(--brand-accent) 85%, black);
+  --color-brand-accent-subtle: color-mix(in srgb, var(--brand-accent) 10%, transparent);
   --color-success: #10b981;
 }
 
-/* Explicit theme attribute selectors (replaces complex media-query negation) */
+/* Explicit theme attribute selectors */
 :root[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
 
   /* Semantic interaction tokens (dark mode) */
-  --color-brand-primary-hover: #4f46e5;
-  --color-brand-subtle: rgb(79 70 229 / 0.2);
-}
-
-:root[data-theme="system"][data-system-dark="true"] {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-
-  /* Semantic interaction tokens (system dark) */
-  --color-brand-primary-hover: #4f46e5;
-  --color-brand-subtle: rgb(79 70 229 / 0.2);
-}
-
-/* System light (explicit, prevents media-query override) */
-:root[data-theme="system"][data-system-dark="false"] {
-  --background: #ffffff;
-  --foreground: #171717;
-
-  /* Semantic interaction tokens (system light) */
-  --color-brand-primary-hover: #4f46e5;
-  --color-brand-subtle: rgb(224 242 254 / 0.1);
+  --color-brand-primary-hover: color-mix(in srgb, var(--brand-primary) 80%, white);
+  --color-brand-subtle: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  --color-brand-accent-hover: color-mix(in srgb, var(--brand-accent) 80%, white);
+  --color-brand-accent-subtle: color-mix(in srgb, var(--brand-accent) 15%, transparent);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--color-brand-primary-hover);
+  --color-brand-subtle: var(--color-brand-subtle);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-hover: var(--color-brand-accent-hover);
+  --color-brand-accent-subtle: var(--color-brand-accent-subtle);
+  --color-focus-ring: var(--brand-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

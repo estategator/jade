@@ -166,7 +166,7 @@ export function AppearanceForm({
                       onClick={() => updateOrgField("theme", mode)}
                       className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                         orgTheme === mode
-                          ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                          ? "border-[var(--color-brand-primary)]/30 bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
                           : "border-stone-200 text-stone-600 hover:border-stone-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600"
                       }`}
                     >
@@ -277,7 +277,7 @@ export function AppearanceForm({
             type="button"
             onClick={handleSave}
             disabled={saving || !canManageSettings}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-[var(--color-brand-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save settings
@@ -315,7 +315,7 @@ function SettingRow({
             onClick={() => onSetEnforced(settingKey, !enforced)}
             className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
               enforced
-                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
                 : "bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
             }`}
           >
@@ -325,7 +325,7 @@ function SettingRow({
         ) : (
           <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
             enforced
-              ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+              ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
               : "bg-stone-100 text-stone-500 dark:bg-zinc-800 dark:text-zinc-400"
           }`}>
             <Lock className="h-2.5 w-2.5" />

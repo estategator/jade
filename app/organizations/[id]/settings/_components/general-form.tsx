@@ -63,6 +63,7 @@ export function GeneralForm({
   const [orgImagePreview, setOrgImagePreview] = useState<string | null>(
     initialCoverImageUrl
   );
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [orgDragging, setOrgDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -86,7 +87,11 @@ export function GeneralForm({
     formData.append("city", city);
     formData.append("state", state);
     formData.append("zip_code", zipCode);
-    if (orgImageFile) formData.append("image", orgImageFile);
+    if (orgImageFile) {
+      formData.append("image", orgImageFile);
+    } else if (imageRemoved) {
+      formData.append("remove_image", "true");
+    }
 
     const result = await updateOrganization(orgId, formData);
     if (result.error) {
@@ -94,13 +99,14 @@ export function GeneralForm({
     } else {
       setSuccess(result.warning || "Organization updated.");
       setOrgImageFile(null);
+      setImageRemoved(false);
       const orgResult = await getOrganization(orgId);
       if (orgResult.data) {
         setOrgImagePreview(orgResult.data.cover_image_url ?? null);
       }
     }
     setSaving(false);
-  }, [editOrgName, orgId, orgImageFile, phone, addressLine1, addressLine2, city, state, zipCode]);
+  }, [editOrgName, orgId, orgImageFile, imageRemoved, phone, addressLine1, addressLine2, city, state, zipCode]);
 
   function handleFileSelect(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -113,6 +119,7 @@ export function GeneralForm({
     }
     setError("");
     setOrgImageFile(file);
+    setImageRemoved(false);
     setOrgImagePreview(URL.createObjectURL(file));
   }
 
@@ -285,6 +292,7 @@ export function GeneralForm({
                   onClick={() => {
                     setOrgImageFile(null);
                     setOrgImagePreview(null);
+                    setImageRemoved(true);
                     if (orgFileInputRef.current) orgFileInputRef.current.value = "";
                   }}
                   className="absolute right-2 top-2 rounded-md bg-stone-900/70 p-1 text-white backdrop-blur-sm transition-colors hover:bg-stone-900"

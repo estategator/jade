@@ -82,7 +82,7 @@ export default function AboutPage() {
           >
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6">
               Modernizing estate sales,{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-brand-primary)] to-violet-600">
                 one home at a time
               </span>
             </h1>
@@ -134,7 +134,7 @@ export default function AboutPage() {
                     key={index}
                     className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 text-center"
                   >
-                    <p className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                    <p className="text-2xl sm:text-3xl font-bold text-[var(--color-brand-primary)] mb-1">
                       {stat.value}
                     </p>
                     <p className="text-sm text-stone-600 dark:text-zinc-400">
@@ -166,9 +166,9 @@ export default function AboutPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
-                  className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group"
+                  className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 hover:shadow-lg hover:border-[var(--color-brand-primary)]/20 dark:hover:border-[var(--color-brand-primary)]/40 transition-all group"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center mb-4 text-indigo-600 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 transition-colors">
+                  <div className="w-12 h-12 rounded-xl bg-[var(--color-brand-subtle)] flex items-center justify-center mb-4 text-[var(--color-brand-primary)] group-hover:bg-[var(--color-brand-subtle)] transition-colors">
                     {value.icon}
                   </div>
                   <h3 className="text-lg font-bold text-stone-900 dark:text-white mb-2">
@@ -209,12 +209,12 @@ export default function AboutPage() {
                     className="flex gap-6"
                   >
                     <div className="relative shrink-0 hidden md:block">
-                      <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold z-10 relative">
+                      <div className="w-12 h-12 rounded-full bg-[var(--color-brand-primary)] text-white flex items-center justify-center text-sm font-bold z-10 relative">
                         {item.year}
                       </div>
                     </div>
                     <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-800 flex-1">
-                      <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-full md:hidden">
+                      <span className="text-xs font-semibold text-[var(--color-brand-primary)] bg-[var(--color-brand-subtle)] px-2 py-1 rounded-full md:hidden">
                         {item.year}
                       </span>
                       <h3 className="text-xl font-bold text-stone-900 dark:text-white mb-2 mt-2 md:mt-0">
@@ -232,7 +232,7 @@ export default function AboutPage() {
         </section>
 
         {/* CTA */}
-        <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-indigo-600 to-indigo-700 dark:from-indigo-900 dark:to-indigo-800">
+        <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-[var(--color-brand-primary)] to-[var(--color-brand-primary-hover)] dark:from-[var(--color-brand-primary)]/60 dark:to-[var(--color-brand-primary-hover)]/60">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -243,13 +243,13 @@ export default function AboutPage() {
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Join us on the journey
             </h2>
-            <p className="text-lg mb-8 text-indigo-100">
+            <p className="text-lg mb-8 text-white/80">
               Whether you run one sale a year or fifty, Curator is built for
               you. Get started free — no credit card required.
             </p>
             <Link
               href="/login?next=/dashboard&intent=signup&tier=free"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors duration-200 shadow-lg hover:shadow-xl"
+              className="inline-flex items-center justify-center px-8 py-4 bg-white text-[var(--color-brand-primary)] font-semibold rounded-xl hover:bg-stone-50 transition-colors duration-200 shadow-lg hover:shadow-xl"
             >
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />

@@ -31,7 +31,7 @@ function OrgAvatar({
         "flex shrink-0 items-center justify-center rounded-lg font-bold",
         size === "sm" ? "h-7 w-7 text-xs" : "h-8 w-8 text-sm",
         active
-          ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400"
+          ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)] dark:bg-[var(--color-brand-subtle)] dark:text-[var(--color-brand-primary)]"
           : "bg-stone-100 text-stone-500 dark:bg-zinc-800 dark:text-zinc-400"
       )}
     >
@@ -103,7 +103,7 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "group flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
+          "group flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
           open
             ? "bg-stone-100 dark:bg-zinc-800"
             : "hover:bg-stone-50 dark:hover:bg-zinc-800/50"
@@ -116,7 +116,7 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
             {activeOrg?.name ?? "Select organization"}
           </span>
           <span className="flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
-            <TierBadge tier={orgTier} />
+            <TierBadge tier={orgTier} variant="text" />
           </span>
         </div>
 
@@ -159,7 +159,7 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm transition-colors",
                     selected
-                      ? "bg-indigo-50 dark:bg-indigo-500/10"
+                      ? "bg-[var(--color-brand-subtle)] dark:bg-[var(--color-brand-subtle)]"
                       : "hover:bg-stone-50 dark:hover:bg-zinc-800/60"
                   )}
                 >
@@ -172,7 +172,7 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
                       className={cn(
                         "truncate font-medium",
                         selected
-                          ? "text-indigo-600 dark:text-indigo-400"
+                          ? "text-[var(--color-brand-primary)]"
                           : "text-stone-700 dark:text-zinc-300"
                       )}
                     >
@@ -183,11 +183,12 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
                         tier={
                           (org.subscription_tier ?? "free") as SubscriptionTier
                         }
+                        variant="text"
                       />
                     </span>
                   </div>
                   {selected && (
-                    <Check className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                    <Check className="h-4 w-4 shrink-0 text-[var(--color-brand-primary)]" />
                   )}
                 </button>
               );

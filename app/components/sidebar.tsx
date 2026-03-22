@@ -155,7 +155,7 @@ export function Sidebar() {
           {isExpanded ? (
             <>
               <div className="flex flex-1 items-center gap-3 overflow-hidden">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-sm shadow-indigo-500/25">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--color-brand-primary)] text-sm font-bold text-white shadow-sm shadow-[var(--color-brand-primary)]/25">
                   C
                 </div>
                 <motion.span
@@ -172,7 +172,7 @@ export function Sidebar() {
                 onClick={toggle}
                 aria-label="Collapse sidebar"
                 aria-expanded={true}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
               >
                 <PanelLeftClose className="h-4 w-4" />
               </button>
@@ -184,7 +184,7 @@ export function Sidebar() {
                 onClick={toggle}
                 aria-label="Expand sidebar"
                 aria-expanded={false}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
               >
                 <PanelLeftOpen className="h-5 w-5" />
               </button>
@@ -228,12 +228,12 @@ export function Sidebar() {
                         aria-label={item.label}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "group relative flex items-center rounded-xl text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
+                          "group relative flex items-center rounded-xl text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
                           isExpanded
                             ? "gap-3 px-3 py-2.5"
                             : "h-10 justify-center",
                           active
-                            ? "text-indigo-600 dark:text-indigo-400"
+                            ? "text-[var(--color-brand-primary)] dark:text-[var(--color-brand-primary)]"
                             : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-white"
                         )}
                       >
@@ -241,7 +241,7 @@ export function Sidebar() {
                         {active && (
                           <motion.div
                             layoutId="sidebar-active"
-                            className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-500/10"
+                            className="absolute inset-0 rounded-xl bg-[var(--color-brand-subtle)] dark:bg-[var(--color-brand-subtle)]"
                             transition={{
                               type: "spring",
                               bounce: 0.15,
@@ -251,7 +251,7 @@ export function Sidebar() {
                         )}
                         {/* Active left rail (expanded only) */}
                         {active && isExpanded && (
-                          <div className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
+                          <div className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-[var(--color-brand-primary)]" />
                         )}
                         {/* Icon with badge overlay for collapsed */}
                         <span className="relative z-10 inline-flex shrink-0">
@@ -259,7 +259,7 @@ export function Sidebar() {
                           {!isExpanded &&
                             item.badge != null &&
                             item.badge > 0 && (
-                              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold leading-none text-white dark:bg-indigo-500">
+                              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1 text-[9px] font-bold leading-none text-white">
                                 {item.badge > 9 ? "9+" : item.badge}
                               </span>
                             )}
@@ -274,7 +274,7 @@ export function Sidebar() {
                         {isExpanded &&
                           item.badge != null &&
                           item.badge > 0 && (
-                            <span className="relative z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[10px] font-bold leading-none text-white dark:bg-indigo-500">
+                            <span className="relative z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1.5 text-[10px] font-bold leading-none text-white">
                               {item.badge > 99 ? "99+" : item.badge}
                             </span>
                           )}
@@ -307,7 +307,7 @@ export function Sidebar() {
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   Sign out
@@ -320,7 +320,7 @@ export function Sidebar() {
                 <Link
                   href="/organizations"
                   aria-label="Switch organization"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 >
                   <Building2 className="h-4 w-4" />
                 </Link>
@@ -331,7 +331,7 @@ export function Sidebar() {
                   type="button"
                   onClick={handleSignOut}
                   aria-label="Sign out"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
@@ -345,7 +345,7 @@ export function Sidebar() {
       <div className="sticky top-0 z-30 flex flex-col border-b border-stone-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80 md:hidden">
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white shadow-sm shadow-indigo-500/25">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-primary)] text-xs font-bold text-white shadow-sm shadow-[var(--color-brand-primary)]/25">
               C
             </div>
             <OrgSwitcher dropdownDirection="down" />
@@ -356,7 +356,7 @@ export function Sidebar() {
               type="button"
               onClick={handleSignOut}
               aria-label="Sign out"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -376,16 +376,16 @@ export function Sidebar() {
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
+                    "relative inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
                     active
-                      ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                      ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
                       : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-white"
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="whitespace-nowrap">{item.label}</span>
                   {item.badge != null && item.badge > 0 && (
-                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold leading-none text-white dark:bg-indigo-500">
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1 text-[9px] font-bold leading-none text-white">
                       {item.badge > 9 ? "9+" : item.badge}
                     </span>
                   )}

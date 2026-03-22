@@ -49,7 +49,7 @@ export function PageHeader({
         {backLink && (
           <Link
             href={backLink.href}
-            className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-400 dark:hover:text-white"
+            className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-400 dark:hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
             {backLink.label}
@@ -81,7 +81,7 @@ export function PageHeader({
                     href={act.href}
                     className={`${baseClasses} ${
                       isPrimary
-                        ? "border-transparent bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                        ? "border-transparent bg-[var(--color-brand-primary)] text-white shadow-lg hover:bg-[var(--color-brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] focus-visible:ring-offset-2"
                         : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     }`}
                   >
@@ -98,7 +98,7 @@ export function PageHeader({
                   onClick={act.onClick}
                   className={`${baseClasses} ${
                     isPrimary
-                      ? "border-transparent bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                      ? "border-transparent bg-[var(--color-brand-primary)] text-white shadow-lg hover:bg-[var(--color-brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] focus-visible:ring-offset-2"
                       : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                   }`}
                 >

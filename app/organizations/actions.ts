@@ -98,6 +98,59 @@ export type OrgInvitation = {
 
 // ── Helpers ──────────────────────────────────────────────────
 
+/** Validate an image File from FormData. Returns an error string or null. */
+function validateImageFile(file: File): string | null {
+  if (!file.type.startsWith('image/')) return 'Cover image must be an image file.';
+  if (file.size > 10 * 1024 * 1024) return 'Cover image must be under 10 MB.';
+  return null;
+}
+
+/**
+ * Upload a cover image to Supabase Storage, normalize to WebP, and return
+ * a cache-busted public URL. Returns `{ url }` on success or `{ warning }` on failure.
+ */
+async function uploadCoverImage(
+  bucket: string,
+  entityId: string,
+  imageFile: File,
+): Promise<{ url: string } | { warning: string }> {
+  try {
+    const { normalizeSourceImage } = await import('@/lib/image-processing');
+    const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
+    const normalizedBuffer = await normalizeSourceImage(rawBuffer);
+    const storagePath = `${entityId}/cover.webp`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(storagePath, normalizedBuffer, { contentType: 'image/webp', upsert: true });
+
+    if (uploadError) {
+      console.error(`Cover image upload error (${bucket}):`, uploadError);
+      return { warning: 'Image upload failed. Please try again.' };
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(storagePath);
+
+    // Append cache-bust param so CDN / browser serves the new file
+    const bustedUrl = `${publicUrl}?v=${Date.now()}`;
+    return { url: bustedUrl };
+  } catch (err) {
+    console.error(`Cover image processing error (${bucket}):`, err);
+    return { warning: 'Image processing failed. Please try again.' };
+  }
+}
+
+/**
+ * Remove a cover image from Supabase Storage for the given entity.
+ */
+async function removeCoverImage(bucket: string, entityId: string): Promise<void> {
+  const storagePath = `${entityId}/cover.webp`;
+  const { error } = await supabase.storage.from(bucket).remove([storagePath]);
+  if (error) console.error(`Cover image removal error (${bucket}):`, error);
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -280,14 +333,13 @@ export async function createOrganization(formData: FormData) {
   if (!userId) return { error: 'User not authenticated.' };
 
   if (imageFile && imageFile.size > 0) {
-    if (!imageFile.type.startsWith('image/')) return { error: 'Cover image must be an image file.' };
-    if (imageFile.size > 10 * 1024 * 1024) return { error: 'Cover image must be under 10 MB.' };
+    const imgErr = validateImageFile(imageFile);
+    if (imgErr) return { error: imgErr };
   }
 
   const slug = slugify(name) || `org-${Date.now()}`;
 
   try {
-    // Create the organization
     const phone = (formData.get('phone') as string)?.trim() || null;
     const addressLine1 = (formData.get('address_line1') as string)?.trim() || null;
     const addressLine2 = (formData.get('address_line2') as string)?.trim() || null;
@@ -326,7 +378,6 @@ export async function createOrganization(formData: FormData) {
 
     if (memberError) {
       console.error('Supabase member error:', memberError);
-      // Rollback: delete the org if we can't add the member
       await supabase.from('organizations').delete().eq('id', org.id);
       return { error: 'Failed to set up organization membership.' };
     }
@@ -334,34 +385,12 @@ export async function createOrganization(formData: FormData) {
     // Upload cover image if provided
     let imageWarning: string | undefined;
     if (imageFile && imageFile.size > 0) {
-      try {
-        const { normalizeSourceImage } = await import('@/lib/image-processing');
-        const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
-        const normalizedBuffer = await normalizeSourceImage(rawBuffer);
-        const storagePath = `${org.id}/cover.webp`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('organization-images')
-          .upload(storagePath, normalizedBuffer, { contentType: 'image/webp', upsert: true });
-
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('organization-images')
-            .getPublicUrl(storagePath);
-
-          await supabase
-            .from('organizations')
-            .update({ cover_image_url: publicUrl })
-            .eq('id', org.id);
-
-          org.cover_image_url = publicUrl;
-        } else {
-          console.error('Org image upload error:', uploadError);
-          imageWarning = 'Organization created but image upload failed. You can add an image later in Settings.';
-        }
-      } catch (imgErr) {
-        console.error('Org image processing error:', imgErr);
-        imageWarning = 'Organization created but image processing failed. You can add an image later in Settings.';
+      const result = await uploadCoverImage('organization-images', org.id, imageFile);
+      if ('url' in result) {
+        await supabase.from('organizations').update({ cover_image_url: result.url }).eq('id', org.id);
+        org.cover_image_url = result.url;
+      } else {
+        imageWarning = `Organization created but ${result.warning.charAt(0).toLowerCase()}${result.warning.slice(1)}`;
       }
     }
 
@@ -375,12 +404,13 @@ export async function createOrganization(formData: FormData) {
 export async function updateOrganization(id: string, formData: FormData) {
   const name = formData.get('name') as string;
   const imageFile = formData.get('image') as File | null;
+  const removeImage = formData.get('remove_image') === 'true';
 
   if (!name || !name.trim()) return { error: 'Organization name is required.' };
 
   if (imageFile && imageFile.size > 0) {
-    if (!imageFile.type.startsWith('image/')) return { error: 'Cover image must be an image file.' };
-    if (imageFile.size > 10 * 1024 * 1024) return { error: 'Cover image must be under 10 MB.' };
+    const imgErr = validateImageFile(imageFile);
+    if (imgErr) return { error: imgErr };
   }
 
   const phone = (formData.get('phone') as string)?.trim() || null;
@@ -410,35 +440,19 @@ export async function updateOrganization(id: string, formData: FormData) {
       return { error: 'Failed to update organization.' };
     }
 
-    // Upload/replace cover image if provided
     let imageWarning: string | undefined;
-    if (imageFile && imageFile.size > 0) {
-      try {
-        const { normalizeSourceImage } = await import('@/lib/image-processing');
-        const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
-        const normalizedBuffer = await normalizeSourceImage(rawBuffer);
-        const storagePath = `${id}/cover.webp`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('organization-images')
-          .upload(storagePath, normalizedBuffer, { contentType: 'image/webp', upsert: true });
-
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('organization-images')
-            .getPublicUrl(storagePath);
-
-          await supabase
-            .from('organizations')
-            .update({ cover_image_url: publicUrl })
-            .eq('id', id);
-        } else {
-          console.error('Org image upload error:', uploadError);
-          imageWarning = 'Settings saved but image upload failed. Please try again.';
-        }
-      } catch (imgErr) {
-        console.error('Org image processing error:', imgErr);
-        imageWarning = 'Settings saved but image processing failed. Please try again.';
+    if (removeImage) {
+      // Explicit removal: delete storage object and clear DB field
+      await removeCoverImage('organization-images', id);
+      await supabase.from('organizations').update({ cover_image_url: null }).eq('id', id);
+    } else if (imageFile && imageFile.size > 0) {
+      // Replace cover image
+      const result = await uploadCoverImage('organization-images', id, imageFile);
+      if ('url' in result) {
+        await supabase.from('organizations').update({ cover_image_url: result.url }).eq('id', id);
+      } else {
+        imageWarning = `Settings saved but ${result.warning.charAt(0).toLowerCase()}${result.warning.slice(1)}`;
       }
     }
 
@@ -1113,8 +1127,8 @@ export async function createProject(formData: FormData) {
   if (!userId) return { error: 'User not authenticated.' };
 
   if (imageFile && imageFile.size > 0) {
-    if (!imageFile.type.startsWith('image/')) return { error: 'Cover image must be an image file.' };
-    if (imageFile.size > 10 * 1024 * 1024) return { error: 'Cover image must be under 10 MB.' };
+    const imgErr = validateImageFile(imageFile);
+    if (imgErr) return { error: imgErr };
   }
 
   const check = await requirePermission(orgId, userId, 'projects:create');
@@ -1153,34 +1167,12 @@ export async function createProject(formData: FormData) {
     // Upload cover image if provided
     let imageWarning: string | undefined;
     if (imageFile && imageFile.size > 0) {
-      try {
-        const { normalizeSourceImage } = await import('@/lib/image-processing');
-        const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
-        const normalizedBuffer = await normalizeSourceImage(rawBuffer);
-        const storagePath = `${data.id}/cover.webp`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('project-images')
-          .upload(storagePath, normalizedBuffer, { contentType: 'image/webp', upsert: true });
-
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('project-images')
-            .getPublicUrl(storagePath);
-
-          await supabase
-            .from('projects')
-            .update({ cover_image_url: publicUrl })
-            .eq('id', data.id);
-
-          data.cover_image_url = publicUrl;
-        } else {
-          console.error('Project image upload error:', uploadError);
-          imageWarning = 'Project created but image upload failed. You can add an image later.';
-        }
-      } catch (imgErr) {
-        console.error('Project image processing error:', imgErr);
-        imageWarning = 'Project created but image processing failed. You can add an image later.';
+      const result = await uploadCoverImage('project-images', data.id, imageFile);
+      if ('url' in result) {
+        await supabase.from('projects').update({ cover_image_url: result.url }).eq('id', data.id);
+        data.cover_image_url = result.url;
+      } else {
+        imageWarning = `Project created but ${result.warning.charAt(0).toLowerCase()}${result.warning.slice(1)}`;
       }
     }
 
@@ -1227,12 +1219,13 @@ export async function updateProject(id: string, formData: FormData) {
   const name = formData.get('name') as string;
   const description = formData.get('description') as string;
   const imageFile = formData.get('image') as File | null;
+  const removeImage = formData.get('remove_image') === 'true';
 
   if (!name || !name.trim()) return { error: 'Project name is required.' };
 
   if (imageFile && imageFile.size > 0) {
-    if (!imageFile.type.startsWith('image/')) return { error: 'Cover image must be an image file.' };
-    if (imageFile.size > 10 * 1024 * 1024) return { error: 'Cover image must be under 10 MB.' };
+    const imgErr = validateImageFile(imageFile);
+    if (imgErr) return { error: imgErr };
   }
 
   const phone = (formData.get('phone') as string)?.trim() || null;
@@ -1263,35 +1256,17 @@ export async function updateProject(id: string, formData: FormData) {
       return { error: 'Failed to update project.' };
     }
 
-    // Upload/replace cover image if provided
     let imageWarning: string | undefined;
-    if (imageFile && imageFile.size > 0) {
-      try {
-        const { normalizeSourceImage } = await import('@/lib/image-processing');
-        const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
-        const normalizedBuffer = await normalizeSourceImage(rawBuffer);
-        const storagePath = `${id}/cover.webp`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('project-images')
-          .upload(storagePath, normalizedBuffer, { contentType: 'image/webp', upsert: true });
-
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('project-images')
-            .getPublicUrl(storagePath);
-
-          await supabase
-            .from('projects')
-            .update({ cover_image_url: publicUrl })
-            .eq('id', id);
-        } else {
-          console.error('Project image upload error:', uploadError);
-          imageWarning = 'Project saved but image upload failed. Please try again.';
-        }
-      } catch (imgErr) {
-        console.error('Project image processing error:', imgErr);
-        imageWarning = 'Project saved but image processing failed. Please try again.';
+    if (removeImage) {
+      await removeCoverImage('project-images', id);
+      await supabase.from('projects').update({ cover_image_url: null }).eq('id', id);
+    } else if (imageFile && imageFile.size > 0) {
+      const result = await uploadCoverImage('project-images', id, imageFile);
+      if ('url' in result) {
+        await supabase.from('projects').update({ cover_image_url: result.url }).eq('id', id);
+      } else {
+        imageWarning = `Project saved but ${result.warning.charAt(0).toLowerCase()}${result.warning.slice(1)}`;
       }
     }
 

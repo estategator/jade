@@ -110,8 +110,8 @@ export default async function DashboardPage({
       value: stats?.totalItems ?? 0,
       fmt: (v: number) => String(v),
       icon: Package,
-      color: "text-indigo-600 dark:text-indigo-400",
-      bg: "bg-indigo-50 dark:bg-indigo-900/20",
+      color: "text-[var(--color-brand-primary)]",
+      bg: "bg-[var(--color-brand-subtle)]",
     },
     {
       label: "Available",
@@ -138,8 +138,8 @@ export default async function DashboardPage({
           maximumFractionDigits: 0,
         })}`,
       icon: DollarSign,
-      color: "text-indigo-600 dark:text-indigo-400",
-      bg: "bg-indigo-50 dark:bg-indigo-900/20",
+      color: "text-[var(--color-brand-primary)]",
+      bg: "bg-[var(--color-brand-subtle)]",
     },
     {
       label: "Sales Revenue",
@@ -223,7 +223,7 @@ export default async function DashboardPage({
           {/* Revenue over time */}
           <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <DollarSign className="h-4 w-4 text-[var(--color-brand-primary)]" />
               <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
                 Revenue (last 6 months)
               </h3>
@@ -307,9 +307,9 @@ export default async function DashboardPage({
               <Link
                 key={action.label}
                 href={action.href}
-                className="group rounded-2xl border border-stone-200 bg-white p-5 text-left transition-all hover:border-indigo-200 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-800"
+                className="group rounded-2xl border border-stone-200 bg-white p-5 text-left transition-all hover:border-[var(--color-brand-primary)]/20 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-[var(--color-brand-primary)]/40"
               >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]">
                   <Icon className="h-5 w-5" />
                 </div>
                 <p className="text-sm font-semibold text-stone-900 dark:text-white">

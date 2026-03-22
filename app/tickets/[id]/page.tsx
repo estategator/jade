@@ -33,7 +33,7 @@ const STATUS_CONFIG: Record<
   open: {
     label: "Open",
     icon: CircleDot,
-    color: "text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/20",
+    color: "text-[var(--color-brand-primary)] bg-[var(--color-brand-subtle)]",
   },
   in_progress: {
     label: "In Progress",
@@ -238,7 +238,7 @@ export default function TicketDetailPage() {
               className={cn(
                 "rounded-xl border p-4",
                 reply.is_admin
-                  ? "border-indigo-200 bg-indigo-50/50 dark:border-indigo-800/50 dark:bg-indigo-950/20"
+                  ? "border-[var(--color-brand-primary)]/20 bg-[var(--color-brand-subtle)]"
                   : "border-stone-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
               )}
             >
@@ -247,7 +247,7 @@ export default function TicketDetailPage() {
                   className={cn(
                     "flex h-6 w-6 items-center justify-center rounded-full",
                     reply.is_admin
-                      ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400"
+                      ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
                       : "bg-stone-100 text-stone-500 dark:bg-zinc-800 dark:text-zinc-400"
                   )}
                 >
@@ -297,10 +297,10 @@ export default function TicketDetailPage() {
                 type="submit"
                 disabled={replySubmitting || !replyText.trim()}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
+                  "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
                   replySubmitting || !replyText.trim()
-                    ? "cursor-not-allowed bg-indigo-400 dark:bg-indigo-600/50"
-                    : "bg-indigo-600 hover:bg-indigo-700"
+                    ? "cursor-not-allowed bg-[var(--color-brand-primary)]/60"
+                    : "bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)]"
                 )}
               >
                 {replySubmitting ? (

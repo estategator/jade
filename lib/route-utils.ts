@@ -11,6 +11,9 @@ export function isAppRoute(pathname: string): boolean {
     "/organizations",
     "/upgrade",
     "/notifications",
+    "/help",
+    "/tickets",
+    "/developer",
   ];
 
   return appRoutes.some((route) => pathname.startsWith(route));

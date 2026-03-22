@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "app/api/queues/process-image/route.ts": {
+      "experimentalTriggers": [
+        { "type": "queue/v2beta", "topic": "process-image" }
+      ]
+    },
+    "app/api/queues/stripe-webhook/route.ts": {
+      "experimentalTriggers": [
+        { "type": "queue/v2beta", "topic": "stripe-webhook" }
+      ]
+    }
+  }
+}

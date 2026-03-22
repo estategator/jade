@@ -173,174 +173,132 @@ export function TeamManager({
 
   return (
     <>
-      <p className="mb-4 text-sm text-stone-500 dark:text-zinc-400">
-        Manage organization members and pending invitations.
-      </p>
-
       {!canInviteMembers && !canUpdateMembers && (
-        <p className="mb-4 text-sm text-stone-500 dark:text-zinc-400">
-          You can view membership, but only managers can modify roles or send
-          invitations.
+        <p className="mb-3 text-xs text-stone-500 dark:text-zinc-400">
+          You can view membership, but only managers can modify roles or send invitations.
         </p>
       )}
 
       {error && (
         <motion.p
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400"
+          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400"
         >
           {error}
         </motion.p>
       )}
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.05 }}
-        className="space-y-6"
+        transition={{ duration: 0.3 }}
+        className="space-y-5"
       >
-        <div>
-          <div className="mb-4 flex items-center justify-between gap-2">
+        {/* Active Members */}
+        <div className="rounded-xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3 dark:border-zinc-800/60">
             <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-stone-400 dark:text-zinc-500" />
-              <h2 className="text-lg font-bold text-stone-900 dark:text-white">
+              <h2 className="text-sm font-semibold text-stone-900 dark:text-white">
                 Members
               </h2>
-              <span className="text-sm text-stone-500 dark:text-zinc-500">
-                ({members.length})
+              <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600 dark:bg-zinc-800 dark:text-zinc-400">
+                {members.length}
               </span>
             </div>
             {canInviteMembers && (
               <button
                 type="button"
-                onClick={() => {
-                  setInviteError("");
-                  setInviteModalOpen(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition-all hover:bg-indigo-700"
+                onClick={() => { setInviteError(""); setInviteModalOpen(true); }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-indigo-700"
               >
-                <Mail className="h-4 w-4" />
-                Invite member
+                <Mail className="h-3.5 w-3.5" />
+                Invite
               </button>
             )}
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="divide-y divide-stone-100 dark:divide-zinc-800/60">
             {members.map((member) => {
               const isUpdating = memberUpdating === member.id;
               const rowError = memberError[member.id];
               const RoleIcon =
-                member.role === "superadmin"
-                  ? Crown
-                  : member.role === "admin"
-                    ? Shield
-                    : User;
+                member.role === "superadmin" ? Crown
+                  : member.role === "admin" ? Shield
+                  : User;
 
               return (
-                <div
-                  key={member.id}
-                  className="border-b border-stone-100 px-5 py-3.5 last:border-b-0 dark:border-zinc-800/50"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${
-                          member.status === "suspended"
-                            ? "bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400"
-                            : "bg-stone-200 text-stone-600 dark:bg-zinc-700 dark:text-zinc-300"
-                        }`}
-                      >
-                        {(
-                          member.profiles?.full_name?.[0] ||
-                          member.email?.[0] ||
-                          "?"
-                        ).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-stone-900 dark:text-white">
-                          {member.profiles?.full_name ||
-                            member.email ||
-                            "Unknown user"}
-                        </p>
-                        {member.status === "suspended" && (
-                          <p className="text-xs text-red-500 dark:text-red-400">
-                            Suspended
-                          </p>
-                        )}
-                      </div>
+                <div key={member.id} className="flex items-center justify-between px-5 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                        member.status === "suspended"
+                          ? "bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-stone-200 text-stone-600 dark:bg-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      {(member.profiles?.full_name?.[0] || member.email?.[0] || "?").toUpperCase()}
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      {isUpdating && (
-                        <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
-                      )}
-
-                      {canUpdateMembers ? (
-                        <>
-                          <select
-                            value={member.role}
-                            disabled={isUpdating}
-                            onChange={(e) =>
-                              handleRoleChange(
-                                member.id,
-                                e.target.value as OrgMember["role"]
-                              )
-                            }
-                            className="rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-medium text-stone-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                          >
-                            <option value="superadmin">Super Admin</option>
-                            <option value="admin">Admin</option>
-                            <option value="member">Member</option>
-                          </select>
-
-                          <button
-                            type="button"
-                            disabled={isUpdating}
-                            onClick={() =>
-                              handleStatusChange(
-                                member.id,
-                                member.status === "active"
-                                  ? "suspended"
-                                  : "active"
-                              )
-                            }
-                            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                              member.status === "active"
-                                ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
-                                : "text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
-                            }`}
-                          >
-                            {member.status === "active" ? (
-                              <>
-                                <AlertTriangle className="h-3 w-3" />
-                                Suspend
-                              </>
-                            ) : (
-                              <>
-                                <Shield className="h-3 w-3" />
-                                Activate
-                              </>
-                            )}
-                          </button>
-                        </>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600 dark:bg-zinc-800 dark:text-zinc-300">
-                          <RoleIcon className="h-3 w-3" />
-                          {member.role === "superadmin"
-                            ? "Super Admin"
-                            : member.role === "admin"
-                              ? "Admin"
-                              : "Member"}
-                        </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-stone-900 dark:text-white">
+                        {member.profiles?.full_name || member.email || "Unknown"}
+                      </p>
+                      {member.status === "suspended" && (
+                        <p className="text-[11px] text-red-500 dark:text-red-400">Suspended</p>
                       )}
                     </div>
                   </div>
 
+                  <div className="flex items-center gap-1.5">
+                    {isUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />}
+
+                    {canUpdateMembers ? (
+                      <>
+                        <select
+                          value={member.role}
+                          disabled={isUpdating}
+                          onChange={(e) =>
+                            handleRoleChange(member.id, e.target.value as OrgMember["role"])
+                          }
+                          className="rounded-md border border-stone-200 bg-white px-1.5 py-1 text-[11px] font-medium text-stone-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        >
+                          <option value="superadmin">Super Admin</option>
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                        </select>
+
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() =>
+                            handleStatusChange(
+                              member.id,
+                              member.status === "active" ? "suspended" : "active"
+                            )
+                          }
+                          className={`rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                            member.status === "active"
+                              ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                              : "text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                          }`}
+                        >
+                          {member.status === "active" ? (
+                            <><AlertTriangle className="mr-0.5 inline h-3 w-3" />Suspend</>
+                          ) : (
+                            <><Shield className="mr-0.5 inline h-3 w-3" />Activate</>
+                          )}
+                        </button>
+                      </>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600 dark:bg-zinc-800 dark:text-zinc-300">
+                        <RoleIcon className="h-3 w-3" />
+                        {member.role === "superadmin" ? "Super Admin" : member.role === "admin" ? "Admin" : "Member"}
+                      </span>
+                    )}
+                  </div>
+
                   {rowError && (
-                    <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
-                      {rowError}
-                    </p>
+                    <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{rowError}</p>
                   )}
                 </div>
               );
@@ -348,35 +306,36 @@ export function TeamManager({
           </div>
         </div>
 
-        <div>
-          <div className="mb-3 flex items-center gap-2">
-            <Mail className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        {/* Pending Invitations */}
+        <div className="rounded-xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex items-center gap-2 border-b border-stone-100 px-5 py-3 dark:border-zinc-800/60">
+            <Mail className="h-3.5 w-3.5 text-stone-400 dark:text-zinc-500" />
             <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
-              Pending invitations ({pendingInvitations.length})
+              Pending Invitations
             </h3>
+            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600 dark:bg-zinc-800 dark:text-zinc-400">
+              {pendingInvitations.length}
+            </span>
           </div>
 
           {pendingInvitations.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-5 text-sm text-stone-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+            <div className="px-5 py-4 text-sm text-stone-500 dark:text-zinc-400">
               No pending invitations.
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/30 dark:bg-amber-950/20">
+            <div className="divide-y divide-stone-100 dark:divide-zinc-800/60">
               {pendingInvitations.map((invitation) => (
                 <div
                   key={invitation.id}
-                  className="flex items-center justify-between border-b border-amber-100 px-5 py-3.5 last:border-b-0 dark:border-amber-900/30"
+                  className="flex items-center justify-between px-5 py-2.5"
                 >
-                  <div>
-                    <p className="text-sm font-medium text-stone-900 dark:text-white">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-stone-900 dark:text-white">
                       {invitation.email}
                     </p>
-                    <p className="text-xs text-stone-600 dark:text-zinc-400">
-                      Invited{" "}
-                      {new Date(invitation.created_at).toLocaleDateString()} as{" "}
-                      {invitation.requested_role === "admin"
-                        ? "Admin"
-                        : "Member"}
+                    <p className="text-[11px] text-stone-500 dark:text-zinc-500">
+                      {new Date(invitation.created_at).toLocaleDateString()} &middot;{" "}
+                      {invitation.requested_role === "admin" ? "Admin" : "Member"}
                     </p>
                   </div>
 
@@ -384,7 +343,7 @@ export function TeamManager({
                     <button
                       type="button"
                       onClick={() => handleCancelInvitation(invitation.id)}
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                      className="rounded-md px-2 py-1 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
                     >
                       Cancel
                     </button>
@@ -398,10 +357,7 @@ export function TeamManager({
 
       <InviteMemberModal
         isOpen={inviteModalOpen}
-        onClose={() => {
-          setInviteModalOpen(false);
-          setInviteWarning("");
-        }}
+        onClose={() => { setInviteModalOpen(false); setInviteWarning(""); }}
         onSubmit={handleInviteMember}
         isLoading={inviteSubmitting}
         error={inviteError}

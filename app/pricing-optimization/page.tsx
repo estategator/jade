@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
+import { resolveActiveOrgId } from '@/lib/rbac';
 import { getUserProjects } from '@/app/inventory/actions';
 import { PricingOptimizationForm } from '@/app/components/pricing-optimization-form';
 import { PageHeader } from '@/app/components/page-header';
@@ -19,8 +19,7 @@ export default async function PricingOptimizationPage({}: PageProps) {
     redirect('/login');
   }
 
-  const cookieStore = await cookies();
-  const activeOrgId = cookieStore.get('curator_active_org')?.value ?? null;
+  const activeOrgId = await resolveActiveOrgId(user.id);
 
   const projectsResult = await getUserProjects(user.id, activeOrgId);
   const projects = projectsResult.data ?? [];

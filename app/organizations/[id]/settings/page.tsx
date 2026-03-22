@@ -33,6 +33,12 @@ export default async function OrgSettingsGeneralPage({
       orgId={orgId}
       initialName={orgResult.data.name}
       initialCoverImageUrl={orgResult.data.cover_image_url}
+      initialPhone={orgResult.data.phone ?? ""}
+      initialAddressLine1={orgResult.data.address_line1 ?? ""}
+      initialAddressLine2={orgResult.data.address_line2 ?? ""}
+      initialCity={orgResult.data.city ?? ""}
+      initialState={orgResult.data.state ?? ""}
+      initialZipCode={orgResult.data.zip_code ?? ""}
       canManageSettings={canManageSettings}
     />
   );

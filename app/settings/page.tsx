@@ -40,7 +40,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
         title="Settings"
         description="Select an organization to manage its settings."
@@ -63,6 +63,6 @@ export default function SettingsPage() {
           Go to Organizations
         </Link>
       </div>
-    </>
+    </div>
   );
 }

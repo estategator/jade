@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
-import { enqueue } from '@/lib/queue';
+import { enqueue, TOPICS } from '@/lib/queue';
 import { processWebhookEvent, type WebhookPayload } from '@/app/api/queues/stripe-webhook/route';
 
 export async function POST(req: NextRequest) {
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   console.log('[stripe-webhook] Received event:', event.type, 'id:', event.id);
 
-  await enqueue('/api/queues/stripe-webhook', payload, processWebhookEvent);
+  await enqueue(TOPICS.STRIPE_WEBHOOK, payload, processWebhookEvent);
 
   return NextResponse.json({ received: true });
 }

@@ -25,7 +25,7 @@ create table if not exists profiles (
   full_name   text not null default '',
   avatar_url  text,
   role        text not null default 'user'
-                check (role in ('user', 'admin')),
+                check (role in ('user', 'admin', 'developer')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -151,6 +151,7 @@ create table if not exists projects (
   name            text not null,
   description     text not null default '',
   cover_image_url text,
+  published       boolean not null default false,
   created_by      uuid references auth.users (id) on delete set null,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
@@ -174,6 +175,7 @@ create table if not exists inventory_items (
   condition   text not null default 'Good',
   status      text not null default 'available'
                 check (status in ('available', 'sold', 'reserved')),
+  quantity    integer not null default 1,
   stripe_payment_id text,
   sold_at     timestamptz,
   original_image_url text,
@@ -1214,3 +1216,194 @@ cross join permissions p
 where r.name = 'member' and r.org_id is null
   and p.id in ('marketing:view', 'marketing:create')
 on conflict (org_role_id, permission_id) do nothing;
+
+-- =========================
+-- Address & phone columns on organizations
+-- =========================
+alter table organizations
+  add column if not exists phone text,
+  add column if not exists address_line1 text,
+  add column if not exists address_line2 text,
+  add column if not exists city text,
+  add column if not exists state text,
+  add column if not exists zip_code text;
+
+-- =========================
+-- Address & phone columns on projects (estate sale location)
+-- =========================
+alter table projects
+  add column if not exists phone text,
+  add column if not exists address_line1 text,
+  add column if not exists address_line2 text,
+  add column if not exists city text,
+  add column if not exists state text,
+  add column if not exists zip_code text;
+
+-- =========================
+-- Support tickets
+-- =========================
+create table if not exists support_tickets (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations (id) on delete cascade,
+  user_id           uuid not null references auth.users (id) on delete cascade,
+  title             text not null,
+  description       text not null,
+  category          text not null default 'general'
+                      check (category in ('billing', 'bug', 'feature', 'general')),
+  priority          text not null default 'low'
+                      check (priority in ('low', 'medium', 'high')),
+  status            text not null default 'open'
+                      check (status in ('open', 'in_progress', 'resolved', 'closed')),
+  tier_at_creation  text not null default 'free'
+                      check (tier_at_creation in ('free', 'pro', 'enterprise')),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  resolved_at       timestamptz
+);
+
+create index if not exists idx_support_tickets_org on support_tickets (org_id);
+create index if not exists idx_support_tickets_user on support_tickets (user_id);
+create index if not exists idx_support_tickets_status on support_tickets (status);
+
+-- =========================
+-- Ticket replies
+-- =========================
+create table if not exists ticket_replies (
+  id          uuid primary key default gen_random_uuid(),
+  ticket_id   uuid not null references support_tickets (id) on delete cascade,
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  is_admin    boolean not null default false,
+  message     text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_ticket_replies_ticket on ticket_replies (ticket_id);
+
+-- ---- support_tickets RLS ----
+alter table support_tickets enable row level security;
+
+create policy "Users can view own org tickets"
+  on support_tickets for select
+  to authenticated
+  using (
+    exists (
+      select 1 from org_members as my
+      where my.org_id = support_tickets.org_id
+        and my.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can create tickets for own org"
+  on support_tickets for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from org_members as my
+      where my.org_id = support_tickets.org_id
+        and my.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can update own tickets"
+  on support_tickets for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- ---- ticket_replies RLS ----
+alter table ticket_replies enable row level security;
+
+create policy "Users can view replies on own org tickets"
+  on ticket_replies for select
+  to authenticated
+  using (
+    exists (
+      select 1 from support_tickets st
+      join org_members my on my.org_id = st.org_id and my.user_id = auth.uid()
+      where st.id = ticket_replies.ticket_id
+    )
+  );
+
+create policy "Users can create replies on own org tickets"
+  on ticket_replies for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from support_tickets st
+      join org_members my on my.org_id = st.org_id and my.user_id = auth.uid()
+      where st.id = ticket_replies.ticket_id
+    )
+  );
+
+-- ---- Developer portal RLS policies ----
+-- Developers can view all tickets (cross-org)
+create policy "Developers can view all tickets"
+  on support_tickets for select
+  to authenticated
+  using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'developer'
+    )
+  );
+
+-- Developers can update any ticket (change status, priority)
+create policy "Developers can update all tickets"
+  on support_tickets for update
+  to authenticated
+  using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'developer'
+    )
+  )
+  with check (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'developer'
+    )
+  );
+
+-- Developers can view all ticket replies
+create policy "Developers can view all replies"
+  on ticket_replies for select
+  to authenticated
+  using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'developer'
+    )
+  );
+
+-- Developers can create admin replies on any ticket
+create policy "Developers can create admin replies"
+  on ticket_replies for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and is_admin = true
+    and exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'developer'
+    )
+  );
+
+-- =========================
+-- Contact form submissions (public / unauthenticated)
+-- =========================
+create table if not exists contact_submissions (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  email      text not null,
+  category   text not null default 'general',
+  message    text not null,
+  processed  boolean not null default false,
+  created_at timestamptz not null default now()
+);

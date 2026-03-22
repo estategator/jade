@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Loader2, Sparkles, RefreshCw, Check, ImageIcon } from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, RotateCw, ImageIcon } from "lucide-react";
 import { PageHeader } from "@/app/components/page-header";
 import {
   updateInventoryItem,
@@ -47,6 +47,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
   const [condition, setCondition] = useState(item.condition ?? "Good");
   const [price, setPrice] = useState(String(item.price ?? ""));
   const [status, setStatus] = useState(item.status ?? "available");
+  const [quantity, setQuantity] = useState(String(item.quantity ?? 1));
   const [projectId, setProjectId] = useState(item.project_id);
 
   const insights = item.ai_insights as AIAnalysisResult | null;
@@ -157,19 +158,18 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
                 <span className="truncate text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                  AI suggestions available
+                  {aiApplied ? "AI suggestions applied" : "AI suggestions available"}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={handleApplyAI}
-                disabled={aiApplied}
                 className="ml-3 inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
               >
                 {aiApplied ? (
                   <>
-                    <Check className="h-3.5 w-3.5" />
-                    Applied
+                    <RotateCw className="h-3.5 w-3.5" />
+                    Re-apply
                   </>
                 ) : (
                   "Apply"
@@ -263,8 +263,8 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
             </div>
           </div>
 
-          {/* Price + Status */}
-          <div className="grid gap-5 sm:grid-cols-2">
+          {/* Price + Quantity + Status */}
+          <div className="grid gap-5 sm:grid-cols-3">
             <div>
               <label htmlFor="price" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">
                 Price ($) <span className="text-red-500">*</span>
@@ -278,6 +278,19 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
                 required
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="quantity" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">Quantity</label>
+              <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="1"
+                step="1"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
                 className={inputClass}
               />
             </div>

@@ -305,7 +305,7 @@ export function MarketingEditor({
               No images available.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
               {orgImages.length > 0 && (
                 <ImageGroup title="Organization" images={orgImages} selectedUrl={selectedImage} onSelect={setSelectedImage} />
               )}
@@ -381,10 +381,11 @@ function ImageGroup({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-zinc-500">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-zinc-500">
         {title}
+        <span className="ml-1 font-normal text-stone-300 dark:text-zinc-600">{images.length}</span>
       </p>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-5 gap-1 sm:grid-cols-6 lg:grid-cols-8">
         {images.map((img) => {
           const isSelected = selectedUrl === img.url;
           return (
@@ -400,11 +401,11 @@ function ImageGroup({
               )}
             >
               <div className="relative aspect-square bg-stone-100 dark:bg-zinc-800">
-                <Image src={img.url} alt={img.label} fill className="object-cover" sizes="80px" />
+                <Image src={img.url} alt={img.label} fill className="object-cover" sizes="48px" />
               </div>
               {isSelected && (
-                <div className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-white">
-                  <Check className="h-2.5 w-2.5" />
+                <div className="absolute right-0.5 top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-indigo-600 text-white">
+                  <Check className="h-2 w-2" />
                 </div>
               )}
             </button>

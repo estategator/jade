@@ -59,6 +59,33 @@ export async function getActiveOrgIdServer(): Promise<string | null> {
 }
 
 /**
+ * Resolve a valid active org for the user.
+ * 1. If the cookie value is set and the user is an active member → use it.
+ * 2. Otherwise fall back to the user's first org membership.
+ * Returns null only when the user truly has zero organizations.
+ */
+export async function resolveActiveOrgId(userId: string): Promise<string | null> {
+  const cookieOrgId = await getActiveOrgIdServer();
+
+  if (cookieOrgId) {
+    // Validate membership
+    const role = await getOrgRole(cookieOrgId, userId);
+    if (role) return cookieOrgId;
+  }
+
+  // Cookie missing or stale — fall back to first org
+  const { data } = await supabaseAdmin
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  return data?.[0]?.org_id ?? null;
+}
+
+/**
  * Resolve the user's role in an org. Returns null if the user is not a member.
  */
 export async function getOrgRole(

@@ -63,7 +63,7 @@ export default function UpgradePage() {
   }
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="mb-10 text-center">
         <h1 className="text-3xl font-bold text-stone-900 dark:text-white">
           Upgrade{org ? ` ${org.name}` : ""}
@@ -80,6 +80,6 @@ export default function UpgradePage() {
             currentTier={(org.subscription_tier ?? "free") as SubscriptionTier}
           />
         )}
-    </>
+    </div>
   );
 }

@@ -15,6 +15,9 @@ import {
   TrendingUp,
   Bell,
   Megaphone,
+  HelpCircle,
+  Code2,
+  Ticket,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { OrgSwitcher } from "@/app/components/org-switcher";
@@ -22,6 +25,7 @@ import { ThemeToggle } from "@/app/components/theme-toggle";
 import { cn } from "@/lib/cn";
 import { useSidebar } from "@/lib/sidebar-context";
 import { getUnreadNotificationCount } from "@/app/notifications/actions";
+import { getProfileRole } from "@/app/developer/actions";
 
 function Tooltip({
   children,
@@ -61,6 +65,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isDeveloper, setIsDeveloper] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,8 +74,14 @@ export function Sidebar() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session || cancelled) return;
-      const result = await getUnreadNotificationCount(session.user.id);
-      if (!cancelled) setUnreadCount(result.count);
+      const [notifResult, role] = await Promise.all([
+        getUnreadNotificationCount(session.user.id),
+        getProfileRole(session.user.id),
+      ]);
+      if (!cancelled) {
+        setUnreadCount(notifResult.count);
+        setIsDeveloper(role === "developer");
+      }
     }
     loadCount();
     const interval = setInterval(loadCount, 30_000);
@@ -111,6 +122,16 @@ export function Sidebar() {
         },
         { label: "Organizations", href: "/organizations", icon: Building2 },
         { label: "Settings", href: "/settings", icon: Settings },
+        ...(isDeveloper
+          ? [{ label: "Developer", href: "/developer", icon: Code2 }]
+          : []),
+      ],
+    },
+    {
+      title: "Support",
+      items: [
+        { label: "Help", href: "/help", icon: HelpCircle },
+        { label: "Tickets", href: "/tickets", icon: Ticket },
       ],
     },
   ];

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Navbar } from "@/app/components/navbar";
+import { Footer } from "@/app/components/footer";
 import { PricingCard } from "@/app/components/pricing-card";
 import { TIERS } from "@/lib/tiers";
 
@@ -232,22 +233,7 @@ export default function PricingPage() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-stone-50 dark:bg-zinc-950 border-t border-stone-200 dark:border-zinc-800 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-stone-900 dark:bg-white rounded flex items-center justify-center text-white dark:text-stone-900 text-xs font-bold">
-                C
-              </div>
-              <span className="font-bold text-stone-900 dark:text-white">Curator</span>
-            </div>
-            <p className="text-sm text-stone-500">
-              © 2026 Curator Inc. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

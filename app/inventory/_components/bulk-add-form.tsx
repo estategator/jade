@@ -143,12 +143,10 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
 
     setItems((prev) => [...prev, ...newItems]);
 
-    // Trigger analysis for each new item with a stagger to avoid flooding the server
-    newItems.forEach((item, index) => {
-      setTimeout(() => {
-        if (item.imageFile) analyzeItem(item.id, item.imageFile);
-      }, 100 + (index * 800)); // 800ms stagger
-    });
+    // Trigger analysis for all new items in parallel
+    for (const item of newItems) {
+      if (item.imageFile) analyzeItem(item.id, item.imageFile);
+    }
   }
 
   function retryAnalysis(id: string) {
@@ -189,13 +187,20 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
     setItems((prev) => [...prev, newEmptyItem()]);
   }
 
+  const analysisInProgress = items.some(
+    (it) => it.analysisStatus === 'queued' || it.analysisStatus === 'analyzing'
+  );
+
   const canSubmit =
     items.length > 0 &&
     items.every(
       (it) =>
-        it.name.trim() &&
+        // Items with completed/failed analysis must have name+price filled.
+        // Items still analyzing are allowed through — the queue worker will hydrate.
+        (it.analysisStatus === 'queued' || it.analysisStatus === 'analyzing') ||
+        (it.name.trim() &&
         !isNaN(parseFloat(it.price)) &&
-        parseFloat(it.price) >= 0
+        parseFloat(it.price) >= 0)
     );
 
   async function handleSubmit() {
@@ -520,6 +525,8 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
           >
             {submitting ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</>
+            ) : analysisInProgress ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Add {items.length} {items.length === 1 ? "item" : "items"} (analysis running…)</>
             ) : (
               <><Check className="h-4 w-4" /> Add {items.length} {items.length === 1 ? "item" : "items"}</>
             )}

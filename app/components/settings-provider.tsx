@@ -228,11 +228,8 @@ export function SettingsProvider({
 
   const setActiveOrg = useCallback(
     (orgId: string | null) => {
-      if (orgId) {
-        setActiveOrgId(orgId);
-      } else {
-        clearActiveOrgId();
-      }
+      if (!orgId) return; // Cannot clear active org — personal workspace removed
+      setActiveOrgId(orgId);
       setActiveOrgIdState(orgId);
       setLoading(true);
       loadSettings(orgId);

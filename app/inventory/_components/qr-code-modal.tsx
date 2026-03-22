@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { X, Copy, Check, ExternalLink } from "lucide-react";
+import { X, Copy, Check, ExternalLink, Printer } from "lucide-react";
 
 type QrModalProps = Readonly<{
   itemId: string;
@@ -56,6 +56,17 @@ export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
         <div className="mx-auto mb-5 flex w-fit items-center justify-center rounded-xl border border-stone-200 bg-white p-4 dark:border-zinc-700">
           <QRCodeSVG value={url} size={200} level="M" />
         </div>
+
+        {/* Print thermal label */}
+        <a
+          href={`/inventory/${itemId}/print`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+        >
+          <Printer className="h-4 w-4" />
+          Print Thermal Label
+        </a>
 
         {/* URL + actions */}
         <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">

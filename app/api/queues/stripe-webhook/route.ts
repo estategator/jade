@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import Stripe from 'stripe';
 import { tierFromStripePriceId } from '@/lib/tiers';
+import { handleCallback } from '@vercel/queue';
 
 export type WebhookPayload = {
   eventType: string;
@@ -266,25 +267,6 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
   }
 }
 
-export async function POST(req: NextRequest) {
-  // In production, verify QStash signature
-  if (process.env.VERCEL) {
-    const signingKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
-    if (!signingKey) {
-      return NextResponse.json({ error: 'Missing signing key.' }, { status: 500 });
-    }
-    const upstashSig = req.headers.get('upstash-signature');
-    if (!upstashSig) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
-    }
-  }
-
-  try {
-    const payload = (await req.json()) as WebhookPayload;
-    await processWebhookEvent(payload);
-    return NextResponse.json({ processed: true });
-  } catch (err) {
-    console.error('Queue consumer error:', err);
-    return NextResponse.json({ error: 'Processing failed.' }, { status: 500 });
-  }
-}
+export const POST = handleCallback(async (payload: WebhookPayload) => {
+  await processWebhookEvent(payload);
+});

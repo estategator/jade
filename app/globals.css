@@ -75,3 +75,75 @@ body {
   opacity: 0;
   animation: fade-in-up 0.5s ease-out forwards;
 }
+
+/* ── Settings form utility classes ──────────────────────── */
+
+.settings-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #44403c; /* stone-700 */
+}
+
+:where(.dark, .dark *) .settings-label {
+  color: #d4d4d8; /* zinc-300 */
+}
+
+.settings-input {
+  display: block;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #d6d3d1; /* stone-300 */
+  background-color: #fff;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #1c1917; /* stone-900 */
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: all 0.15s;
+}
+
+.settings-input::placeholder {
+  color: #a8a29e; /* stone-400 */
+}
+
+.settings-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #6366f1; /* indigo-500 ring */
+}
+
+.settings-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+:where(.dark, .dark *) .settings-input {
+  border-color: #3f3f46; /* zinc-700 */
+  background-color: #18181b; /* zinc-900 */
+  color: #fff;
+}
+
+:where(.dark, .dark *) .settings-input::placeholder {
+  color: #71717a; /* zinc-500 */
+}
+
+/* ── Thermal print label ───────────────────────────────── */
+@media print {
+  @page {
+    size: 58mm auto;
+    margin: 2mm;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .thermal-label {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}

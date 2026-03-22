@@ -77,9 +77,16 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
     };
   }, []);
 
-  const activeOrg = orgs.find((o) => o.id === activeOrgId);
-  const orgInitial = activeOrg?.name[0]?.toUpperCase() ?? "P";
+  const activeOrg = orgs.find((o) => o.id === activeOrgId) || orgs[0];
+  const orgInitial = activeOrg?.name[0]?.toUpperCase() ?? "?";
   const orgTier = (activeOrg?.subscription_tier ?? "free") as SubscriptionTier;
+
+  // If no active org is set but user has orgs, auto-select the first one
+  useEffect(() => {
+    if (orgs.length > 0 && !activeOrgId) {
+      setActiveOrg(orgs[0].id);
+    }
+  }, [orgs, activeOrgId, setActiveOrg]);
 
   const isUp = dropdownDirection === "up";
   const dropdownPositionClass = isUp ? "bottom-full mb-1.5" : "top-full mt-1.5";
@@ -92,7 +99,7 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        aria-label={`Organization: ${activeOrg ? activeOrg.name : "Personal"}`}
+        aria-label={`Organization: ${activeOrg?.name ?? "Select organization"}`}
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
@@ -102,18 +109,14 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
             : "hover:bg-stone-50 dark:hover:bg-zinc-800/50"
         )}
       >
-        <OrgAvatar initial={orgInitial} active={!!activeOrgId} />
+        <OrgAvatar initial={orgInitial} active={true} />
 
         <div className="flex min-w-0 flex-1 flex-col items-start">
           <span className="w-full truncate text-left text-sm font-semibold text-stone-900 dark:text-white">
-            {activeOrg ? activeOrg.name : "Personal"}
+            {activeOrg?.name ?? "Select organization"}
           </span>
           <span className="flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
-            {activeOrgId ? (
-              <TierBadge tier={orgTier} />
-            ) : (
-              "No organization"
-            )}
+            <TierBadge tier={orgTier} />
           </span>
         </div>
 
@@ -140,45 +143,9 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
             role="listbox"
             aria-label="Select organization"
           >
-            {/* Personal */}
-            <button
-              type="button"
-              role="option"
-              aria-selected={!activeOrgId}
-              onClick={() => {
-                setActiveOrg(null);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm transition-colors",
-                !activeOrgId
-                  ? "bg-indigo-50 dark:bg-indigo-500/10"
-                  : "hover:bg-stone-50 dark:hover:bg-zinc-800/60"
-              )}
-            >
-              <OrgAvatar initial="P" active={!activeOrgId} />
-              <span
-                className={cn(
-                  "flex-1 truncate font-medium",
-                  !activeOrgId
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-stone-700 dark:text-zinc-300"
-                )}
-              >
-                Personal
-              </span>
-              {!activeOrgId && (
-                <Check className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
-              )}
-            </button>
-
-            {orgs.length > 0 && (
-              <div className="mx-2 my-1 h-px bg-stone-100 dark:bg-zinc-800" />
-            )}
-
             {/* Orgs */}
             {orgs.map((org) => {
-              const selected = activeOrgId === org.id;
+              const selected = activeOrg?.id === org.id;
               return (
                 <button
                   key={org.id}

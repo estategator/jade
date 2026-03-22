@@ -1,6 +1,6 @@
 ﻿import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { resolveActiveOrgId } from "@/lib/rbac";
 import { getUserProjects } from "@/app/inventory/actions";
 import { AddItemForm } from "@/app/inventory/_components/add-item-form";
 
@@ -16,15 +16,14 @@ export default async function AddInventoryPage() {
     redirect("/login");
   }
 
-  const cookieStore = await cookies();
-  const activeOrgId = cookieStore.get("curator_active_org")?.value ?? null;
+  const activeOrgId = await resolveActiveOrgId(user.id);
 
   const projResult = await getUserProjects(user.id, activeOrgId);
   const projects = projResult.data ?? [];
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <AddItemForm key={activeOrgId} projects={projects} userId={user.id} />
-    </>
+    </div>
   );
 }

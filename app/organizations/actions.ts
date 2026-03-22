@@ -28,6 +28,12 @@ export type Organization = {
   name: string;
   slug: string;
   cover_image_url: string | null;
+  phone: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -65,6 +71,13 @@ export type Project = {
   name: string;
   description: string;
   cover_image_url: string | null;
+  phone: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  published: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -92,6 +105,97 @@ function slugify(text: string): string {
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+// ── Default org bootstrap ────────────────────────────────────
+
+/**
+ * Ensure the user has at least one organization.
+ * If they have none, create "{First Name}'s Org" (or "{emailPrefix}'s Org").
+ * Returns the org id of an existing or newly-created org.
+ */
+export async function ensureDefaultOrg(
+  userId: string,
+  metadata?: { fullName?: string; email?: string },
+): Promise<{ orgId: string } | { error: string }> {
+  try {
+    // Check if user already belongs to any org
+    const { data: existing, error: memErr } = await supabase
+      .from('org_members')
+      .select('org_id')
+      .eq('user_id', userId)
+      .limit(1);
+
+    if (memErr) {
+      console.error('ensureDefaultOrg membership check error:', memErr);
+      return { error: 'Failed to check organizations.' };
+    }
+
+    if (existing && existing.length > 0) {
+      return { orgId: existing[0].org_id };
+    }
+
+    // Derive org name from first name or email prefix
+    const fullName = (metadata?.fullName ?? '').trim();
+    const firstName = fullName.split(' ')[0]?.trim();
+    const emailPrefix = (metadata?.email ?? '').split('@')[0]?.trim();
+    const baseName = firstName || emailPrefix || 'My';
+    const orgName = `${baseName}'s Org`;
+    const slug = slugify(orgName) || `org-${Date.now()}`;
+
+    const { data: org, error: orgErr } = await supabase
+      .from('organizations')
+      .insert({ name: orgName, slug, created_by: userId })
+      .select('id')
+      .single();
+
+    if (orgErr) {
+      // Handle slug collision by appending timestamp
+      if (orgErr.code === '23505') {
+        const retrySlug = `${slugify(orgName)}-${Date.now()}`;
+        const { data: retryOrg, error: retryErr } = await supabase
+          .from('organizations')
+          .insert({ name: orgName, slug: retrySlug, created_by: userId })
+          .select('id')
+          .single();
+
+        if (retryErr || !retryOrg) {
+          console.error('ensureDefaultOrg retry error:', retryErr);
+          return { error: 'Failed to create default organization.' };
+        }
+
+        const { error: retryMemErr } = await supabase
+          .from('org_members')
+          .insert({ org_id: retryOrg.id, user_id: userId, role: 'superadmin' });
+
+        if (retryMemErr) {
+          await supabase.from('organizations').delete().eq('id', retryOrg.id);
+          return { error: 'Failed to set up organization membership.' };
+        }
+
+        return { orgId: retryOrg.id };
+      }
+
+      console.error('ensureDefaultOrg create error:', orgErr);
+      return { error: 'Failed to create default organization.' };
+    }
+
+    // Add the creator as superadmin
+    const { error: memberErr } = await supabase
+      .from('org_members')
+      .insert({ org_id: org.id, user_id: userId, role: 'superadmin' });
+
+    if (memberErr) {
+      await supabase.from('organizations').delete().eq('id', org.id);
+      console.error('ensureDefaultOrg membership error:', memberErr);
+      return { error: 'Failed to set up organization membership.' };
+    }
+
+    return { orgId: org.id };
+  } catch (err) {
+    console.error('ensureDefaultOrg unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
 }
 
 // ── Organizations ────────────────────────────────────────────
@@ -184,9 +288,26 @@ export async function createOrganization(formData: FormData) {
 
   try {
     // Create the organization
+    const phone = (formData.get('phone') as string)?.trim() || null;
+    const addressLine1 = (formData.get('address_line1') as string)?.trim() || null;
+    const addressLine2 = (formData.get('address_line2') as string)?.trim() || null;
+    const city = (formData.get('city') as string)?.trim() || null;
+    const state = (formData.get('state') as string)?.trim() || null;
+    const zipCode = (formData.get('zip_code') as string)?.trim() || null;
+
     const { data: org, error: orgError } = await supabase
       .from('organizations')
-      .insert({ name: name.trim(), slug, created_by: userId })
+      .insert({
+        name: name.trim(),
+        slug,
+        created_by: userId,
+        phone,
+        address_line1: addressLine1,
+        address_line2: addressLine2,
+        city,
+        state,
+        zip_code: zipCode,
+      })
       .select()
       .single();
 
@@ -262,10 +383,26 @@ export async function updateOrganization(id: string, formData: FormData) {
     if (imageFile.size > 10 * 1024 * 1024) return { error: 'Cover image must be under 10 MB.' };
   }
 
+  const phone = (formData.get('phone') as string)?.trim() || null;
+  const addressLine1 = (formData.get('address_line1') as string)?.trim() || null;
+  const addressLine2 = (formData.get('address_line2') as string)?.trim() || null;
+  const city = (formData.get('city') as string)?.trim() || null;
+  const state = (formData.get('state') as string)?.trim() || null;
+  const zipCode = (formData.get('zip_code') as string)?.trim() || null;
+
   try {
     const { error } = await supabase
       .from('organizations')
-      .update({ name: name.trim(), updated_at: new Date().toISOString() })
+      .update({
+        name: name.trim(),
+        phone,
+        address_line1: addressLine1,
+        address_line2: addressLine2,
+        city,
+        state,
+        zip_code: zipCode,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id);
 
     if (error) {
@@ -984,6 +1121,13 @@ export async function createProject(formData: FormData) {
   if (!check.granted) return { error: check.error };
 
   try {
+    const phone = (formData.get('phone') as string)?.trim() || null;
+    const addressLine1 = (formData.get('address_line1') as string)?.trim() || null;
+    const addressLine2 = (formData.get('address_line2') as string)?.trim() || null;
+    const city = (formData.get('city') as string)?.trim() || null;
+    const state = (formData.get('state') as string)?.trim() || null;
+    const zipCode = (formData.get('zip_code') as string)?.trim() || null;
+
     const { data, error } = await supabase
       .from('projects')
       .insert({
@@ -991,6 +1135,12 @@ export async function createProject(formData: FormData) {
         description: description?.trim() || '',
         org_id: orgId,
         created_by: userId,
+        phone,
+        address_line1: addressLine1,
+        address_line2: addressLine2,
+        city,
+        state,
+        zip_code: zipCode,
       })
       .select()
       .single();
@@ -1042,6 +1192,37 @@ export async function createProject(formData: FormData) {
   }
 }
 
+export async function toggleProjectPublished(projectId: string, userId: string, published: boolean) {
+  try {
+    // Look up org_id from the project to check permissions
+    const { data: project, error: lookupErr } = await supabase
+      .from('projects')
+      .select('org_id')
+      .eq('id', projectId)
+      .single();
+
+    if (lookupErr || !project) return { error: 'Project not found.' };
+
+    const check = await requirePermission(project.org_id, userId, 'projects:update');
+    if (!check.granted) return { error: check.error };
+
+    const { error } = await supabase
+      .from('projects')
+      .update({ published, updated_at: new Date().toISOString() })
+      .eq('id', projectId);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to update publish status.' };
+    }
+
+    return { success: true, published };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
 export async function updateProject(id: string, formData: FormData) {
   const name = formData.get('name') as string;
   const description = formData.get('description') as string;
@@ -1054,12 +1235,25 @@ export async function updateProject(id: string, formData: FormData) {
     if (imageFile.size > 10 * 1024 * 1024) return { error: 'Cover image must be under 10 MB.' };
   }
 
+  const phone = (formData.get('phone') as string)?.trim() || null;
+  const addressLine1 = (formData.get('address_line1') as string)?.trim() || null;
+  const addressLine2 = (formData.get('address_line2') as string)?.trim() || null;
+  const city = (formData.get('city') as string)?.trim() || null;
+  const state = (formData.get('state') as string)?.trim() || null;
+  const zipCode = (formData.get('zip_code') as string)?.trim() || null;
+
   try {
     const { error } = await supabase
       .from('projects')
       .update({
         name: name.trim(),
         description: description?.trim() || '',
+        phone,
+        address_line1: addressLine1,
+        address_line2: addressLine2,
+        city,
+        state,
+        zip_code: zipCode,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);

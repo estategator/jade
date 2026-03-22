@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Loader2, Check, X, ImageOff, ZoomIn } from 'lucide-react';
+import { Upload, Loader2, Check, X, ImageOff, ZoomIn, Rows3, LayoutGrid, Package, Trash2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { processPricingBatch, addPricingResultToInventory, type PricingBatchResult } from '@/app/pricing-optimization/actions';
@@ -18,6 +18,16 @@ type PricingOptimizationFormProps = Readonly<{
 }>;
 
 type ConditionKey = 'excellent' | 'good' | 'fair' | 'poor';
+type ViewDensity = 'comfortable' | 'compact';
+
+const conditionStops: ConditionKey[] = ['poor', 'fair', 'good', 'excellent'];
+
+type ResultItem = PricingBatchResult & {
+  selectedCondition: ConditionKey;
+  adding?: boolean;
+  originalFile?: File;
+  error?: string;
+};
 
 const conditionConfig: Record<
   ConditionKey,
@@ -74,12 +84,29 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [results, setResults] = useState<(PricingBatchResult & { selectedCondition?: ConditionKey; adding?: boolean; originalFile?: File })[]>([]);
+  const [results, setResults] = useState<ResultItem[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id ?? '');
+  const [viewDensity, setViewDensityState] = useState<ViewDensity>('comfortable');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkAdding, setBulkAdding] = useState(false);
+  const isCompact = viewDensity === 'compact';
+
+  useEffect(() => {
+    const saved = localStorage.getItem('pricing-view-density') as ViewDensity;
+    if (saved === 'comfortable' || saved === 'compact') {
+      setViewDensityState(saved);
+    }
+  }, []);
+
+  const setViewDensity = useCallback((density: ViewDensity) => {
+    setViewDensityState(density);
+    localStorage.setItem('pricing-view-density', density);
+  }, []);
 
   async function handleFiles(files: FileList) {
     setError('');
     setLoading(true);
+    setSelected(new Set());
 
     const formData = new FormData();
     const fileArray: File[] = [];
@@ -97,8 +124,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
     }
 
     if (result.data) {
-      // Initialize with default condition selection and store original files
-      const resultsWithDefaults = result.data.map((r, idx) => ({
+      const resultsWithDefaults: ResultItem[] = result.data.map((r, idx) => ({
         ...r,
         selectedCondition: 'good' as ConditionKey,
         originalFile: fileArray[idx],
@@ -125,10 +151,10 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
 
   async function handleAddToInventory(index: number) {
     const item = results[index];
-    if (!item || !item.selectedCondition) return;
+    if (!item?.selectedCondition) return;
 
     setResults((prev) =>
-      prev.map((r, i) => (i === index ? { ...r, adding: true } : r))
+      prev.map((r, i) => (i === index ? { ...r, adding: true, error: undefined } : r))
     );
 
     const result = await addPricingResultToInventory(
@@ -143,14 +169,93 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
     );
 
     if (result.error) {
-      setError(result.error);
       setResults((prev) =>
-        prev.map((r, i) => (i === index ? { ...r, adding: false } : r))
+        prev.map((r, i) => (i === index ? { ...r, adding: false, error: result.error } : r))
       );
     } else {
-      // Remove from results after successful add
       setResults((prev) => prev.filter((_, i) => i !== index));
+      setSelected((prev) => {
+        const next = new Set<number>();
+        for (const idx of prev) {
+          if (idx < index) next.add(idx);
+          else if (idx > index) next.add(idx - 1);
+        }
+        return next;
+      });
     }
+  }
+
+  async function handleBulkAdd() {
+    if (selected.size === 0 || bulkAdding) return;
+    setBulkAdding(true);
+
+    const selectedIndices = Array.from(selected);
+    const succeeded = new Set<number>();
+
+    for (const idx of selectedIndices) {
+      const item = results[idx];
+      if (!item?.selectedCondition) continue;
+
+      setResults((prev) =>
+        prev.map((r, i) => (i === idx ? { ...r, adding: true, error: undefined } : r))
+      );
+
+      const result = await addPricingResultToInventory(
+        item.name,
+        item.description,
+        item.category,
+        item.selectedCondition,
+        item.pricePerCondition,
+        selectedProjectId || projects[0]?.id || '',
+        userId,
+        item.originalFile
+      );
+
+      if (result.error) {
+        setResults((prev) =>
+          prev.map((r, i) => (i === idx ? { ...r, adding: false, error: result.error } : r))
+        );
+      } else {
+        succeeded.add(idx);
+      }
+    }
+
+    if (succeeded.size > 0) {
+      setResults((prev) => prev.filter((_, i) => !succeeded.has(i)));
+    }
+
+    setSelected(new Set());
+    setBulkAdding(false);
+  }
+
+  function handleToggleSelect(index: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function handleToggleSelectAll() {
+    if (selected.size === results.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(results.map((_, i) => i)));
+    }
+  }
+
+  function handleRemoveSelected() {
+    if (selected.size === 0) return;
+    setResults((prev) => prev.filter((_, i) => !selected.has(i)));
+    setSelected(new Set());
+  }
+
+  function handleUploadMore() {
+    setResults([]);
+    setError('');
+    setSelected(new Set());
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   return (
@@ -227,42 +332,140 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
         </motion.div>
       )}
 
-      {/* Results Grid */}
+      {/* Results Section */}
       {results.length > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="space-y-6"
+          className="space-y-4"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-stone-900 dark:text-white">
-              Pricing Results ({results.length})
-            </h2>
-            <button
-              onClick={() => {
-                setResults([]);
-                setError('');
-                if (fileInputRef.current) fileInputRef.current.value = '';
-              }}
-              className="px-4 py-2 text-sm font-medium text-stone-600 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-white"
-            >
-              Upload more
-            </button>
+          {/* Results Toolbar */}
+          <div className="sticky top-16 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-stone-50/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-stone-200/50 dark:border-zinc-800/50">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-bold text-stone-900 dark:text-white">
+                  Results ({results.length})
+                </h2>
+                <button
+                  onClick={handleToggleSelectAll}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-lg text-stone-600 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  {selected.size === results.length && results.length > 0 ? (
+                    <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                  ) : (
+                    <div className="h-3.5 w-3.5 rounded border border-stone-300 dark:border-zinc-600" />
+                  )}
+                  {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Density Toggle */}
+                <div className="flex items-center rounded-lg border border-stone-200 dark:border-zinc-700 overflow-hidden">
+                  <button
+                    onClick={() => setViewDensity('comfortable')}
+                    className={cn(
+                      'p-1.5 transition-colors',
+                      !isCompact
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                        : 'text-stone-400 dark:text-zinc-500 hover:text-stone-600 dark:hover:text-zinc-300'
+                    )}
+                    aria-label="Comfortable view"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewDensity('compact')}
+                    className={cn(
+                      'p-1.5 transition-colors',
+                      isCompact
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                        : 'text-stone-400 dark:text-zinc-500 hover:text-stone-600 dark:hover:text-zinc-300'
+                    )}
+                    aria-label="Compact view"
+                  >
+                    <Rows3 className="h-4 w-4" />
+                  </button>
+                </div>
+                <button
+                  onClick={handleUploadMore}
+                  className="px-3 py-1.5 text-sm font-medium text-stone-600 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                >
+                  Upload more
+                </button>
+              </div>
+            </div>
+
+            {/* Bulk Action Bar */}
+            <AnimatePresence>
+              {selected.size > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex items-center gap-3 pt-3">
+                    <button
+                      onClick={handleBulkAdd}
+                      disabled={bulkAdding}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
+                        bulkAdding
+                          ? 'bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-500 cursor-not-allowed'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:hover:bg-indigo-500'
+                      )}
+                    >
+                      {bulkAdding ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Package className="h-4 w-4" />
+                      )}
+                      Add {selected.size} to Inventory
+                    </button>
+                    <button
+                      onClick={handleRemoveSelected}
+                      disabled={bulkAdding}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
+                        bulkAdding
+                          ? 'text-stone-400 dark:text-zinc-600 cursor-not-allowed'
+                          : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                      )}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove {selected.size}
+                    </button>
+                    <button
+                      onClick={() => setSelected(new Set())}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium text-stone-500 dark:text-zinc-400 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {results.map((item, idx) => (
-            <PricingResultCard
-              key={idx}
-              item={item}
-              index={idx}
-              onSelectCondition={(condition) => {
-                setResults((prev) =>
-                  prev.map((r, i) => (i === idx ? { ...r, selectedCondition: condition } : r))
-                );
-              }}
-              onAddToInventory={handleAddToInventory}
-            />
-          ))}
+          {/* Result Cards */}
+          <div className={cn('space-y-4', isCompact && 'space-y-2')}>
+            {results.map((item, idx) => (
+              <PricingResultCard
+                key={idx}
+                item={item}
+                index={idx}
+                compact={isCompact}
+                isSelected={selected.has(idx)}
+                onToggleSelect={() => handleToggleSelect(idx)}
+                onSelectCondition={(condition) => {
+                  setResults((prev) =>
+                    prev.map((r, i) => (i === idx ? { ...r, selectedCondition: condition } : r))
+                  );
+                }}
+                onAddToInventory={handleAddToInventory}
+              />
+            ))}
+          </div>
         </motion.div>
       )}
     </div>
@@ -270,8 +473,11 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
 }
 
 type PricingResultCardProps = Readonly<{
-  item: PricingBatchResult & { selectedCondition?: ConditionKey; adding?: boolean; originalFile?: File };
+  item: ResultItem;
   index: number;
+  compact: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
   onSelectCondition: (condition: ConditionKey) => void;
   onAddToInventory: (index: number) => void;
 }>;
@@ -319,9 +525,96 @@ function ImagePreviewModal({ src, name, onClose }: { src: string; name: string; 
   );
 }
 
+function ConditionSlider({
+  value,
+  pricePerCondition,
+  onChange,
+  compact,
+}: Readonly<{
+  value: ConditionKey;
+  pricePerCondition: Record<ConditionKey, number>;
+  onChange: (condition: ConditionKey) => void;
+  compact?: boolean;
+}>) {
+  const stopIndex = conditionStops.indexOf(value);
+  const config = conditionConfig[value];
+  const price = pricePerCondition[value];
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider',
+            config.textLight,
+            config.textDark
+          )}
+        >
+          <span
+            className={cn(
+              'h-2 w-2 rounded-full',
+              config.bgLight,
+              config.bgDark
+            )}
+          />
+          {config.label}
+        </span>
+        <span
+          className={cn(
+            'font-bold font-mono',
+            compact ? 'text-lg' : 'text-2xl',
+            config.textLight,
+            config.textDark
+          )}
+        >
+          ${price.toFixed(2)}
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min={0}
+        max={3}
+        step={1}
+        value={stopIndex}
+        onChange={(e) => onChange(conditionStops[parseInt(e.target.value)])}
+        className={cn(
+          'w-full h-1.5 appearance-none rounded-full cursor-pointer bg-stone-200 dark:bg-zinc-700',
+          '[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4',
+          '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:shadow-md',
+          '[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110',
+          '[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full',
+          '[&::-moz-range-thumb]:bg-indigo-600 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer'
+        )}
+        aria-label="Condition slider"
+      />
+
+      <div className="flex justify-between">
+        {conditionStops.map((stop) => (
+          <button
+            key={stop}
+            onClick={() => onChange(stop)}
+            className={cn(
+              'text-[10px] font-medium transition-colors',
+              stop === value
+                ? cn(conditionConfig[stop].textLight, conditionConfig[stop].textDark)
+                : 'text-stone-400 dark:text-zinc-500 hover:text-stone-600 dark:hover:text-zinc-300'
+            )}
+          >
+            {conditionConfig[stop].label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PricingResultCard({
   item,
   index,
+  compact,
+  isSelected,
+  onToggleSelect,
   onSelectCondition,
   onAddToInventory,
 }: PricingResultCardProps) {
@@ -331,7 +624,6 @@ function PricingResultCard({
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Revoke the object URL when the component unmounts or the file changes.
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -355,15 +647,40 @@ function PricingResultCard({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.05 }}
-        className="rounded-2xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden"
+        className={cn(
+          'rounded-2xl border overflow-hidden transition-colors',
+          isSelected
+            ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-900/10'
+            : 'border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50'
+        )}
       >
         <div className="flex flex-col sm:flex-row">
-          {/* Image Thumbnail */}
-          <div className="sm:w-48 sm:flex-shrink-0 bg-stone-100 dark:bg-zinc-800">
+          {/* Selection + Image */}
+          <div
+            className={cn(
+              'relative sm:flex-shrink-0 bg-stone-100 dark:bg-zinc-800',
+              compact ? 'sm:w-32' : 'sm:w-48'
+            )}
+          >
+            <button
+              onClick={onToggleSelect}
+              className="absolute top-2 left-2 z-10 p-1 rounded-md bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border border-stone-200 dark:border-zinc-700 transition-colors hover:bg-white dark:hover:bg-zinc-900"
+              aria-label={isSelected ? 'Deselect item' : 'Select item'}
+            >
+              {isSelected ? (
+                <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+              ) : (
+                <div className="h-3.5 w-3.5 rounded-sm border border-stone-300 dark:border-zinc-600" />
+              )}
+            </button>
+
             {previewUrl ? (
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="relative w-full h-48 sm:h-full group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                className={cn(
+                  'relative w-full group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500',
+                  compact ? 'h-32 sm:h-full' : 'h-48 sm:h-full'
+                )}
                 aria-label={`Enlarge image of ${item.name}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -373,81 +690,117 @@ function PricingResultCard({
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                  <ZoomIn className="h-7 w-7 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                  <ZoomIn
+                    className={cn(
+                      'text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg',
+                      compact ? 'h-5 w-5' : 'h-7 w-7'
+                    )}
+                  />
                 </div>
               </button>
             ) : (
-              <div className="w-full h-48 sm:h-full flex items-center justify-center">
-                <ImageOff className="h-10 w-10 text-stone-300 dark:text-zinc-600" />
+              <div
+                className={cn(
+                  'w-full flex items-center justify-center',
+                  compact ? 'h-32 sm:h-full' : 'h-48 sm:h-full'
+                )}
+              >
+                <ImageOff
+                  className={cn(
+                    'text-stone-300 dark:text-zinc-600',
+                    compact ? 'h-8 w-8' : 'h-10 w-10'
+                  )}
+                />
               </div>
             )}
           </div>
 
           {/* Card Content */}
-          <div className="flex-1 p-6 space-y-4">
+          <div className={cn('flex-1', compact ? 'p-3 space-y-2' : 'p-6 space-y-4')}>
             {/* Item Details */}
-            <div>
-              <h3 className="text-lg font-bold text-stone-900 dark:text-white">{item.name}</h3>
-              <p className="text-sm text-stone-600 dark:text-zinc-400 mt-1">{item.description}</p>
-              <p className="text-xs text-stone-500 dark:text-zinc-500 mt-2">
-                Category: <span className="font-medium">{item.category}</span>
-              </p>
+            <div className={compact ? 'flex items-start justify-between gap-3' : ''}>
+              <div className={compact ? 'min-w-0 flex-1' : ''}>
+                <h3
+                  className={cn(
+                    'font-bold text-stone-900 dark:text-white',
+                    compact ? 'text-sm' : 'text-lg'
+                  )}
+                >
+                  {item.name}
+                </h3>
+                <p
+                  className={cn(
+                    'text-stone-600 dark:text-zinc-400',
+                    compact ? 'text-xs line-clamp-1 mt-0.5' : 'text-sm mt-1'
+                  )}
+                >
+                  {item.description}
+                </p>
+                <p
+                  className={cn(
+                    'text-stone-500 dark:text-zinc-500',
+                    compact ? 'text-[10px] mt-0.5' : 'text-xs mt-2'
+                  )}
+                >
+                  Category: <span className="font-medium">{item.category}</span>
+                </p>
+              </div>
             </div>
 
-            {/* Condition Prices Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {(Object.keys(conditionConfig) as ConditionKey[]).map((condition) => {
-                const config = conditionConfig[condition];
-                const price = item.pricePerCondition[condition];
-                const isSelected = item.selectedCondition === condition;
+            {/* Condition Slider */}
+            <ConditionSlider
+              value={item.selectedCondition}
+              pricePerCondition={item.pricePerCondition}
+              onChange={onSelectCondition}
+              compact={compact}
+            />
 
-                return (
-                  <motion.button
-                    key={condition}
-                    onClick={() => onSelectCondition(condition)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={cn(
-                      'p-3 rounded-xl border-2 transition-all cursor-pointer',
-                      isSelected
-                        ? cn(config.bgLight, config.bgDark, `border-${condition === 'excellent' ? 'emerald' : condition === 'good' ? 'indigo' : condition === 'fair' ? 'amber' : 'red'}-500`)
-                        : cn(
-                            `border-${condition === 'excellent' ? 'emerald' : condition === 'good' ? 'indigo' : condition === 'fair' ? 'amber' : 'red'}-200`,
-                            `dark:border-${condition === 'excellent' ? 'emerald' : condition === 'good' ? 'indigo' : condition === 'fair' ? 'amber' : 'red'}-800`,
-                            'bg-white dark:bg-zinc-800/50'
-                          )
-                    )}
-                  >
-                    <div className={cn('text-xs font-semibold mb-1', isSelected ? cn(config.textLight, config.textDark) : 'text-stone-600 dark:text-zinc-400')}>
-                      {config.label}
-                    </div>
-                    <div className={cn('text-lg font-bold', isSelected ? cn(config.textLight, config.textDark) : 'text-stone-900 dark:text-white')}>
-                      ${price.toFixed(2)}
-                    </div>
-                    {isSelected && (
-                      <Check className={cn('h-4 w-4 mt-1', config.textLight, config.textDark)} />
-                    )}
-                  </motion.button>
-                );
-              })}
-            </div>
+            {/* Quick condition chips - comfortable only */}
+            {!compact && (
+              <div className="flex flex-wrap gap-2">
+                {conditionStops.map((condition) => {
+                  const config = conditionConfig[condition];
+                  const isActive = item.selectedCondition === condition;
+                  return (
+                    <button
+                      key={condition}
+                      onClick={() => onSelectCondition(condition)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
+                        isActive
+                          ? cn(config.bgLight, config.bgDark, config.textLight, config.textDark)
+                          : 'bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 hover:bg-stone-200 dark:hover:bg-zinc-700'
+                      )}
+                    >
+                      {config.label} &middot; ${item.pricePerCondition[condition].toFixed(0)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Per-item error */}
+            {item.error && (
+              <p className="text-xs text-red-600 dark:text-red-400">{item.error}</p>
+            )}
 
             {/* Add to Inventory Button */}
             <button
               onClick={() => onAddToInventory(index)}
               disabled={item.adding}
               className={cn(
-                'w-full px-4 py-2 rounded-lg font-medium text-sm transition-all',
+                'w-full rounded-lg font-medium transition-all',
+                compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm',
                 item.adding
                   ? 'bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-500 cursor-not-allowed'
                   : 'bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600'
               )}
             >
               {item.adding ? (
-                <div className="flex items-center justify-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Adding...
-                </div>
+                </span>
               ) : (
                 'Add to Inventory'
               )}

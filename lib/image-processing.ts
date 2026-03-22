@@ -112,28 +112,49 @@ export async function analyzeImage(base64Image: string): Promise<AIAnalysisResul
     });
 
     const content = response.output_text ?? '';
+    console.log('[analyzeImage] raw output_text:', content.slice(0, 500));
     const cleaned = content.replace(/```json?\s*/gi, '').replace(/```/g, '').trim();
     const raw = JSON.parse(cleaned);
+    console.log('[analyzeImage] parsed JSON keys:', Object.keys(raw));
 
-    // Map from prompt output format (primary_object + pricing_strategy) to flat AIAnalysisResult
-    const primary = raw.primary_object ?? raw;
-    const pricing = raw.pricing_strategy;
+    let parsed: AIAnalysisResult;
 
-    const parsed: AIAnalysisResult = {
-      name: primary.name ?? raw.name ?? '',
-      description: primary.description ?? raw.description ?? '',
-      category: primary.category ?? raw.category ?? 'Other',
-      condition: inferCondition(primary.condition_notes ?? primary.condition ?? raw.condition),
-      price: pricing?.suggested_estate_price ?? pricing?.fair_market_value ?? raw.price ?? 0,
-    };
+    // New schema: { sale_summary, identified_items[] }
+    if (Array.isArray(raw.identified_items) && raw.identified_items.length > 0) {
+      const item = raw.identified_items[0];
+      const pricing = item.pricing_strategy;
+      console.log('[analyzeImage] new schema detected, item keys:', Object.keys(item));
+
+      parsed = {
+        name: item.item_name ?? '',
+        description: item.description ?? '',
+        category: item.category ?? 'Other',
+        condition: inferCondition(item.appraisal_notes?.condition ?? item.condition),
+        price: pricing?.suggested_day_1_estate_price ?? pricing?.fair_market_value_retail ?? 0,
+      };
+    } else {
+      // Legacy schema: { primary_object, pricing_strategy } or flat
+      const primary = raw.primary_object ?? raw;
+      const pricing = raw.pricing_strategy;
+      console.log('[analyzeImage] legacy/flat schema, primary keys:', Object.keys(primary));
+
+      parsed = {
+        name: primary.name ?? raw.name ?? '',
+        description: primary.description ?? raw.description ?? '',
+        category: primary.category ?? raw.category ?? 'Other',
+        condition: inferCondition(primary.condition_notes ?? primary.condition ?? raw.condition),
+        price: pricing?.suggested_estate_price ?? pricing?.fair_market_value ?? raw.price ?? 0,
+      };
+    }
 
     if (!VALID_CATEGORIES.includes(parsed.category)) parsed.category = 'Other';
     if (!VALID_CONDITIONS.includes(parsed.condition)) parsed.condition = 'Good';
     if (typeof parsed.price !== 'number' || parsed.price < 0) parsed.price = 0;
 
+    console.log('[analyzeImage] final result:', JSON.stringify(parsed));
     return parsed;
   } catch (err) {
-    console.error('AI analysis error:', err);
+    console.error('[analyzeImage] AI analysis error:', err);
     return null;
   }
 }
@@ -311,14 +332,35 @@ export async function processItemImage(itemId: string, storagePath: string): Pro
     const medBase64 = `data:image/webp;base64,${medium.toString('base64')}`;
     const aiResult = await analyzeImage(medBase64);
 
+    // Hydrate primary item fields from AI output when still at defaults
+    const fieldUpdates: Record<string, unknown> = {
+      thumbnail_url: thumbUrl,
+      medium_image_url: medUrl,
+      ai_insights: aiResult,
+      processing_status: 'complete',
+    };
+
+    console.log(`AI analysis for item ${itemId}:`, aiResult);
+
+    if (aiResult) {
+      const { data: current } = await supabaseAdmin
+        .from('inventory_items')
+        .select('name, description, category, condition, price')
+        .eq('id', itemId)
+        .single();
+
+      if (current) {
+        if (!current.name && aiResult.name) fieldUpdates.name = aiResult.name;
+        if (!current.description && aiResult.description) fieldUpdates.description = aiResult.description;
+        if (current.category === 'Other' && aiResult.category) fieldUpdates.category = aiResult.category;
+        if (current.condition === 'Good' && aiResult.condition) fieldUpdates.condition = aiResult.condition;
+        if ((!current.price || current.price === 0) && aiResult.price) fieldUpdates.price = aiResult.price;
+      }
+    }
+
     await supabaseAdmin
       .from('inventory_items')
-      .update({
-        thumbnail_url: thumbUrl,
-        medium_image_url: medUrl,
-        ai_insights: aiResult,
-        processing_status: 'complete',
-      })
+      .update(fieldUpdates)
       .eq('id', itemId);
   } catch (err) {
     console.error(`Image processing failed for item ${itemId}:`, err);

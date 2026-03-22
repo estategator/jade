@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
+import { resolveActiveOrgId } from '@/lib/rbac';
 import { getMarketingAssets, getMarketingSourceImages } from './actions';
 import { getProjects } from '@/app/organizations/actions';
 import { PageHeader } from '@/app/components/page-header';
@@ -18,8 +18,7 @@ export default async function MarketingPage() {
     redirect('/login');
   }
 
-  const cookieStore = await cookies();
-  const activeOrgId = cookieStore.get('curator_active_org')?.value ?? null;
+  const activeOrgId = await resolveActiveOrgId(user.id);
 
   if (!activeOrgId) {
     return (

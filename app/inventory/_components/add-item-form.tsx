@@ -1,11 +1,11 @@
 ﻿"use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Loader2, Upload, X, Sparkles, Check } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, Check, RotateCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { PageHeader } from "@/app/components/page-header";
 import {
@@ -21,6 +21,16 @@ const categories = [
 ];
 const conditions = ["Excellent", "Good", "Fair", "Poor"];
 
+const FIELD_DEFAULTS = {
+  name: "",
+  description: "",
+  category: "Other",
+  condition: "Good",
+  price: "",
+} as const;
+
+type SubmitState = "idle" | "submitting" | "success" | "error";
+
 const inputClass =
   "block w-full rounded-xl border border-stone-300 bg-white px-3 py-3 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder-stone-500";
 const selectClass =
@@ -34,7 +44,12 @@ type AddItemFormProps = Readonly<{
 export function AddItemForm({ projects, userId }: AddItemFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [submitting, setSubmitting] = useState(false);
+  // Tracks which analysis request is current; stale responses are discarded
+  const analysisTokenRef = useRef(0);
+  // Ref mirror of dirty fields — always current, safe to read in async callbacks
+  const dirtyFieldsRef = useRef<Set<string>>(new Set());
+
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [error, setError] = useState("");
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -45,11 +60,52 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
   const [aiApplied, setAiApplied] = useState(false);
 
   const [projectId, setProjectId] = useState("");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Other");
-  const [condition, setCondition] = useState("Good");
-  const [price, setPrice] = useState("");
+  const [name, setName] = useState<string>(FIELD_DEFAULTS.name);
+  const [description, setDescription] = useState<string>(FIELD_DEFAULTS.description);
+  const [category, setCategory] = useState<string>(FIELD_DEFAULTS.category);
+  const [condition, setCondition] = useState<string>(FIELD_DEFAULTS.condition);
+  const [price, setPrice] = useState<string>(FIELD_DEFAULTS.price);
+  const [quantity, setQuantity] = useState<string>("1");
+
+  const markDirty = useCallback((field: string) => {
+    dirtyFieldsRef.current = new Set(dirtyFieldsRef.current).add(field);
+    console.log("[AddItemForm] field marked dirty:", field, [...dirtyFieldsRef.current]);
+  }, []);
+
+  /** Apply AI data to form fields. When `onlyClean` is true, skip user-edited fields. */
+  function applyAIFields(data: AIAnalysisResult, onlyClean: boolean) {
+    const dirty = dirtyFieldsRef.current;
+    console.log("[AddItemForm] applyAIFields", { onlyClean, dirty: [...dirty], data });
+
+    if (data.name && (!onlyClean || !dirty.has("name"))) {
+      console.log("[AddItemForm]  → setName:", data.name);
+      setName(data.name);
+    }
+    if (data.description && (!onlyClean || !dirty.has("description"))) {
+      console.log("[AddItemForm]  → setDescription:", data.description.slice(0, 60));
+      setDescription(data.description);
+    }
+    if (data.category && categories.includes(data.category) && (!onlyClean || !dirty.has("category"))) {
+      console.log("[AddItemForm]  → setCategory:", data.category);
+      setCategory(data.category);
+    }
+    if (data.condition && conditions.includes(data.condition) && (!onlyClean || !dirty.has("condition"))) {
+      console.log("[AddItemForm]  → setCondition:", data.condition);
+      setCondition(data.condition);
+    }
+    if (data.price != null && (!onlyClean || !dirty.has("price"))) {
+      console.log("[AddItemForm]  → setPrice:", data.price);
+      setPrice(String(data.price));
+    }
+  }
+
+  /** Manual re-apply: overwrite all AI-supported fields regardless of dirty state. */
+  function handleApplyAI() {
+    console.log("[AddItemForm] handleApplyAI called, insights:", insights);
+    if (!insights) return;
+    applyAIFields(insights, false);
+    setAiApplied(true);
+  }
 
   function processFile(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -63,19 +119,48 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
     setError("");
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
+    // Reset AI lifecycle for new image
     setInsights(null);
     setAiApplied(false);
 
-    // Trigger AI analysis in the background
+    // Bump token so any in-flight response for a previous image is discarded
+    const token = ++analysisTokenRef.current;
+    console.log("[AddItemForm] processFile: starting analysis, token =", token);
+
     setAnalyzing(true);
     const fd = new FormData();
     fd.append("image", file);
-    analyzeItemAction(fd).then((result) => {
-      if (result.success && result.data) {
-        setInsights(result.data as AIAnalysisResult);
-      }
-      setAnalyzing(false);
-    });
+    analyzeItemAction(fd)
+      .then((result) => {
+        console.log("[AddItemForm] analyzeItemAction result:", JSON.stringify(result).slice(0, 300));
+
+        // Guard: discard if a newer upload has started
+        if (token !== analysisTokenRef.current) {
+          console.log("[AddItemForm] stale token, discarding", { token, current: analysisTokenRef.current });
+          return;
+        }
+
+        if (result.success && result.data) {
+          const data = result.data as AIAnalysisResult;
+          const hasUsefulData = !!(data.name || data.description || (data.price && data.price > 0));
+          console.log("[AddItemForm] analysis succeeded, hasUsefulData:", hasUsefulData);
+          setInsights(data);
+          if (hasUsefulData) {
+            // Auto-apply to untouched fields only
+            applyAIFields(data, true);
+            setAiApplied(true);
+          }
+        } else {
+          console.warn("[AddItemForm] analysis returned no data or error:", result);
+        }
+        setAnalyzing(false);
+      })
+      .catch((err) => {
+        console.error("[AddItemForm] analyzeItemAction threw:", err);
+        if (token === analysisTokenRef.current) {
+          setAnalyzing(false);
+        }
+      });
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -96,23 +181,17 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
     setInsights(null);
     setAiApplied(false);
     setAnalyzing(false);
+    // Invalidate any in-flight analysis
+    analysisTokenRef.current++;
+    dirtyFieldsRef.current = new Set();
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  function handleApplyAI() {
-    if (!insights) return;
-    if (insights.name) setName(insights.name);
-    if (insights.description) setDescription(insights.description);
-    if (insights.category && categories.includes(insights.category)) setCategory(insights.category);
-    if (insights.condition && conditions.includes(insights.condition)) setCondition(insights.condition);
-    if (insights.price != null) setPrice(String(insights.price));
-    setAiApplied(true);
+    console.log("[AddItemForm] removeImage: AI state reset");
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    setSubmitting(true);
+    setSubmitState("submitting");
 
     const formData = new FormData();
     formData.append("name", name);
@@ -120,6 +199,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
     formData.append("category", category);
     formData.append("condition", condition);
     formData.append("price", price);
+    formData.append("quantity", quantity);
     formData.append("user_id", userId);
     formData.append("project_id", projectId);
     if (imageFile) {
@@ -130,11 +210,14 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
 
     if (result.error) {
       setError(result.error);
-      setSubmitting(false);
+      setSubmitState("error");
     } else {
+      setSubmitState("success");
       router.push("/inventory");
     }
   }
+
+  const isBusy = submitState === "submitting" || submitState === "success";
 
   return (
     <main className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -228,7 +311,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
             </div>
           )}
 
-          {insights && !analyzing && (
+          {insights && !analyzing && !!(insights.name || insights.description || (insights.price && insights.price > 0)) && (
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -237,19 +320,19 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
                 <span className="truncate text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                  AI suggestions available
+                  {aiApplied ? "AI suggestions applied" : "AI suggestions available"}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={handleApplyAI}
-                disabled={aiApplied}
+                disabled={isBusy}
                 className="ml-3 inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
               >
                 {aiApplied ? (
                   <>
-                    <Check className="h-3.5 w-3.5" />
-                    Applied
+                    <RotateCw className="h-3.5 w-3.5" />
+                    Re-apply
                   </>
                 ) : (
                   "Apply"
@@ -316,8 +399,9 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
               name="name"
               type="text"
               required
+              disabled={isBusy}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); markDirty("name"); }}
               placeholder="e.g. Vintage Ceramic Vase"
               className={inputClass}
             />
@@ -332,8 +416,9 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
               id="description"
               name="description"
               rows={4}
+              disabled={isBusy}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => { setDescription(e.target.value); markDirty("description"); }}
               placeholder="Brief description of the item..."
               className={inputClass}
             />
@@ -343,35 +428,55 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label htmlFor="category" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">Category</label>
-              <select id="category" name="category" value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
+              <select id="category" name="category" disabled={isBusy} value={category} onChange={(e) => { setCategory(e.target.value); markDirty("category"); }} className={selectClass}>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
               <label htmlFor="condition" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">Condition</label>
-              <select id="condition" name="condition" value={condition} onChange={(e) => setCondition(e.target.value)} className={selectClass}>
+              <select id="condition" name="condition" disabled={isBusy} value={condition} onChange={(e) => { setCondition(e.target.value); markDirty("condition"); }} className={selectClass}>
                 {conditions.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
 
-          {/* Price */}
-          <div>
-            <label htmlFor="price" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">
-              Price ($) <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="price"
-              name="price"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.00"
-              className={inputClass}
-            />
+          {/* Price + Quantity */}
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <label htmlFor="price" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">
+                Price ($) <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="price"
+                name="price"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                disabled={isBusy}
+                value={price}
+                onChange={(e) => { setPrice(e.target.value); markDirty("price"); }}
+                placeholder="0.00"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="quantity" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">
+                Quantity
+              </label>
+              <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="1"
+                step="1"
+                disabled={isBusy}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="1"
+                className={inputClass}
+              />
+            </div>
           </div>
 
           {error && (
@@ -383,10 +488,16 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
           <div className="flex items-center gap-3 pt-2">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={isBusy}
               className="inline-flex items-center justify-center rounded-xl border border-transparent bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add item"}
+              {submitState === "submitting" ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</>
+              ) : submitState === "success" ? (
+                <><Check className="mr-2 h-4 w-4" /> Added!</>
+              ) : (
+                "Add item"
+              )}
             </button>
             <Link href="/inventory" className="text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white">
               Cancel

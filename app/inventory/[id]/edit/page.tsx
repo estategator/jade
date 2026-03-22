@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { resolveActiveOrgId } from "@/lib/rbac";
 import {
   getInventoryItem,
   getUserProjects,
@@ -24,8 +24,7 @@ export default async function EditInventoryPage({
   }
 
   const { id } = await params;
-  const cookieStore = await cookies();
-  const activeOrgId = cookieStore.get("curator_active_org")?.value ?? null;
+  const activeOrgId = await resolveActiveOrgId(user.id);
 
   const [result, projResult] = await Promise.all([
     getInventoryItem(id, user.id),
@@ -44,8 +43,8 @@ export default async function EditInventoryPage({
   const projects = projResult.data ?? [];
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <EditItemForm key={activeOrgId} item={result.data} projects={projects} userId={user.id} />
-    </>
+    </div>
   );
 }

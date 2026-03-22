@@ -1,7 +1,20 @@
 import 'server-only';
+import { send } from '@vercel/queue';
 
+/** Well-known topic names. Keep in sync with vercel.json experimentalTriggers. */
+export const TOPICS = {
+  STRIPE_WEBHOOK: 'stripe-webhook',
+  PROCESS_IMAGE: 'process-image',
+} as const;
+
+/**
+ * Publish a message to a Vercel Queue topic.
+ *
+ * In local dev (no VERCEL env) or when sending fails, falls back to
+ * inline processing so events are never silently dropped.
+ */
 export async function enqueue<T>(
-  queueUrl: string,
+  topic: string,
   payload: T,
   processInline: (data: T) => Promise<void>,
 ): Promise<void> {
@@ -11,28 +24,10 @@ export async function enqueue<T>(
     return;
   }
 
-  const qstashToken = process.env.QSTASH_TOKEN;
-  if (!qstashToken) {
-    console.warn('QSTASH_TOKEN not set — processing inline');
-    await processInline(payload);
-    return;
-  }
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://localhost:3000';
-  const destination = `${appUrl}${queueUrl}`;
-
-  const res = await fetch('https://qstash.upstash.io/v2/publish/' + destination, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${qstashToken}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('QStash enqueue failed:', res.status, text);
+  try {
+    await send(topic, payload);
+  } catch (err) {
+    console.error(`Vercel Queue send failed for topic "${topic}":`, err);
     // Fallback to inline processing so we don't drop the event
     await processInline(payload);
   }

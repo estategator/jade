@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Apple, ArrowRight, Loader2, Mail } from "lucide-react";
+import { Apple, ArrowRight, BarChart3, Loader2, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { supabase } from "@/lib/supabase";
@@ -193,10 +193,74 @@ export default function LoginPage() {
     setEmailLoading(false);
   }
 
+  const features = [
+    { icon: Sparkles, label: "AI-powered pricing & cataloging" },
+    { icon: BarChart3, label: "Real-time sales analytics" },
+    { icon: ShieldCheck, label: "Secure inventory management" },
+  ];
+
   return (
-    <div className="min-h-screen bg-stone-50 font-sans selection:bg-stone-200 dark:bg-zinc-950 dark:selection:bg-zinc-800">
-      <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+      {/* ── Left branded panel (lg+) ── */}
+      <div className="relative hidden w-1/2 overflow-hidden bg-indigo-600 dark:bg-indigo-700 lg:flex lg:flex-col lg:justify-between">
+        {/* Decorative blurs */}
         <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-20 top-1/4 h-96 w-96 rounded-full bg-indigo-400/30 blur-3xl" />
+          <div className="absolute -right-20 bottom-1/4 h-96 w-96 rounded-full bg-indigo-800/40 blur-3xl" />
+        </div>
+
+        <div className="relative z-10 flex flex-1 flex-col justify-center px-12 xl:px-16">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <Link href="/" className="mb-10 inline-flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white font-bold text-indigo-600">
+                C
+              </div>
+              <span className="text-xl font-bold text-white">Curator</span>
+            </Link>
+
+            <h2 className="text-4xl font-bold leading-tight text-white xl:text-5xl">
+              Estate sales,{" "}
+              <span className="text-indigo-200">simplified.</span>
+            </h2>
+            <p className="mt-4 max-w-md text-base leading-relaxed text-indigo-100">
+              The all-in-one platform that helps estate sale professionals
+              catalog, price, and sell — powered by AI.
+            </p>
+
+            <ul className="mt-10 space-y-4">
+              {features.map((f) => (
+                <motion.li
+                  key={f.label}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: 0.3 }}
+                  className="flex items-center gap-3 text-sm font-medium text-indigo-100"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
+                    <f.icon className="h-4 w-4 text-white" />
+                  </span>
+                  {f.label}
+                </motion.li>
+              ))}
+            </ul>
+          </motion.div>
+        </div>
+
+        <div className="relative z-10 px-12 pb-8 xl:px-16">
+          <p className="text-xs text-indigo-200/70">
+            &copy; {new Date().getFullYear()} Curator. All rights reserved.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Right form panel ── */}
+      <div className="relative flex w-full flex-col items-center justify-center bg-stone-50 px-4 py-12 dark:bg-zinc-950 sm:px-6 lg:w-1/2 lg:px-12 xl:px-16">
+        {/* Blurs — visible only on small screens where the left panel is hidden */}
+        <div className="pointer-events-none absolute inset-0 lg:hidden">
           <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-[120%] rounded-full bg-indigo-500/10 blur-3xl mix-blend-multiply dark:mix-blend-screen" />
           <div className="absolute left-1/2 top-40 h-72 w-72 translate-x-[20%] rounded-full bg-emerald-500/10 blur-3xl mix-blend-multiply dark:mix-blend-screen" />
         </div>
@@ -207,9 +271,10 @@ export default function LoginPage() {
           transition={{ duration: 0.45 }}
           className="relative z-10 w-full max-w-md rounded-[2rem] border border-stone-200 bg-white p-6 shadow-2xl shadow-stone-200/60 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/30 sm:p-8"
         >
+          {/* Logo link — only on small screens since the left panel has it on lg+ */}
           <Link
             href="/"
-            className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-stone-500 transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
+            className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-stone-500 transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 lg:hidden"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-900 font-bold text-white dark:bg-white dark:text-stone-900">
               C
@@ -334,7 +399,7 @@ export default function LoginPage() {
             By continuing, you agree to Curator&apos;s terms and privacy policy.
           </p>
         </motion.div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -74,7 +74,7 @@ export default function OrganizationsPage() {
   }
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
           title="Organizations"
           description={`Manage your teams, projects, and billing — ${orgs.length} ${orgs.length === 1 ? "organization" : "organizations"}.`}
@@ -168,6 +168,6 @@ export default function OrganizationsPage() {
             })}
           </motion.div>
         )}
-    </>
+    </div>
   );
 }

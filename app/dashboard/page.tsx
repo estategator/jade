@@ -13,6 +13,7 @@ import {
 
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { resolveActiveOrgId } from "@/lib/rbac";
 import { PageHeader } from "@/app/components/page-header";
 import { UpgradeIntentHandler } from "@/app/dashboard/upgrade-intent-handler";
 import {
@@ -72,8 +73,7 @@ export default async function DashboardPage({
     }
   }
 
-  const cookieStore = await cookies();
-  const activeOrgId = cookieStore.get("curator_active_org")?.value ?? null;
+  const activeOrgId = await resolveActiveOrgId(user.id);
 
   const [statsRes, catRes, revRes, salesRes, salesRevRes] = await Promise.all([
     getDashboardStats(user.id, activeOrgId),
@@ -185,7 +185,7 @@ export default async function DashboardPage({
   const hasData = statsLoaded && (stats?.totalItems ?? 0) > 0;
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <DashboardErrorToast errors={errors} />
       <PageHeader
         title={`Welcome back, ${displayName}`}
@@ -340,7 +340,7 @@ export default async function DashboardPage({
 
       {/* Upgrade intent consumer */}
       <UpgradeIntentHandler />
-    </>
+    </div>
   );
 }
 

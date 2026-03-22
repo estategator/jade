@@ -18,6 +18,7 @@ import {
   Sparkles,
   ImageIcon,
   Pencil,
+  Eye,
   ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -327,9 +328,8 @@ export default function OrganizationDetailPage() {
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {projects.map((project) => (
-                    <Link
+                    <div
                       key={project.id}
-                      href={`/organizations/${orgId}/projects/${project.id}`}
                       className="overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all hover:border-indigo-200 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-800"
                     >
                       {project.cover_image_url ? (
@@ -348,25 +348,44 @@ export default function OrganizationDetailPage() {
                         </div>
                       )}
                       <div className="p-5">
-                        <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
-                          {project.name}
-                        </h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
+                            {project.name}
+                          </h3>
+                          {project.published ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                              Published
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500 dark:bg-zinc-800 dark:text-zinc-400">
+                              Draft
+                            </span>
+                          )}
+                        </div>
                         {project.description && (
                           <p className="mt-1 text-xs text-stone-500 dark:text-zinc-500 line-clamp-2">
                             {project.description}
                           </p>
                         )}
                         <div className="mt-4 flex items-center gap-2">
-                          <span
+                          <Link
+                            href={`/sales/${project.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Link>
+                          <Link
+                            href={`/organizations/${orgId}/projects/${project.id}`}
                             className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                             Edit
-                          </span>
+                          </Link>
                           {canDeleteProjects && (
                             <button
                               type="button"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteProjectTarget({ id: project.id, name: project.name }); }}
+                              onClick={() => setDeleteProjectTarget({ id: project.id, name: project.name })}
                               className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -375,7 +394,7 @@ export default function OrganizationDetailPage() {
                           )}
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               )}

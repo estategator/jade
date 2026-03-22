@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 // The client you created from the Server-Side Auth instructions
 import { createClient } from '@/utils/supabase/server'
 import { syncPendingInvitesForUser } from '@/app/notifications/actions'
+import { ensureDefaultOrg } from '@/app/organizations/actions'
+
+const ACTIVE_ORG_COOKIE = 'curator_active_org';
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -17,8 +21,20 @@ export async function GET(request: Request) {
     if (!error) {
       // Sync pending email invites into notifications for this user
       const { data: { user } } = await supabase.auth.getUser()
+
+      let defaultOrgId: string | null = null;
+
       if (user?.id && user?.email) {
         syncPendingInvitesForUser(user.id, user.email).catch(() => {});
+
+        // Ensure user has at least one organization
+        const result = await ensureDefaultOrg(user.id, {
+          fullName: user.user_metadata?.full_name ?? '',
+          email: user.email,
+        });
+        if ('orgId' in result) {
+          defaultOrgId = result.orgId;
+        }
       }
 
       const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
@@ -30,14 +46,27 @@ export async function GET(request: Request) {
       if (tier) redirectParams.set('tier', tier)
       const redirectPath = redirectParams.toString() ? `${next}?${redirectParams.toString()}` : next
       
+      let redirectUrl: string;
       if (isLocalEnv) {
-        // we can be sure that there is no load balancer in between, so no need to watch for X-Forwarded-Host
-        return NextResponse.redirect(`${origin}${redirectPath}`)
+        redirectUrl = `${origin}${redirectPath}`;
       } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${redirectPath}`)
+        redirectUrl = `https://${forwardedHost}${redirectPath}`;
       } else {
-        return NextResponse.redirect(`${origin}${redirectPath}`)
+        redirectUrl = `${origin}${redirectPath}`;
       }
+
+      const response = NextResponse.redirect(redirectUrl);
+
+      // Set active org cookie so first page load is org-scoped
+      if (defaultOrgId) {
+        response.cookies.set(ACTIVE_ORG_COOKIE, defaultOrgId, {
+          path: '/',
+          maxAge: COOKIE_MAX_AGE,
+          sameSite: 'lax',
+        });
+      }
+
+      return response;
     }
   }
 

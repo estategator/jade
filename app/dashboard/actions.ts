@@ -29,19 +29,17 @@ export type StatusBreakdown = {
 
 export async function getDashboardStats(userId: string, orgId?: string | null) {
   try {
-    let query = supabase
-      .from('inventory_items')
-      .select('price, status');
-
-    if (orgId) {
-      const membership = await requireOrgMembership(orgId, userId);
-      if ('error' in membership) return { error: membership.error };
-      query = query.eq('org_id', orgId);
-    } else {
-      query = query.eq('user_id', userId);
+    if (!orgId) {
+      return { data: { totalItems: 0, totalRevenue: 0, totalSoldRevenue: 0, availableItems: 0, soldItems: 0 } as DashboardStats };
     }
 
-    const { data, error } = await query;
+    const membership = await requireOrgMembership(orgId, userId);
+    if ('error' in membership) return { error: membership.error };
+
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('price, status')
+      .eq('org_id', orgId);
 
     if (error) {
       console.error('Supabase error:', error);
@@ -68,19 +66,15 @@ export async function getDashboardStats(userId: string, orgId?: string | null) {
 
 export async function getCategoryBreakdown(userId: string, orgId?: string | null) {
   try {
-    let query = supabase
+    if (!orgId) return { data: [] as CategoryBreakdown[] };
+
+    const membership = await requireOrgMembership(orgId, userId);
+    if ('error' in membership) return { error: membership.error };
+
+    const { data, error } = await supabase
       .from('inventory_items')
-      .select('category');
-
-    if (orgId) {
-      const membership = await requireOrgMembership(orgId, userId);
-      if ('error' in membership) return { error: membership.error };
-      query = query.eq('org_id', orgId);
-    } else {
-      query = query.eq('user_id', userId);
-    }
-
-    const { data, error } = await query;
+      .select('category')
+      .eq('org_id', orgId);
 
     if (error) {
       console.error('Supabase error:', error);
@@ -106,21 +100,17 @@ export async function getCategoryBreakdown(userId: string, orgId?: string | null
 
 export async function getRevenueByMonth(userId: string, orgId?: string | null) {
   try {
-    let query = supabase
+    if (!orgId) return { data: [] as RevenueByMonth[] };
+
+    const membership = await requireOrgMembership(orgId, userId);
+    if ('error' in membership) return { error: membership.error };
+
+    const { data, error } = await supabase
       .from('inventory_items')
       .select('price, sold_at')
       .eq('status', 'sold')
-      .not('sold_at', 'is', null);
-
-    if (orgId) {
-      const membership = await requireOrgMembership(orgId, userId);
-      if ('error' in membership) return { error: membership.error };
-      query = query.eq('org_id', orgId);
-    } else {
-      query = query.eq('user_id', userId);
-    }
-
-    const { data, error } = await query;
+      .not('sold_at', 'is', null)
+      .eq('org_id', orgId);
 
     if (error) {
       console.error('Supabase error:', error);
@@ -158,19 +148,15 @@ export async function getRevenueByMonth(userId: string, orgId?: string | null) {
 
 export async function getStatusBreakdown(userId: string, orgId?: string | null) {
   try {
-    let query = supabase
+    if (!orgId) return { data: [] as StatusBreakdown[] };
+
+    const membership = await requireOrgMembership(orgId, userId);
+    if ('error' in membership) return { error: membership.error };
+
+    const { data, error } = await supabase
       .from('inventory_items')
-      .select('status, price');
-
-    if (orgId) {
-      const membership = await requireOrgMembership(orgId, userId);
-      if ('error' in membership) return { error: membership.error };
-      query = query.eq('org_id', orgId);
-    } else {
-      query = query.eq('user_id', userId);
-    }
-
-    const { data, error } = await query;
+      .select('status, price')
+      .eq('org_id', orgId);
 
     if (error) {
       console.error('Supabase error:', error);

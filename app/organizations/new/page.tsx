@@ -5,10 +5,32 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Loader2, ArrowLeft, Upload, X } from "lucide-react";
+import { Loader2, ArrowLeft, Upload, X, MapPin, Phone } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { setActiveOrgId } from "@/lib/active-org";
 import { PageHeader } from "@/app/components/page-header";
 import { createOrganization } from "@/app/organizations/actions";
+
+const US_STATES = [
+  { value: "", label: "Select state" },
+  { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" }, { value: "AZ", label: "Arizona" },
+  { value: "AR", label: "Arkansas" }, { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
+  { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" }, { value: "FL", label: "Florida" },
+  { value: "GA", label: "Georgia" }, { value: "HI", label: "Hawaii" }, { value: "ID", label: "Idaho" },
+  { value: "IL", label: "Illinois" }, { value: "IN", label: "Indiana" }, { value: "IA", label: "Iowa" },
+  { value: "KS", label: "Kansas" }, { value: "KY", label: "Kentucky" }, { value: "LA", label: "Louisiana" },
+  { value: "ME", label: "Maine" }, { value: "MD", label: "Maryland" }, { value: "MA", label: "Massachusetts" },
+  { value: "MI", label: "Michigan" }, { value: "MN", label: "Minnesota" }, { value: "MS", label: "Mississippi" },
+  { value: "MO", label: "Missouri" }, { value: "MT", label: "Montana" }, { value: "NE", label: "Nebraska" },
+  { value: "NV", label: "Nevada" }, { value: "NH", label: "New Hampshire" }, { value: "NJ", label: "New Jersey" },
+  { value: "NM", label: "New Mexico" }, { value: "NY", label: "New York" }, { value: "NC", label: "North Carolina" },
+  { value: "ND", label: "North Dakota" }, { value: "OH", label: "Ohio" }, { value: "OK", label: "Oklahoma" },
+  { value: "OR", label: "Oregon" }, { value: "PA", label: "Pennsylvania" }, { value: "RI", label: "Rhode Island" },
+  { value: "SC", label: "South Carolina" }, { value: "SD", label: "South Dakota" }, { value: "TN", label: "Tennessee" },
+  { value: "TX", label: "Texas" }, { value: "UT", label: "Utah" }, { value: "VT", label: "Vermont" },
+  { value: "VA", label: "Virginia" }, { value: "WA", label: "Washington" }, { value: "WV", label: "West Virginia" },
+  { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" }, { value: "DC", label: "District of Columbia" },
+];
 
 export default function NewOrganizationPage() {
   const router = useRouter();
@@ -18,6 +40,12 @@ export default function NewOrganizationPage() {
   const [error, setError] = useState("");
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zipCode, setZipCode] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -45,6 +73,12 @@ export default function NewOrganizationPage() {
     const formData = new FormData();
     formData.append("name", name);
     formData.append("user_id", userId);
+    formData.append("phone", phone);
+    formData.append("address_line1", addressLine1);
+    formData.append("address_line2", addressLine2);
+    formData.append("city", city);
+    formData.append("state", state);
+    formData.append("zip_code", zipCode);
     if (imageFile) {
       formData.append("image", imageFile);
     }
@@ -55,7 +89,11 @@ export default function NewOrganizationPage() {
       setError(result.error);
       setSubmitting(false);
     } else {
-      router.push("/organizations");
+      // Auto-activate the newly created org
+      if (result.data?.id) {
+        setActiveOrgId(result.data.id);
+      }
+      router.push("/dashboard");
     }
   }
 
@@ -100,7 +138,7 @@ export default function NewOrganizationPage() {
   }
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
         title="Create organization"
         backLink={{ href: "/organizations", label: "Organizations" }}
@@ -140,6 +178,82 @@ export default function NewOrganizationPage() {
                 className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
               />
             </div>
+
+            {/* Phone */}
+            <div>
+              <label
+                htmlFor="phone"
+                className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-zinc-300"
+              >
+                Phone number{" "}
+                <span className="text-stone-400 dark:text-zinc-500">(optional)</span>
+              </label>
+              <div className="relative">
+                <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400 dark:text-zinc-500" />
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="block w-full rounded-xl border border-stone-300 bg-white py-2.5 pl-10 pr-4 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <fieldset className="space-y-4">
+              <legend className="mb-1.5 flex items-center gap-2 text-sm font-medium text-stone-700 dark:text-zinc-300">
+                <MapPin className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                Address{" "}
+                <span className="text-stone-400 dark:text-zinc-500">(optional)</span>
+              </legend>
+              <input
+                type="text"
+                value={addressLine1}
+                onChange={(e) => setAddressLine1(e.target.value)}
+                placeholder="123 Main St"
+                className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+              />
+              <input
+                type="text"
+                value={addressLine2}
+                onChange={(e) => setAddressLine2(e.target.value)}
+                placeholder="Suite 200 (optional)"
+                className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+              />
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+                  />
+                </div>
+                <select
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                >
+                  {US_STATES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="ZIP code"
+                  className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+                />
+              </div>
+            </fieldset>
 
             {/* Cover image */}
             <div>
@@ -211,6 +325,6 @@ export default function NewOrganizationPage() {
             </div>
           </form>
         </motion.div>
-    </>
+    </div>
   );
 }

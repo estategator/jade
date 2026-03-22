@@ -1,10 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { after } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { processItemImage, analyzeUploadedSimpleImage, normalizeSourceImage } from '@/lib/image-processing';
 import { requireOrgMembership, requirePermission, auditLog } from '@/lib/rbac';
+import { enqueue, TOPICS } from '@/lib/queue';
 
 export type AIAnalysisResult = {
   name: string;
@@ -28,6 +28,7 @@ export type InventoryItem = {
   price: number;
   condition: string;
   status: 'available' | 'sold' | 'reserved';
+  quantity: number;
   created_at: string;
   updated_at: string;
   user_id: string;
@@ -256,6 +257,7 @@ export async function createInventoryItem(formData: FormData) {
   const userId = formData.get('user_id') as string;
   const projectId = formData.get('project_id') as string;
   const imageFile = formData.get('image') as File | null;
+  const quantity = parseInt(formData.get('quantity') as string, 10);
 
   if (!name) return { error: 'Name is required.' };
   if (isNaN(price) || price < 0) return { error: 'Valid price is required.' };
@@ -285,6 +287,7 @@ export async function createInventoryItem(formData: FormData) {
         price,
         condition: condition || 'Good',
         status: 'available',
+        quantity: isNaN(quantity) || quantity < 1 ? 1 : quantity,
         user_id: userId,
         org_id: project.org_id,
         project_id: projectId,
@@ -325,9 +328,11 @@ export async function createInventoryItem(formData: FormData) {
         .update({ original_image_url: publicUrl })
         .eq('id', item.id);
 
-      after(async () => {
-        await processItemImage(item.id, storagePath);
-      });
+      await enqueue(
+        TOPICS.PROCESS_IMAGE,
+        { itemId: item.id, storagePath },
+        async (data) => processItemImage(data.itemId, data.storagePath),
+      );
     }
 
     revalidateInventoryRoutes();
@@ -353,6 +358,7 @@ export async function updateInventoryItem(id: string, userId: string, formData: 
   const condition = formData.get('condition') as string;
   const status = formData.get('status') as string;
   const projectId = formData.get('project_id') as string;
+  const quantity = parseInt(formData.get('quantity') as string, 10);
 
   if (!name) return { error: 'Name is required.' };
   if (isNaN(price) || price < 0) return { error: 'Valid price is required.' };
@@ -368,6 +374,7 @@ export async function updateInventoryItem(id: string, userId: string, formData: 
         price,
         condition: condition || 'Good',
         status: status || 'available',
+        quantity: isNaN(quantity) || quantity < 1 ? 1 : quantity,
         project_id: projectId,
         ...(status === 'sold' ? { sold_at: new Date().toISOString() } : {}),
         updated_at: new Date().toISOString(),
@@ -424,6 +431,80 @@ export async function deleteInventoryItem(id: string, userId: string) {
   }
 }
 
+export async function bulkDeleteInventoryItems(ids: string[], userId: string) {
+  if (!ids.length) return { error: 'No items selected.' };
+
+  try {
+    // Verify ownership for each item
+    for (const id of ids) {
+      const check = await verifyItemOwnership(userId, id);
+      if (!check.valid) return { error: check.error || 'Permission denied for one or more items.' };
+    }
+
+    // Remove storage objects for each item
+    for (const id of ids) {
+      const { data: files } = await supabase.storage
+        .from('inventory-images')
+        .list(id);
+      if (files && files.length > 0) {
+        const paths = files.map((f) => `${id}/${f.name}`);
+        await supabase.storage.from('inventory-images').remove(paths);
+      }
+    }
+
+    const { error } = await supabase
+      .from('inventory_items')
+      .delete()
+      .in('id', ids);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to delete items.' };
+    }
+
+    revalidateInventoryRoutes();
+    return { success: true };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function bulkUpdateInventoryStatus(
+  ids: string[],
+  userId: string,
+  status: 'available' | 'sold' | 'reserved',
+) {
+  if (!ids.length) return { error: 'No items selected.' };
+
+  try {
+    for (const id of ids) {
+      const check = await verifyItemOwnership(userId, id);
+      if (!check.valid) return { error: check.error || 'Permission denied for one or more items.' };
+    }
+
+    const { error } = await supabase
+      .from('inventory_items')
+      .update({
+        status,
+        ...(status === 'sold' ? { sold_at: new Date().toISOString() } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', ids);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to update items.' };
+    }
+
+    revalidateInventoryRoutes();
+    return { success: true };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
 export type BulkItemInput = {
   name: string;
   description: string;
@@ -448,6 +529,19 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
   if (!items.length) return { error: 'No items to add.' };
   // Project ID is optional now
 
+  // Resolve org_id for each distinct project_id to prevent null org_id
+  const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
+  const projOrgMap: Record<string, string> = {};
+  if (projectIds.length) {
+    const { data: projects } = await supabase
+      .from('projects')
+      .select('id, org_id')
+      .in('id', projectIds);
+    for (const p of projects ?? []) {
+      if (p.org_id) projOrgMap[p.id] = p.org_id;
+    }
+  }
+
   const rows = items.map((item) => ({
     name: item.name,
     description: item.description || '',
@@ -456,7 +550,8 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
     condition: item.condition || 'Good',
     status: 'available' as const,
     user_id: item.user_id,
-    project_id: item.project_id || null, // Convert empty string/undefined to null
+    project_id: item.project_id || null,
+    org_id: item.project_id ? (projOrgMap[item.project_id] ?? null) : null,
     processing_status: 'none' as const,
   }));
 
@@ -503,13 +598,16 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
       }
     }
 
-    if (toProcess.length > 0) {
-      after(async () => {
-        await Promise.all(
-          toProcess.map(({ itemId, storagePath }) => processItemImage(itemId, storagePath))
-        );
-      });
-    }
+    // Enqueue each image for parallel processing via Vercel Queues
+    await Promise.all(
+      toProcess.map(({ itemId, storagePath }) =>
+        enqueue(
+          TOPICS.PROCESS_IMAGE,
+          { itemId, storagePath },
+          async (data) => processItemImage(data.itemId, data.storagePath),
+        )
+      ),
+    );
 
     revalidateInventoryRoutes();
 
@@ -524,6 +622,19 @@ export async function createBulkInventoryItems(items: BulkItemInput[]) {
   if (!items.length) return { error: 'No items to add.' };
   if (items.some((it) => !it.project_id)) return { error: 'Project is required for all items.' };
 
+  // Resolve org_id for each distinct project_id
+  const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
+  const projOrgMap: Record<string, string> = {};
+  if (projectIds.length) {
+    const { data: projects } = await supabase
+      .from('projects')
+      .select('id, org_id')
+      .in('id', projectIds);
+    for (const p of projects ?? []) {
+      if (p.org_id) projOrgMap[p.id] = p.org_id;
+    }
+  }
+
   const rows = items.map((item) => ({
     name: item.name,
     description: item.description || '',
@@ -533,6 +644,7 @@ export async function createBulkInventoryItems(items: BulkItemInput[]) {
     status: 'available' as const,
     user_id: item.user_id,
     project_id: item.project_id,
+    org_id: item.project_id ? (projOrgMap[item.project_id] ?? null) : null,
   }));
 
   try {
@@ -581,9 +693,11 @@ export async function retryImageProcessing(itemId: string) {
       .update({ processing_status: 'queued' })
       .eq('id', itemId);
 
-    after(async () => {
-      await processItemImage(itemId, storagePath);
-    });
+    await enqueue(
+      TOPICS.PROCESS_IMAGE,
+      { itemId, storagePath },
+      async (data) => processItemImage(data.itemId, data.storagePath),
+    );
 
     return { success: true };
   } catch (err) {
@@ -596,19 +710,23 @@ export async function analyzeItemAction(formData: FormData) {
   try {
     const imageFile = formData.get('image') as File | null;
     if (!imageFile || imageFile.size === 0) {
+      console.warn('[analyzeItemAction] No image in FormData');
       return { error: 'No image provided.' };
     }
 
+    console.log('[analyzeItemAction] image received:', imageFile.name, imageFile.size, 'bytes');
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     const result = await analyzeUploadedSimpleImage(buffer);
 
     if (!result) {
+      console.warn('[analyzeItemAction] analyzeUploadedSimpleImage returned null');
       return { error: 'Could not analyze image.' };
     }
 
+    console.log('[analyzeItemAction] returning:', JSON.stringify(result).slice(0, 300));
     return { success: true, data: result };
   } catch (err) {
-    console.error('Analysis action error:', err);
+    console.error('[analyzeItemAction] error:', err);
     return { error: 'An unexpected error occurred during analysis.' };
   }
 }

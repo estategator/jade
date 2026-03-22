@@ -27,13 +27,15 @@ export default async function OrgSettingsLayout({
   }
 
   return (
-    <>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
-        title="Organization Settings"
-        description={`Manage settings for ${orgResult.data.name}.`}
+        title="Settings"
+        description={orgResult.data.name}
       />
-      <OrgSettingsNav orgId={orgId} />
-      <div className="mt-6">{children}</div>
-    </>
+      <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+        <OrgSettingsNav orgId={orgId} />
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    </div>
   );
 }

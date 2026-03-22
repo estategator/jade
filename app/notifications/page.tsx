@@ -115,7 +115,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div>
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
         title="Notifications"
         description={unreadCount > 0 ? `You have ${unreadCount} unread ${unreadCount === 1 ? "notification" : "notifications"} — manage invites, updates, and team activity.` : "You’re all caught up — no unread notifications."}

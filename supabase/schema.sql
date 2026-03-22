@@ -1407,3 +1407,10 @@ create table if not exists contact_submissions (
   processed  boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table contact_submissions enable row level security;
+
+create policy "Allow anonymous inserts"
+  on contact_submissions for insert
+  to anon
+  with check (true);

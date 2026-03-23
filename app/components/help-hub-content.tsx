@@ -30,8 +30,9 @@ interface HelpHubContentProps {
 export function HelpHubContent({ basePath }: Readonly<HelpHubContentProps>) {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
+  const validTabs: Tab[] = ["docs", "tutorials", "contact", "faq"];
   const [activeTab, setActiveTab] = useState<Tab>(
-    initialTab === "contact" ? "contact" : "docs"
+    validTabs.includes(initialTab as Tab) ? (initialTab as Tab) : "docs"
   );
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -194,6 +195,7 @@ function DocsContent({ basePath }: { basePath: string }) {
     </div>
   );
 }
+
 
 function TutorialsContent() {
   const tutorials = [

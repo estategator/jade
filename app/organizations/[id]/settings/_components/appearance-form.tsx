@@ -90,8 +90,8 @@ export function AppearanceForm({
     if (result.error) {
       setError(result.error);
     } else {
+      await refresh();
       setSuccess("Organization settings saved.");
-      refresh();
     }
     setSaving(false);
   }

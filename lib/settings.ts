@@ -60,7 +60,7 @@ export type ResolvedSettings = {
 
 /**
  * Merges org settings, user settings, and enforcement into one effective config.
- * Priority: defaults → user overrides → org-enforced values (highest).
+ * Priority: defaults → org defaults → user overrides → org-enforced values (highest).
  */
 export function resolveSettings(
   orgSettings: Partial<AppSettings> | null,
@@ -69,10 +69,22 @@ export function resolveSettings(
 ): ResolvedSettings {
   const effective: AppSettings = { ...DEFAULT_SETTINGS };
   const lockedKeys = new Set<keyof AppSettings>();
+  const enforcedSet = new Set(enforcedKeys);
 
-  // Layer 1: Apply user preferences over defaults
+  // Layer 1: Apply org defaults over app defaults
+  if (orgSettings) {
+    for (const key of SETTING_KEYS) {
+      const val = orgSettings[key];
+      if (val !== null && val !== undefined) {
+        (effective as Record<string, unknown>)[key] = val;
+      }
+    }
+  }
+
+  // Layer 2: Apply user preferences (only for non-enforced keys)
   if (userOrgSettings) {
     for (const key of SETTING_KEYS) {
+      if (enforcedSet.has(key)) continue;
       const val = userOrgSettings[key];
       if (val !== null && val !== undefined) {
         (effective as Record<string, unknown>)[key] = val;
@@ -85,12 +97,11 @@ export function resolveSettings(
     effective.theme = 'light';
   }
 
-  // Layer 2: Force org-enforced keys (overrides user prefs)
-  if (orgSettings && enforcedKeys.length > 0) {
+  // Mark enforced keys as locked
+  if (orgSettings) {
     for (const raw of enforcedKeys) {
       const key = raw as keyof AppSettings;
-      if (SETTING_KEYS.includes(key) && orgSettings[key] !== null && orgSettings[key] !== undefined) {
-        (effective as Record<string, unknown>)[key] = orgSettings[key];
+      if (SETTING_KEYS.includes(key)) {
         lockedKeys.add(key);
       }
     }

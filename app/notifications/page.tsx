@@ -10,6 +10,7 @@ import {
   Check,
   CheckCheck,
   Loader2,
+  ShoppingBag,
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -52,6 +53,36 @@ export default function NotificationsPage() {
     }
     init();
   }, [router, load]);
+
+  // Real-time: listen for new notifications inserted for this user
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('user-notifications-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `recipient_user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newNotification = payload.new as UserNotification;
+          setNotifications((prev) => {
+            // Avoid duplicates if already fetched
+            if (prev.some((n) => n.id === newNotification.id)) return prev;
+            return [newNotification, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   async function handleAcceptInvite(notification: UserNotification) {
     if (!userId) return;
@@ -195,7 +226,7 @@ function NotificationCard({
 }) {
   const isLoading = actionLoading === notification.id;
   const isUnread = !notification.read_at;
-  const payload = notification.payload as { org_name?: string; requested_role?: string; invited_by_email?: string };
+  const payload = notification.payload as { org_name?: string; requested_role?: string; invited_by_email?: string; item_name?: string; amount?: number; currency?: string; buyer_email?: string | null };
 
   return (
     <motion.div
@@ -217,11 +248,15 @@ function NotificationCard({
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
             notification.kind === "org_invite"
               ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400"
-              : "bg-stone-100 text-stone-600 dark:bg-zinc-800 dark:text-zinc-400"
+              : notification.kind === "sale_completed"
+                ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400"
+                : "bg-stone-100 text-stone-600 dark:bg-zinc-800 dark:text-zinc-400"
           )}
         >
           {notification.kind === "org_invite" ? (
             <Building2 className="h-5 w-5" />
+          ) : notification.kind === "sale_completed" ? (
+            <ShoppingBag className="h-5 w-5" />
           ) : (
             <Bell className="h-5 w-5" />
           )}
@@ -292,6 +327,18 @@ function NotificationCard({
                   Mark read
                 </button>
               )}
+            </div>
+          )}
+
+          {notification.kind !== "org_invite" && isUnread && (
+            <div className="mt-3 flex items-center">
+              <button
+                type="button"
+                onClick={() => onMarkRead(notification)}
+                className="text-xs text-stone-400 transition-colors hover:text-stone-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+              >
+                Mark read
+              </button>
             </div>
           )}
         </div>

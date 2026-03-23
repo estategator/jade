@@ -742,7 +742,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
           className="overflow-hidden rounded-2xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
         >
           {/* Table header */}
-          <div className="hidden border-b border-stone-200 px-4 py-3 sm:grid sm:grid-cols-[32px_1fr] sm:gap-3 lg:px-5 lg:gap-4 dark:border-zinc-800">
+          <div className="hidden border-b border-stone-200 px-4 py-3 lg:grid lg:grid-cols-[32px_1fr] lg:gap-4 lg:px-5 dark:border-zinc-800">
             <div className="flex items-center justify-center">
               <input
                 type="checkbox"
@@ -791,9 +791,9 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
           {filtered.map((item) => (
             <div
               key={item.id}
-              className={`grid grid-cols-1 gap-2 border-b border-stone-100 px-4 py-3 last:border-b-0 sm:grid-cols-[32px_1fr] sm:items-center sm:gap-3 lg:px-5 lg:py-4 lg:gap-4 dark:border-zinc-800/50 transition-colors ${selectedIds.has(item.id) ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}
+              className={`grid grid-cols-1 gap-2 border-b border-stone-100 px-4 py-3 last:border-b-0 lg:grid-cols-[32px_1fr] lg:items-center lg:gap-4 lg:px-5 lg:py-4 dark:border-zinc-800/50 transition-colors ${selectedIds.has(item.id) ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}
             >
-              <div className="hidden sm:flex items-center justify-center">
+              <div className="hidden lg:flex items-center justify-center">
                 <input
                   type="checkbox"
                   checked={selectedIds.has(item.id)}
@@ -801,7 +801,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
                   className="h-4 w-4 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-center sm:gap-3 lg:gap-4">
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-12 lg:items-center lg:gap-4">
               <div className="col-span-1 flex justify-center sm:justify-start">
                 <ItemThumbnail item={item} />
               </div>

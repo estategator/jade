@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import Stripe from 'stripe';
 import { tierFromStripePriceId } from '@/lib/tiers';
 import { handleCallback } from '@vercel/queue';
+import { createSaleNotifications } from '@/app/notifications/actions';
 
 export type WebhookPayload = {
   eventType: string;
@@ -157,7 +158,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             .single();
 
           // Insert sale record
-          await supabaseAdmin.from('sales').insert({
+          const { data: sale } = await supabaseAdmin.from('sales').insert({
             inventory_item_id: itemId,
             seller_org_id: project?.org_id ?? null,
             buyer_email: session.customer_details?.email ?? null,
@@ -167,7 +168,19 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             stripe_payment_intent_id: session.payment_intent as string,
             stripe_connected_account_id: connectedAccountId ?? null,
             status: 'completed',
-          });
+          }).select('id').single();
+
+          // Notify all org members about the sale
+          if (sale && project?.org_id) {
+            await createSaleNotifications({
+              orgId: project.org_id,
+              saleId: sale.id,
+              itemName: item.name ?? 'Unknown item',
+              amount: (session.amount_total ?? 0) / 100,
+              currency: session.currency ?? 'usd',
+              buyerEmail: session.customer_details?.email ?? null,
+            });
+          }
         }
       }
       break;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -36,14 +36,36 @@ function Tooltip({
   label: string;
   show?: boolean;
 }) {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
   if (!show) return <>{children}</>;
+
+  const handleEnter = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setCoords({ top: rect.top + rect.height / 2, left: rect.right + 12 });
+    }
+    setVisible(true);
+  };
+
   return (
-    <div className="group/tip relative">
+    <div
+      ref={triggerRef}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setVisible(false)}
+    >
       {children}
-      <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-all duration-200 group-hover/tip:opacity-100 dark:bg-stone-100 dark:text-stone-900">
-        <div className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900 dark:border-r-stone-100" />
-        {label}
-      </div>
+      {visible && (
+        <div
+          className="pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg dark:bg-stone-100 dark:text-stone-900"
+          style={{ top: coords.top, left: coords.left }}
+        >
+          <div className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900 dark:border-r-stone-100" />
+          {label}
+        </div>
+      )}
     </div>
   );
 }
@@ -193,7 +215,7 @@ export function Sidebar() {
         </div>
 
         {/* ── Zone 2: Navigation ── */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-4">
           {navSections.map((section, sectionIdx) => (
             <div key={section.title} className={cn(sectionIdx > 0 && "mt-6")}>
               <AnimatePresence>
@@ -249,8 +271,8 @@ export function Sidebar() {
                             }}
                           />
                         )}
-                        {/* Active left rail (expanded only) */}
-                        {active && isExpanded && (
+                        {/* Active left rail */}
+                        {active && (
                           <div className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-[var(--color-brand-primary)]" />
                         )}
                         {/* Icon with badge overlay for collapsed */}
@@ -316,15 +338,7 @@ export function Sidebar() {
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1">
-              <Tooltip label="Switch workspace">
-                <Link
-                  href="/organizations"
-                  aria-label="Switch organization"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                >
-                  <PiBuildingsDuotone className="h-4 w-4" />
-                </Link>
-              </Tooltip>
+              <OrgSwitcher variant="collapsed" dropdownDirection="up" />
               <ThemeToggle />
               <Tooltip label="Sign out">
                 <button

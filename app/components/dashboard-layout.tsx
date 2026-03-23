@@ -18,7 +18,8 @@ function DashboardShell({ children }: DashboardLayoutProps) {
       <main
         className={cn(
           "min-h-screen transition-[margin-left] duration-300 ease-in-out motion-reduce:transition-none",
-          isExpanded ? "md:ml-64" : "md:ml-[72px]"
+          isExpanded ? "md:ml-64" : "md:ml-[72px]",
+          "bg-stone-50 dark:bg-zinc-950",
         )}
       >
         <div className="mx-auto max-w-7xl">

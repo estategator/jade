@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   PiArrowRightDuotone,
   PiChartBarDuotone,
@@ -16,16 +16,55 @@ import {
   PiTagDuotone,
   PiGoogleLogoDuotone,
   PiAppleLogoDuotone,
+  PiEyeDuotone,
+  PiEyeSlashDuotone,
+  PiUserDuotone,
 } from "react-icons/pi";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/cn";
 import { supabase } from "@/lib/supabase";
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+type AuthMode = "signin" | "signup" | "forgot";
+type AuthProvider = "google" | "apple";
+
+const modeCopy: Record<AuthMode, { label: string; heading: string; subtext: string }> = {
+  signin: {
+    label: "Sign in",
+    heading: "Welcome back",
+    subtext: "Use a provider or your email to access Curator.",
+  },
+  signup: {
+    label: "Create account",
+    heading: "Get started",
+    subtext: "Sign up with a provider or create an account with your email.",
+  },
+  forgot: {
+    label: "Reset password",
+    heading: "Forgot your password?",
+    subtext: "Enter your email and we\u2019ll send you a reset link.",
+  },
+};
+
+function getPasswordStrength(pw: string): "weak" | "medium" | "strong" | null {
+  if (!pw) return null;
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  if (score <= 1) return "weak";
+  if (score <= 3) return "medium";
+  return "strong";
 }
 
-type AuthProvider = "google" | "apple";
+const strengthColors: Record<string, string> = {
+  weak: "bg-red-400 dark:bg-red-500",
+  medium: "bg-orange-400 dark:bg-orange-500",
+  strong: "bg-emerald-500 dark:bg-emerald-500",
+};
+const strengthSegments: Record<string, number> = { weak: 1, medium: 2, strong: 3 };
+
+const INPUT_CLASS =
+  "block w-full rounded-xl border border-stone-300 bg-white py-3 px-3 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder-stone-500";
 
 type OAuthButtonProps = Readonly<{
   provider: AuthProvider;
@@ -73,9 +112,66 @@ export default function LoginPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const passwordStrength = mode === "signup" ? getPasswordStrength(password) : null;
+
+  function switchMode(to: AuthMode) {
+    setMode(to);
+    setErrorMessage("");
+    setConfirmationSent(false);
+    setFieldErrors({});
+  }
+
+  // ── Field-level validation ──
+  const validateField = useCallback(
+    (field: string, value: string) => {
+      let error = "";
+      switch (field) {
+        case "firstName":
+          if (mode === "signup" && !value.trim()) error = "First name is required.";
+          break;
+        case "email":
+          if (!value.trim()) error = "Email is required.";
+          else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) error = "Enter a valid email address.";
+          break;
+        case "password":
+          if (!value) error = "Password is required.";
+          else if (value.length < 6) error = "Password must be at least 6 characters.";
+          break;
+      }
+      return error;
+    },
+    [mode],
+  );
+
+  function handleBlur(field: string, value: string) {
+    const error = validateField(field, value);
+    setFieldErrors((prev) => ({ ...prev, [field]: error }));
+  }
+
+  function validateForm(): boolean {
+    const fields: [string, string][] =
+      mode === "signup"
+        ? [["firstName", firstName], ["email", email], ["password", password]]
+        : mode === "signin"
+          ? [["email", email], ["password", password]]
+          : [["email", email]];
+
+    const errors: Record<string, string> = {};
+    for (const [field, value] of fields) {
+      const err = validateField(field, value);
+      if (err) errors[field] = err;
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
 
   // Read URL params for intent flow
   const next = searchParams.get("next") || "/dashboard";
@@ -161,16 +257,32 @@ export default function LoginPage() {
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorMessage("");
-    setEmailLoading(true);
     setConfirmationSent(false);
+
+    if (!validateForm()) return;
+
+    setEmailLoading(true);
 
     const emailRedirectUrl = `${window.location.origin}${next}${intent && tier ? `?intent=${intent}&tier=${tier}` : ""}`;
 
-    if (mode === "signup") {
+    if (mode === "forgot") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/update-password`,
+      });
+      if (error) {
+        setErrorMessage(error.message);
+      } else {
+        setConfirmationSent(true);
+      }
+    } else if (mode === "signup") {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: emailRedirectUrl },
+        options: {
+          data: { full_name: fullName },
+          emailRedirectTo: emailRedirectUrl,
+        },
       });
       if (error) {
         setErrorMessage(error.message);
@@ -283,6 +395,7 @@ export default function LoginPage() {
         </div>
 
         <motion.div
+          layout
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45 }}
@@ -299,62 +412,252 @@ export default function LoginPage() {
             Curator
           </Link>
 
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wider text-stone-500">
-              Sign in
-            </p>
-            <h1 className="mt-3 text-3xl font-bold text-stone-900 dark:text-white sm:text-4xl">
-              Welcome back
-            </h1>
-            <p className="mt-3 text-sm leading-relaxed text-stone-600 dark:text-zinc-400">
-              Use a provider or your email to access Curator.
-            </p>
-          </div>
+          {/* ── Mode-aware heading ── */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={mode}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+            >
+              <p className="text-sm font-medium uppercase tracking-wider text-stone-500">
+                {modeCopy[mode].label}
+              </p>
+              <h1 className="mt-3 text-3xl font-bold text-stone-900 dark:text-white sm:text-4xl">
+                {modeCopy[mode].heading}
+              </h1>
+              <p className="mt-3 text-sm leading-relaxed text-stone-600 dark:text-zinc-400">
+                {modeCopy[mode].subtext}
+              </p>
+            </motion.div>
+          </AnimatePresence>
 
-          <div className="mt-8 space-y-3">
-            <OAuthButton
-              provider="google"
-              loadingProvider={loadingProvider}
-              onClick={handleOAuthSignIn}
-            />
-            <OAuthButton
-              provider="apple"
-              loadingProvider={loadingProvider}
-              onClick={handleOAuthSignIn}
-            />
-          </div>
+          {/* ── OAuth (hidden in forgot mode) ── */}
+          <AnimatePresence>
+            {mode !== "forgot" && (
+              <motion.div
+                key="oauth"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-8 space-y-3">
+                  <OAuthButton
+                    provider="google"
+                    loadingProvider={loadingProvider}
+                    onClick={handleOAuthSignIn}
+                  />
+                  <OAuthButton
+                    provider="apple"
+                    loadingProvider={loadingProvider}
+                    onClick={handleOAuthSignIn}
+                  />
+                </div>
 
-          {/* Divider */}
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-stone-200 dark:bg-zinc-800" />
-            <span className="text-xs font-medium uppercase tracking-wider text-stone-400 dark:text-zinc-600">or</span>
-            <div className="h-px flex-1 bg-stone-200 dark:bg-zinc-800" />
-          </div>
+                {/* Divider */}
+                <div className="my-6 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-stone-200 dark:bg-zinc-800" />
+                  <span className="text-xs font-medium uppercase tracking-wider text-stone-400 dark:text-zinc-600">
+                    or
+                  </span>
+                  <div className="h-px flex-1 bg-stone-200 dark:bg-zinc-800" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Email form */}
-          <form onSubmit={handleEmailSubmit} className="space-y-3">
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <PiEnvelopeDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+          {/* ── Email form ── */}
+          <form onSubmit={handleEmailSubmit} className={cn("space-y-3", mode === "forgot" && "mt-8")}>
+            {/* First name / Last name — signup only */}
+            <AnimatePresence>
+              {mode === "signup" && (
+                <motion.div
+                  key="name-fields"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mb-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                          <PiUserDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          onBlur={() => handleBlur("firstName", firstName)}
+                          placeholder="First name"
+                          className={cn(INPUT_CLASS, "pl-10")}
+                        />
+                      </div>
+                      <AnimatePresence>
+                        {fieldErrors.firstName && (
+                          <motion.p
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-1 text-xs text-red-600 dark:text-red-400"
+                          >
+                            {fieldErrors.firstName}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Last name"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Email */}
+            <div>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <PiEnvelopeDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => handleBlur("email", email)}
+                  placeholder="Email address"
+                  className={cn(INPUT_CLASS, "pl-10")}
+                />
               </div>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email address"
-                className="block w-full rounded-xl border border-stone-300 bg-white py-3 pl-10 pr-3 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder-stone-500"
-              />
+              <AnimatePresence>
+                {fieldErrors.email && (
+                  <motion.p
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-1 text-xs text-red-600 dark:text-red-400"
+                  >
+                    {fieldErrors.email}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password (min 6 characters)"
-              className="block w-full rounded-xl border border-stone-300 bg-white py-3 px-3 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder-stone-500"
-            />
+
+            {/* Password — hidden in forgot mode */}
+            <AnimatePresence>
+              {mode !== "forgot" && (
+                <motion.div
+                  key="password-field"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onBlur={() => handleBlur("password", password)}
+                      placeholder="Password (min 6 characters)"
+                      className={cn(INPUT_CLASS, "pr-10")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-stone-400 hover:text-stone-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <PiEyeSlashDuotone className="h-4 w-4" />
+                      ) : (
+                        <PiEyeDuotone className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Field error */}
+                  <AnimatePresence>
+                    {fieldErrors.password && (
+                      <motion.p
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-1 text-xs text-red-600 dark:text-red-400"
+                      >
+                        {fieldErrors.password}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Password strength indicator — signup only */}
+                  <AnimatePresence>
+                    {mode === "signup" && passwordStrength && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-2 flex items-center gap-2"
+                      >
+                        <div className="flex flex-1 gap-1">
+                          {[0, 1, 2].map((i) => (
+                            <div
+                              key={i}
+                              className={cn(
+                                "h-1 flex-1 rounded-full transition-colors",
+                                i < strengthSegments[passwordStrength]
+                                  ? strengthColors[passwordStrength]
+                                  : "bg-stone-200 dark:bg-zinc-800",
+                              )}
+                            />
+                          ))}
+                        </div>
+                        <span
+                          className={cn(
+                            "text-xs font-medium capitalize",
+                            passwordStrength === "weak" && "text-red-500 dark:text-red-400",
+                            passwordStrength === "medium" && "text-orange-500 dark:text-orange-400",
+                            passwordStrength === "strong" && "text-emerald-600 dark:text-emerald-400",
+                          )}
+                        >
+                          {passwordStrength}
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Forgot password — signin only */}
+                  {mode === "signin" && (
+                    <div className="mt-1 text-right">
+                      <button
+                        type="button"
+                        onClick={() => switchMode("forgot")}
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <button
               type="submit"
               disabled={emailLoading}
@@ -364,33 +667,57 @@ export default function LoginPage() {
                 <PiSpinnerDuotone className="h-4 w-4 animate-spin" />
               ) : mode === "signup" ? (
                 "Create account"
+              ) : mode === "forgot" ? (
+                "Send reset link"
               ) : (
                 "Sign in with email"
               )}
             </button>
           </form>
 
+          {/* ── Mode switcher links ── */}
           <p className="mt-4 text-center text-xs text-stone-500 dark:text-zinc-500">
-            {mode === "signin" ? (
-              <>Don&apos;t have an account?{" "}
-                <button type="button" onClick={() => { setMode("signup"); setErrorMessage(""); setConfirmationSent(false); }} className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">Sign up</button>
+            {mode === "signin" && (
+              <>
+                Don&apos;t have an account?{" "}
+                <button type="button" onClick={() => switchMode("signup")} className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                  Sign up
+                </button>
               </>
-            ) : (
-              <>Already have an account?{" "}
-                <button type="button" onClick={() => { setMode("signin"); setErrorMessage(""); setConfirmationSent(false); }} className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">Sign in</button>
+            )}
+            {mode === "signup" && (
+              <>
+                Already have an account?{" "}
+                <button type="button" onClick={() => switchMode("signin")} className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                  Sign in
+                </button>
+              </>
+            )}
+            {mode === "forgot" && (
+              <>
+                Remember your password?{" "}
+                <button type="button" onClick={() => switchMode("signin")} className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                  Back to sign in
+                </button>
               </>
             )}
           </p>
 
-          {confirmationSent ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-100/70 px-4 py-3 text-sm text-emerald-600 dark:border-emerald-900/50 dark:bg-emerald-900/30 dark:text-emerald-400"
-            >
-              Check your email for a confirmation link to finish signing up.
-            </motion.div>
-          ) : null}
+          {/* ── Confirmation banner ── */}
+          <AnimatePresence>
+            {confirmationSent && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-100/70 px-4 py-3 text-sm text-emerald-600 dark:border-emerald-900/50 dark:bg-emerald-900/30 dark:text-emerald-400"
+              >
+                {mode === "forgot"
+                  ? "Check your email for a password reset link."
+                  : "Check your email for a confirmation link to finish signing up."}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {isAuthenticated && !errorMessage ? (
             <motion.div
@@ -402,18 +729,30 @@ export default function LoginPage() {
             </motion.div>
           ) : null}
 
-          {errorMessage ? (
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400"
-            >
-              {errorMessage}
-            </motion.p>
-          ) : null}
+          {/* ── Error banner ── */}
+          <AnimatePresence>
+            {errorMessage && (
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400"
+              >
+                {errorMessage}
+              </motion.p>
+            )}
+          </AnimatePresence>
 
           <p className="mt-6 text-center text-xs leading-relaxed text-stone-500 dark:text-zinc-500">
-            By continuing, you agree to Curator&apos;s terms and privacy policy.
+            By continuing, you agree to Curator&apos;s{" "}
+            <Link href="/terms" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+              terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline hover:text-indigo-600 dark:hover:text-indigo-400">
+              privacy policy
+            </Link>
+            .
           </p>
         </motion.div>
       </div>

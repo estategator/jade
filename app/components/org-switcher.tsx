@@ -14,6 +14,7 @@ type OrgWithRole = Organization & { myRole: OrgMember["role"] };
 
 type OrgSwitcherProps = {
   dropdownDirection?: "up" | "down";
+  variant?: "default" | "collapsed";
 };
 
 function OrgAvatar({
@@ -40,11 +41,13 @@ function OrgAvatar({
   );
 }
 
-export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcherProps>) {
+export function OrgSwitcher({ dropdownDirection = "down", variant = "default" }: Readonly<OrgSwitcherProps>) {
   const { activeOrgId, setActiveOrg, userId } = useSettings();
   const [orgs, setOrgs] = useState<OrgWithRole[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<React.CSSProperties>({});
 
   useEffect(() => {
     async function load() {
@@ -90,43 +93,75 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
 
   const isUp = dropdownDirection === "up";
   const dropdownPositionClass = isUp ? "bottom-full mb-1.5" : "top-full mt-1.5";
+  const isCollapsed = variant === "collapsed";
+
+  const handleToggle = () => {
+    if (isCollapsed && !open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPos(
+        isUp
+          ? { left: rect.right + 8, bottom: window.innerHeight - rect.bottom }
+          : { left: rect.right + 8, top: rect.top }
+      );
+    }
+    setOpen((p) => !p);
+  };
 
   if (orgs.length === 0) return null;
 
   return (
-    <div ref={ref} className="relative w-full">
+    <div ref={ref} className={cn("relative", isCollapsed ? "flex justify-center" : "w-full")}>
       {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => setOpen((p) => !p)}
-        aria-label={`Organization: ${activeOrg?.name ?? "Select organization"}`}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        className={cn(
-          "group flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
-          open
-            ? "bg-stone-100 dark:bg-zinc-800"
-            : "hover:bg-stone-50 dark:hover:bg-zinc-800/50"
-        )}
-      >
-        <OrgAvatar initial={orgInitial} active={true} />
-
-        <div className="flex min-w-0 flex-1 flex-col items-start">
-          <span className="w-full truncate text-left text-sm font-semibold text-stone-900 dark:text-white">
-            {activeOrg?.name ?? "Select organization"}
-          </span>
-          <span className="flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
-            <TierBadge tier={orgTier} variant="text" />
-          </span>
-        </div>
-
-        <ChevronsUpDown
+      {isCollapsed ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handleToggle}
+          aria-label={`Organization: ${activeOrg?.name ?? "Select organization"}`}
+          aria-expanded={open}
+          aria-haspopup="listbox"
           className={cn(
-            "h-3.5 w-3.5 shrink-0 text-stone-300 transition-colors dark:text-zinc-600",
-            open && "text-stone-500 dark:text-zinc-400"
+            "flex h-9 w-9 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
+            open
+              ? "bg-stone-100 text-stone-600 dark:bg-zinc-800 dark:text-zinc-300"
+              : "text-stone-400 hover:bg-stone-100 hover:text-stone-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
           )}
-        />
-      </button>
+        >
+          <OrgAvatar initial={orgInitial} active={open} size="sm" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleToggle}
+          aria-label={`Organization: ${activeOrg?.name ?? "Select organization"}`}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          className={cn(
+            "group flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
+            open
+              ? "bg-stone-100 dark:bg-zinc-800"
+              : "hover:bg-stone-50 dark:hover:bg-zinc-800/50"
+          )}
+        >
+          <OrgAvatar initial={orgInitial} active={true} />
+
+          <div className="flex min-w-0 flex-1 flex-col items-start">
+            <span className="w-full truncate text-left text-sm font-semibold text-stone-900 dark:text-white">
+              {activeOrg?.name ?? "Select organization"}
+            </span>
+            <span className="flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
+              <TierBadge tier={orgTier} variant="text" />
+            </span>
+          </div>
+
+          <ChevronsUpDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-stone-300 transition-colors dark:text-zinc-600",
+              open && "text-stone-500 dark:text-zinc-400"
+            )}
+          />
+        </button>
+      )}
 
       {/* Dropdown */}
       <AnimatePresence>
@@ -137,9 +172,12 @@ export function OrgSwitcher({ dropdownDirection = "down" }: Readonly<OrgSwitcher
             exit={{ opacity: 0, scale: 0.95, y: isUp ? 4 : -4 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
             className={cn(
-              "absolute left-0 z-50 w-full min-w-[220px] overflow-hidden rounded-xl border border-stone-200/80 bg-white p-1 shadow-xl shadow-stone-200/50 dark:border-zinc-700/80 dark:bg-zinc-900 dark:shadow-black/30",
-              dropdownPositionClass
+              "overflow-hidden rounded-xl border border-stone-200/80 bg-white p-1 shadow-xl shadow-stone-200/50 dark:border-zinc-700/80 dark:bg-zinc-900 dark:shadow-black/30",
+              isCollapsed
+                ? "fixed z-50 w-[220px]"
+                : cn("absolute left-0 z-50 w-full min-w-[220px]", dropdownPositionClass)
             )}
+            style={isCollapsed ? dropdownPos : undefined}
             role="listbox"
             aria-label="Select organization"
           >

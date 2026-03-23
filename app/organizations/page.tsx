@@ -12,6 +12,9 @@ import {
   Crown,
   Shield,
   User,
+  Users,
+  ChevronRight,
+  Calendar,
 } from "lucide-react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
@@ -33,7 +36,7 @@ const roleBadge: Record<OrgMember["role"], { label: string; color: string; Icon:
 export default function OrganizationsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [orgs, setOrgs] = useState<(Organization & { myRole: OrgMember["role"] })[]>([]);
+  const [orgs, setOrgs] = useState<(Organization & { myRole: OrgMember["role"]; memberCount: number })[]>([]);
   const [error, setError] = useState("");
 
   const load = useCallback(async (userId: string) => {
@@ -120,50 +123,88 @@ export default function OrganizationsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
           >
-            {orgs.map((org) => {
+            {orgs.map((org, idx) => {
               const badge = roleBadge[org.myRole];
               const BadgeIcon = badge.Icon;
+              const createdDate = org.created_at
+                ? new Date(org.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    year: "numeric",
+                  })
+                : null;
               return (
-                <Link
+                <motion.div
                   key={org.id}
-                  href={`/organizations/${org.id}`}
-                  className="group rounded-2xl border border-stone-200 bg-white p-6 transition-all hover:border-indigo-200 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-800"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.05 * idx }}
                 >
-                  {org.cover_image_url ? (
-                    <div className="relative mb-4 h-11 w-11 overflow-hidden rounded-xl">
-                      <Image
-                        src={org.cover_image_url}
-                        alt={org.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
+                  <Link
+                    href={`/organizations/${org.id}`}
+                    className="group flex h-full flex-col rounded-2xl border border-stone-200 bg-white transition-all hover:border-indigo-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-700 dark:focus-visible:ring-offset-zinc-950"
+                  >
+                    {/* Card header */}
+                    <div className="flex items-start gap-4 p-5 pb-0">
+                      {org.cover_image_url ? (
+                        <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl ring-1 ring-stone-200 dark:ring-zinc-700">
+                          <Image
+                            src={org.cover_image_url}
+                            alt={org.name}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:ring-indigo-900/40">
+                          <Building2 className="h-5.5 w-5.5" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate text-base font-semibold text-stone-900 dark:text-white">
+                            {org.name}
+                          </h3>
+                          <ChevronRight className="h-4 w-4 flex-shrink-0 text-stone-400 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-zinc-500" />
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-zinc-500">
+                          /{org.slug}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Badges */}
+                    <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.color}`}
+                      >
+                        <BadgeIcon className="h-3 w-3" />
+                        {badge.label}
+                      </span>
+                      <TierBadge
+                        tier={(org.subscription_tier ?? "free") as SubscriptionTier}
                       />
                     </div>
-                  ) : (
-                    <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
-                      <Building2 className="h-5 w-5" />
+
+                    {/* Card footer — metadata */}
+                    <div className="mt-auto border-t border-stone-100 px-5 py-3 dark:border-zinc-800">
+                      <div className="flex items-center gap-4 text-xs text-stone-500 dark:text-zinc-500">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5" />
+                          {org.memberCount} {org.memberCount === 1 ? "member" : "members"}
+                        </span>
+                        {createdDate && (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {createdDate}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <h3 className="text-base font-semibold text-stone-900 dark:text-white">
-                    {org.name}
-                  </h3>
-                  <p className="mt-1 text-xs text-stone-500 dark:text-zinc-500">
-                    /{org.slug}
-                  </p>
-                  <div className="mt-4 flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.color}`}
-                    >
-                      <BadgeIcon className="h-3 w-3" />
-                      {badge.label}
-                    </span>
-                    <TierBadge
-                      tier={(org.subscription_tier ?? "free") as SubscriptionTier}
-                    />
-                  </div>
-                </Link>
+                  </Link>
+                </motion.div>
               );
             })}
           </motion.div>

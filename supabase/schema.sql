@@ -87,6 +87,10 @@ create index if not exists idx_org_members_user
 create index if not exists idx_org_members_active
   on org_members (org_id, user_id) where status = 'active';
 
+-- Covers RLS admin/superadmin checks as index-only scan (avoids heap fetch for role)
+create index if not exists idx_org_members_org_user_role
+  on org_members (org_id, user_id, role);
+
 -- =========================
 -- 4b. Organization invitations (pending invites)
 -- =========================
@@ -116,6 +120,16 @@ create index if not exists idx_org_invitations_invited_user
   on organization_invitations (invited_user_id)
   where invited_user_id is not null;
 
+-- Pending-invite queue: getPendingInvitations, pending count check
+create index if not exists idx_org_invitations_org_pending
+  on organization_invitations (org_id, created_at desc)
+  where status = 'pending';
+
+-- syncPendingInvitesForUser: email lookup for unclaimed pending invites
+create index if not exists idx_org_invitations_email_pending
+  on organization_invitations (email)
+  where status = 'pending' and invited_user_id is null;
+
 -- =========================
 -- 4c. User notifications (extensible inbox)
 -- =========================
@@ -141,6 +155,19 @@ create index if not exists idx_user_notifications_recipient
 
 create index if not exists idx_user_notifications_source
   on user_notifications (source_table, source_id);
+
+-- Unread notification count: .is('resolved_at', null).is('read_at', null)
+create index if not exists idx_user_notifications_unread
+  on user_notifications (recipient_user_id, created_at desc)
+  where resolved_at is null and read_at is null;
+
+-- resolveNotificationsForSource: find unresolved by source
+create index if not exists idx_user_notifications_source_unresolved
+  on user_notifications (source_table, source_id)
+  where resolved_at is null;
+
+-- Enable Realtime so clients can subscribe to new notifications
+alter publication supabase_realtime add table user_notifications;
 
 -- =========================
 -- 5. Projects (belong to an organization)
@@ -193,6 +220,20 @@ create index if not exists idx_inventory_items_user_created
 
 create index if not exists idx_inventory_items_org
   on inventory_items (org_id);
+
+-- Project-scoped listings: getInventoryItems, getPublicProjectItems
+create index if not exists idx_inventory_items_project_created
+  on inventory_items (project_id, created_at desc)
+  where project_id is not null;
+
+-- Org + status filter: getRevenueByMonth (.eq('org_id',X).eq('status','sold'))
+create index if not exists idx_inventory_items_org_status
+  on inventory_items (org_id, status);
+
+-- Cleanup-images cron: completed items older than threshold
+create index if not exists idx_inventory_items_processing_cleanup
+  on inventory_items (processing_status, created_at)
+  where processing_status = 'complete';
 
 -- Backfill sold_at for existing sold items (run once after adding the column):
 -- ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS sold_at timestamptz;
@@ -603,6 +644,11 @@ alter table organizations
                 check (subscription_tier in ('free', 'pro', 'enterprise')),
   add column if not exists stripe_subscription_id text;
 
+-- Stripe Connect webhook: account.updated lookup by connected account ID
+create index if not exists idx_organizations_stripe_account
+  on organizations (stripe_account_id)
+  where stripe_account_id is not null;
+
 -- =========================
 -- 9b. Stripe Billing columns on organizations (SaaS subscriptions)
 -- =========================
@@ -638,6 +684,15 @@ create index if not exists idx_sales_seller_org
 
 create index if not exists idx_sales_item
   on sales (inventory_item_id);
+
+-- Recent sales: .in('seller_org_id', X).order('created_at desc')
+create index if not exists idx_sales_org_created
+  on sales (seller_org_id, created_at desc);
+
+-- Revenue query: .in('seller_org_id', X).eq('status', 'completed')
+create index if not exists idx_sales_org_completed
+  on sales (seller_org_id, amount)
+  where status = 'completed';
 
 -- ---- sales RLS ----
 alter table sales enable row level security;
@@ -1264,6 +1319,14 @@ create table if not exists support_tickets (
 create index if not exists idx_support_tickets_org on support_tickets (org_id);
 create index if not exists idx_support_tickets_user on support_tickets (user_id);
 create index if not exists idx_support_tickets_status on support_tickets (status);
+
+-- Org ticket list: .eq('org_id', X).order('created_at desc')
+create index if not exists idx_support_tickets_org_created
+  on support_tickets (org_id, created_at desc);
+
+-- Developer portal: .eq('status', X).order('created_at desc')
+create index if not exists idx_support_tickets_status_created
+  on support_tickets (status, created_at desc);
 
 -- =========================
 -- Ticket replies

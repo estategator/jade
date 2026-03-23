@@ -5,7 +5,7 @@ import { auditLog } from '@/lib/rbac';
 
 // ── Types ────────────────────────────────────────────────────
 
-export type NotificationKind = 'org_invite';
+export type NotificationKind = 'org_invite' | 'sale_completed';
 
 export type UserNotification = {
   id: string;
@@ -310,6 +310,68 @@ export async function resolveNotificationsForSource(sourceTable: string, sourceI
       .is('resolved_at', null);
   } catch (err) {
     console.error('Failed to resolve notifications:', err);
+  }
+}
+
+/** Notify every active member of an org that a sale completed. */
+export async function createSaleNotifications(params: {
+  orgId: string;
+  saleId: string;
+  itemName: string;
+  amount: number;
+  currency: string;
+  buyerEmail: string | null;
+}) {
+  try {
+    // Find all active members of the seller org
+    const { data: members, error: memberError } = await supabase
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', params.orgId)
+      .eq('status', 'active');
+
+    if (memberError || !members || members.length === 0) {
+      if (memberError) console.error('Failed to fetch org members for sale notification:', memberError);
+      return;
+    }
+
+    const formatted = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: params.currency,
+    }).format(params.amount);
+
+    const body = params.buyerEmail
+      ? `${params.buyerEmail} purchased it for ${formatted}`
+      : `Sold for ${formatted}`;
+
+    const rows = members.map((m) => ({
+      recipient_user_id: m.user_id,
+      org_id: params.orgId,
+      kind: 'sale_completed' as NotificationKind,
+      source_table: 'sales',
+      source_id: params.saleId,
+      title: `Item Sold: ${params.itemName}`,
+      body,
+      payload: {
+        item_name: params.itemName,
+        amount: params.amount,
+        currency: params.currency,
+        buyer_email: params.buyerEmail,
+      },
+    }));
+
+    const { error } = await supabase
+      .from('user_notifications')
+      .upsert(rows, {
+        onConflict: 'recipient_user_id,source_table,source_id',
+        ignoreDuplicates: true,
+      });
+
+    if (error) {
+      console.error('Failed to create sale notifications:', error);
+    }
+  } catch (err) {
+    console.error('Unexpected error creating sale notifications:', err);
   }
 }
 

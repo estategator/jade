@@ -30,7 +30,7 @@ type SettingsContextValue = {
   loading: boolean;
   setActiveOrg: (orgId: string | null) => void;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
-  refresh: () => void;
+  refresh: () => Promise<void>;
 };
 
 const SettingsContext = createContext<SettingsContextValue>({
@@ -41,7 +41,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   loading: true,
   setActiveOrg: () => {},
   updateSetting: () => {},
-  refresh: () => {},
+  refresh: () => Promise.resolve(),
 });
 
 export function useSettings() {
@@ -193,6 +193,7 @@ export function SettingsProvider({
         fontSize: serverResolved.effective.fontSize,
         brandPrimary: serverResolved.effective.brandPrimary,
         brandAccent: serverResolved.effective.brandAccent,
+        logoUrl: serverResolved.effective.logoUrl,
       });
 
       setLoading(false);
@@ -214,8 +215,7 @@ export function SettingsProvider({
       setActiveOrgId(orgId);
       setActiveOrgIdState(orgId);
       setLoading(true);
-      loadSettings(orgId);
-      router.refresh();
+      loadSettings(orgId).then(() => router.refresh());
     },
     [loadSettings, router]
   );
@@ -230,22 +230,25 @@ export function SettingsProvider({
       const newResolved = resolveSettings(orgSettings, enforcedKeys, updated);
       setResolved(newResolved);
 
-      // Persist to cache and server (fire-and-forget)
+      // Persist to cache and server
       if (userId && activeOrgId) {
         setCachedSettings(activeOrgId, {
           theme: newResolved.effective.theme,
           fontSize: newResolved.effective.fontSize,
           brandPrimary: newResolved.effective.brandPrimary,
           brandAccent: newResolved.effective.brandAccent,
+          logoUrl: newResolved.effective.logoUrl,
         });
-        updateUserOrgSettings(userId, activeOrgId, updated);
+        updateUserOrgSettings(userId, activeOrgId, updated).catch((err) =>
+          console.error('Failed to persist user settings:', err)
+        );
       }
     },
     [resolved.lockedKeys, userSettings, orgSettings, enforcedKeys, userId, activeOrgId]
   );
 
-  const refresh = useCallback(() => {
-    loadSettings(activeOrgId);
+  const refresh = useCallback((): Promise<void> => {
+    return loadSettings(activeOrgId);
   }, [activeOrgId, loadSettings]);
 
   const value = useMemo<SettingsContextValue>(

@@ -283,7 +283,26 @@ export async function getOrganizations(userId: string) {
       } as Organization & { myRole: OrgMember['role'] };
     });
 
-    return { data: orgs };
+    // Fetch member counts per org in a single query
+    const orgIds = orgs.map((o) => o.id);
+    const countMap = new Map<string, number>();
+    if (orgIds.length > 0) {
+      const { data: members } = await supabase
+        .from('org_members')
+        .select('org_id')
+        .in('org_id', orgIds)
+        .eq('status', 'active');
+      (members ?? []).forEach((m) => {
+        countMap.set(m.org_id, (countMap.get(m.org_id) ?? 0) + 1);
+      });
+    }
+
+    const enriched = orgs.map((o) => ({
+      ...o,
+      memberCount: countMap.get(o.id) ?? 0,
+    }));
+
+    return { data: enriched };
   } catch (err) {
     console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };

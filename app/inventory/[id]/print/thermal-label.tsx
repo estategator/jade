@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, ArrowLeft, TrendingUp } from "lucide-react";
+import { PiPrinterDuotone, PiArrowLeftDuotone, PiTrendUpDuotone } from "react-icons/pi";
 
 type ThermalLabelProps = Readonly<{
   itemName: string;
@@ -43,7 +43,7 @@ export function ThermalLabel({
           onClick={() => window.close()}
           className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <PiArrowLeftDuotone className="h-4 w-4" />
           Close
         </button>
         <button
@@ -51,7 +51,7 @@ export function ThermalLabel({
           onClick={handlePrint}
           className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
         >
-          <Printer className="h-4 w-4" />
+          <PiPrinterDuotone className="h-4 w-4" />
           Print Label
         </button>
       </div>
@@ -72,7 +72,7 @@ export function ThermalLabel({
           {/* Good find badge */}
           {isGreatDeal && (
             <div className="mx-auto mt-1.5 flex w-fit items-center gap-1 rounded-md border border-stone-300 px-2 py-0.5 text-xs font-semibold">
-              <TrendingUp className="h-3 w-3" />
+              <PiTrendUpDuotone className="h-3 w-3" />
               Great Deal
             </div>
           )}

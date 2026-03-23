@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Loader2, Sparkles, RefreshCw, RotateCw, ImageIcon } from "lucide-react";
+import { PiSpinnerDuotone, PiSparkleDuotone, PiArrowsClockwiseDuotone, PiArrowClockwiseDuotone, PiImageDuotone } from "react-icons/pi";
 import { PageHeader } from "@/app/components/page-header";
 import {
   updateInventoryItem,
@@ -118,7 +118,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
               />
             ) : (
               <div className="flex aspect-square w-full items-center justify-center">
-                <ImageIcon className="h-16 w-16 text-stone-300 dark:text-zinc-700" />
+                <PiImageDuotone className="h-16 w-16 text-stone-300 dark:text-zinc-700" />
               </div>
             )}
           </motion.div>
@@ -133,7 +133,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
                 disabled={retrying}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
-                {retrying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                {retrying ? <PiSpinnerDuotone className="h-3.5 w-3.5 animate-spin" /> : <PiArrowsClockwiseDuotone className="h-3.5 w-3.5" />}
                 Retry
               </button>
             </div>
@@ -141,7 +141,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
 
           {(item.processing_status === "queued" || item.processing_status === "processing") && (
             <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30">
-              <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <PiSpinnerDuotone className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-sm text-indigo-700 dark:text-indigo-300">
                 {item.processing_status === "queued" ? "Queued…" : "Processing…"}
               </p>
@@ -156,7 +156,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
               className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <Sparkles className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                <PiSparkleDuotone className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
                 <span className="truncate text-sm font-medium text-indigo-700 dark:text-indigo-300">
                   {aiApplied ? "AI suggestions applied" : "AI suggestions available"}
                 </span>
@@ -168,7 +168,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
               >
                 {aiApplied ? (
                   <>
-                    <RotateCw className="h-3.5 w-3.5" />
+                    <PiArrowClockwiseDuotone className="h-3.5 w-3.5" />
                     Re-apply
                   </>
                 ) : (
@@ -314,7 +314,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
               disabled={submitting}
               className="inline-flex items-center justify-center rounded-xl border border-transparent bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
+              {submitting ? <PiSpinnerDuotone className="h-4 w-4 animate-spin" /> : "Save changes"}
             </button>
             <Link href="/inventory" className="text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white">
               Cancel

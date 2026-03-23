@@ -4,16 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  CircleDot,
-  Loader2,
-  Send,
-  User,
-  Shield,
-} from "lucide-react";
+  PiArrowLeftDuotone,
+  PiClockDuotone,
+  PiCheckCircleDuotone,
+  PiWarningCircleDuotone,
+  PiCircleDuotone,
+  PiSpinnerDuotone,
+  PiPaperPlaneRightDuotone,
+  PiUserDuotone,
+  PiShieldDuotone,
+} from "react-icons/pi";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getActiveOrgId } from "@/lib/active-org";
@@ -32,22 +32,22 @@ const STATUS_CONFIG: Record<
 > = {
   open: {
     label: "Open",
-    icon: CircleDot,
-    color: "text-[var(--color-brand-primary)] bg-[var(--color-brand-subtle)]",
+    icon: PiCircleDuotone,
+    color: "text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/20",
   },
   in_progress: {
     label: "In Progress",
-    icon: Clock,
+    icon: PiClockDuotone,
     color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20",
   },
   resolved: {
     label: "Resolved",
-    icon: CheckCircle2,
+    icon: PiCheckCircleDuotone,
     color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20",
   },
   closed: {
     label: "Closed",
-    icon: AlertCircle,
+    icon: PiWarningCircleDuotone,
     color: "text-stone-500 bg-stone-100 dark:text-zinc-400 dark:bg-zinc-800",
   },
 };
@@ -129,7 +129,7 @@ export default function TicketDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-stone-400 dark:text-zinc-500" />
+        <PiSpinnerDuotone className="h-6 w-6 animate-spin text-stone-400 dark:text-zinc-500" />
       </div>
     );
   }
@@ -141,11 +141,11 @@ export default function TicketDetailPage() {
           href="/tickets"
           className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <PiArrowLeftDuotone className="h-4 w-4" />
           Back to Tickets
         </Link>
         <div className="rounded-xl border border-stone-200 bg-white py-16 text-center dark:border-zinc-700 dark:bg-zinc-900">
-          <AlertCircle className="mx-auto h-10 w-10 text-stone-300 dark:text-zinc-600" />
+          <PiWarningCircleDuotone className="mx-auto h-10 w-10 text-stone-300 dark:text-zinc-600" />
           <p className="mt-3 text-sm text-stone-500 dark:text-zinc-400">
             {error || "Ticket not found."}
           </p>
@@ -164,7 +164,7 @@ export default function TicketDetailPage() {
         href="/tickets"
         className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <PiArrowLeftDuotone className="h-4 w-4" />
         Back to Tickets
       </Link>
 
@@ -252,9 +252,9 @@ export default function TicketDetailPage() {
                   )}
                 >
                   {reply.is_admin ? (
-                    <Shield className="h-3 w-3" />
+                    <PiShieldDuotone className="h-3 w-3" />
                   ) : (
-                    <User className="h-3 w-3" />
+                    <PiUserDuotone className="h-3 w-3" />
                   )}
                 </div>
                 <span className="text-xs font-medium text-stone-700 dark:text-zinc-300">
@@ -304,9 +304,9 @@ export default function TicketDetailPage() {
                 )}
               >
                 {replySubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <PiSpinnerDuotone className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <PiPaperPlaneRightDuotone className="h-4 w-4" />
                 )}
                 {replySubmitting ? "Sending..." : "Reply"}
               </button>

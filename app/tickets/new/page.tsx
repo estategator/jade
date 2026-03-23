@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { PiSpinnerDuotone } from "react-icons/pi";
 import { supabase } from "@/lib/supabase";
 import { getActiveOrgId } from "@/lib/active-org";
 import { PageHeader } from "@/app/components/page-header";
@@ -52,7 +52,7 @@ export default function NewTicketPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-stone-400 dark:text-zinc-500" />
+        <PiSpinnerDuotone className="h-6 w-6 animate-spin text-stone-400 dark:text-zinc-500" />
       </div>
     );
   }

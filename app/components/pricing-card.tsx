@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, X } from "lucide-react";
+import { PiCheckCircleDuotone, PiXCircleDuotone } from "react-icons/pi";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { PricingTier } from "@/lib/tiers";
@@ -120,9 +120,9 @@ export function PricingCard({ tier, isPopular = false, onSelectTier }: PricingCa
         {tier.features.map((feature, index) => (
           <div key={index} className="flex items-start gap-3">
             {feature.included ? (
-              <Check className="h-5 w-5 text-emerald-600 dark:text-emerald-500 shrink-0 mt-0.5" />
+              <PiCheckCircleDuotone className="h-5 w-5 text-emerald-600 dark:text-emerald-500 shrink-0 mt-0.5" />
             ) : (
-              <X className="h-5 w-5 text-stone-300 dark:text-zinc-700 shrink-0 mt-0.5" />
+              <PiXCircleDuotone className="h-5 w-5 text-stone-300 dark:text-zinc-700 shrink-0 mt-0.5" />
             )}
             <div className="flex-1">
               <p

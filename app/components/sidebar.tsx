@@ -5,20 +5,20 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  BarChart3,
-  Package,
-  Building2,
-  Settings,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  TrendingUp,
-  Bell,
-  Megaphone,
-  HelpCircle,
-  Code2,
-  Ticket,
-} from "lucide-react";
+  PiChartBarDuotone,
+  PiPackageDuotone,
+  PiBuildingsDuotone,
+  PiGearDuotone,
+  PiSignOutDuotone,
+  PiSidebarDuotone,
+  PiSidebarSimpleDuotone,
+  PiTrendUpDuotone,
+  PiBellDuotone,
+  PiMegaphoneDuotone,
+  PiQuestionDuotone,
+  PiCodeDuotone,
+  PiTicketDuotone,
+} from "react-icons/pi";
 import { supabase } from "@/lib/supabase";
 import { OrgSwitcher } from "@/app/components/org-switcher";
 import { ThemeToggle } from "@/app/components/theme-toggle";
@@ -105,10 +105,10 @@ export function Sidebar() {
     {
       title: "Core",
       items: [
-        { label: "Dashboard", href: "/dashboard", icon: BarChart3 },
-        { label: "Inventory", href: "/inventory", icon: Package },
-        { label: "Pricing", href: "/pricing-optimization", icon: TrendingUp },
-        { label: "Marketing", href: "/marketing", icon: Megaphone },
+        { label: "Dashboard", href: "/dashboard", icon: PiChartBarDuotone },
+        { label: "Inventory", href: "/inventory", icon: PiPackageDuotone },
+        { label: "Pricing", href: "/pricing-optimization", icon: PiTrendUpDuotone },
+        { label: "Marketing", href: "/marketing", icon: PiMegaphoneDuotone },
       ],
     },
     {
@@ -117,21 +117,21 @@ export function Sidebar() {
         {
           label: "Notifications",
           href: "/notifications",
-          icon: Bell,
+          icon: PiBellDuotone,
           badge: unreadCount,
         },
-        { label: "Organizations", href: "/organizations", icon: Building2 },
-        { label: "Settings", href: "/settings", icon: Settings },
+        { label: "Organizations", href: "/organizations", icon: PiBuildingsDuotone },
+        { label: "Settings", href: "/settings", icon: PiGearDuotone },
         ...(isDeveloper
-          ? [{ label: "Developer", href: "/developer", icon: Code2 }]
+          ? [{ label: "Developer", href: "/developer", icon: PiCodeDuotone }]
           : []),
       ],
     },
     {
       title: "Support",
       items: [
-        { label: "Help", href: "/dashboard/help", icon: HelpCircle },
-        { label: "Tickets", href: "/tickets", icon: Ticket },
+        { label: "Help", href: "/dashboard/help", icon: PiQuestionDuotone },
+        { label: "Tickets", href: "/tickets", icon: PiTicketDuotone },
       ],
     },
   ];
@@ -174,7 +174,7 @@ export function Sidebar() {
                 aria-expanded={true}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <PiSidebarDuotone className="h-4 w-4" />
               </button>
             </>
           ) : (
@@ -186,7 +186,7 @@ export function Sidebar() {
                 aria-expanded={false}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
               >
-                <PanelLeftOpen className="h-5 w-5" />
+                <PiSidebarSimpleDuotone className="h-5 w-5" />
               </button>
             </Tooltip>
           )}
@@ -309,7 +309,7 @@ export function Sidebar() {
                   onClick={handleSignOut}
                   className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <PiSignOutDuotone className="h-3.5 w-3.5" />
                   Sign out
                 </button>
               </div>
@@ -322,7 +322,7 @@ export function Sidebar() {
                   aria-label="Switch organization"
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 >
-                  <Building2 className="h-4 w-4" />
+                  <PiBuildingsDuotone className="h-4 w-4" />
                 </Link>
               </Tooltip>
               <ThemeToggle />
@@ -333,7 +333,7 @@ export function Sidebar() {
                   aria-label="Sign out"
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <PiSignOutDuotone className="h-4 w-4" />
                 </button>
               </Tooltip>
             </div>
@@ -358,7 +358,7 @@ export function Sidebar() {
               aria-label="Sign out"
               className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             >
-              <LogOut className="h-4 w-4" />
+              <PiSignOutDuotone className="h-4 w-4" />
             </button>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { X, Copy, Check, ExternalLink, Printer } from "lucide-react";
+import { PiXDuotone, PiCopyDuotone, PiCheckDuotone, PiArrowSquareOutDuotone, PiPrinterDuotone } from "react-icons/pi";
 
 type QrModalProps = Readonly<{
   itemId: string;
@@ -42,7 +42,7 @@ export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
           onClick={onClose}
           className="absolute right-3 top-3 rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-white"
         >
-          <X className="h-4 w-4" />
+          <PiXDuotone className="h-4 w-4" />
         </button>
 
         <h2 className="mb-1 text-lg font-bold text-stone-900 dark:text-white">
@@ -64,7 +64,7 @@ export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
           rel="noopener noreferrer"
           className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
         >
-          <Printer className="h-4 w-4" />
+          <PiPrinterDuotone className="h-4 w-4" />
           Print Thermal Label
         </a>
 
@@ -80,9 +80,9 @@ export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
             title="Copy link"
           >
             {copied ? (
-              <Check className="h-4 w-4 text-emerald-500" />
+              <PiCheckDuotone className="h-4 w-4 text-emerald-500" />
             ) : (
-              <Copy className="h-4 w-4" />
+              <PiCopyDuotone className="h-4 w-4" />
             )}
           </button>
           <a
@@ -92,7 +92,7 @@ export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
             className="flex-shrink-0 rounded-lg p-1.5 text-stone-500 transition-colors hover:bg-stone-200 hover:text-stone-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-white"
             title="Open detail page"
           >
-            <ExternalLink className="h-4 w-4" />
+            <PiArrowSquareOutDuotone className="h-4 w-4" />
           </a>
         </div>
       </div>

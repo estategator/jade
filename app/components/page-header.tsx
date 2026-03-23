@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, LucideIcon } from "lucide-react";
+import { PiArrowLeftDuotone } from "react-icons/pi";
+
+type IconComponent = React.ComponentType<{ className?: string }>;
 
 type PageHeaderProps = {
   title: string;
@@ -13,14 +15,14 @@ type PageHeaderProps = {
     href?: string;
     onClick?: () => void;
     variant?: "primary" | "secondary";
-    icon?: LucideIcon;
+    icon?: IconComponent;
   };
   actions?: Array<{
     label: string;
     href?: string;
     onClick?: () => void;
     variant?: "primary" | "secondary";
-    icon?: LucideIcon;
+    icon?: IconComponent;
   }>;
   className?: string;
 };
@@ -51,7 +53,7 @@ export function PageHeader({
             href={backLink.href}
             className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-400 dark:hover:text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <PiArrowLeftDuotone className="h-4 w-4" />
             {backLink.label}
           </Link>
         )}

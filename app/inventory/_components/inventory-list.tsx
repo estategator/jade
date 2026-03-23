@@ -6,25 +6,25 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Loader2,
-  Plus,
-  Search,
-  Package,
-  Pencil,
-  Trash2,
-  ShoppingCart,
-  SlidersHorizontal,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  X,
-  ImageOff,
-  MoreHorizontal,
-  QrCode,
-  Images,
-  CheckSquare,
-  AlertTriangle,
-} from "lucide-react";
+  PiSpinnerDuotone,
+  PiPlusDuotone,
+  PiMagnifyingGlassDuotone,
+  PiPackageDuotone,
+  PiPencilDuotone,
+  PiTrashDuotone,
+  PiShoppingCartDuotone,
+  PiSlidersDuotone,
+  PiArrowUpDuotone,
+  PiArrowDownDuotone,
+  PiArrowsDownUpDuotone,
+  PiXDuotone,
+  PiImageBrokenDuotone,
+  PiDotsThreeDuotone,
+  PiQrCodeDuotone,
+  PiImagesDuotone,
+  PiCheckSquareDuotone,
+  PiWarningDuotone,
+} from "react-icons/pi";
 import { PageHeader } from "@/app/components/page-header";
 import {
   deleteInventoryItem,
@@ -96,7 +96,7 @@ function BulkConfirmModal({
               ? "bg-red-100 dark:bg-red-900/30"
               : "bg-indigo-100 dark:bg-indigo-900/30"
           }`}>
-            <AlertTriangle className={`h-5 w-5 ${
+            <PiWarningDuotone className={`h-5 w-5 ${
               isDestructive
                 ? "text-red-600 dark:text-red-400"
                 : "text-indigo-600 dark:text-indigo-400"
@@ -134,7 +134,7 @@ function BulkConfirmModal({
                 : "bg-indigo-600 hover:bg-indigo-700"
             }`}
           >
-            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {busy && <PiSpinnerDuotone className="h-3.5 w-3.5 animate-spin" />}
             {isDestructive ? "Delete" : "Confirm"}
           </button>
         </div>
@@ -167,7 +167,7 @@ function ItemThumbnail({ item }: { item: InventoryItem }) {
   return (
     <div className="flex items-center justify-center h-10 w-10 rounded-lg border border-stone-200 bg-stone-50 dark:border-zinc-700 dark:bg-zinc-800 flex-shrink-0">
       {isProcessing ? (
-        <Loader2 className="h-5 w-5 animate-spin text-stone-400 dark:text-zinc-600" />
+        <PiSpinnerDuotone className="h-5 w-5 animate-spin text-stone-400 dark:text-zinc-600" />
       ) : shouldShowImage && imageUrl ? (
         <Image
           src={imageUrl}
@@ -178,7 +178,7 @@ function ItemThumbnail({ item }: { item: InventoryItem }) {
           unoptimized
         />
       ) : (
-        <ImageOff className="h-5 w-5 text-stone-400 dark:text-zinc-600" />
+        <PiImageBrokenDuotone className="h-5 w-5 text-stone-400 dark:text-zinc-600" />
       )}
     </div>
   );
@@ -226,9 +226,9 @@ function RowActions({
             title="Buy"
           >
             {buyingId === item.id ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <PiSpinnerDuotone className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <ShoppingCart className="h-3.5 w-3.5" />
+              <PiShoppingCartDuotone className="h-3.5 w-3.5" />
             )}
           </button>
         )}
@@ -237,7 +237,7 @@ function RowActions({
           className="inline-flex items-center justify-center rounded-lg p-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white min-h-[32px] min-w-[32px]"
           title="Edit"
         >
-          <Pencil className="h-3.5 w-3.5" />
+          <PiPencilDuotone className="h-3.5 w-3.5" />
         </Link>
         <button
           type="button"
@@ -245,7 +245,7 @@ function RowActions({
           className="inline-flex items-center justify-center rounded-lg p-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white min-h-[32px] min-w-[32px]"
           title="More actions"
         >
-          <MoreHorizontal className="h-3.5 w-3.5" />
+          <PiDotsThreeDuotone className="h-3.5 w-3.5" />
         </button>
         <AnimatePresence>
           {open && (
@@ -261,7 +261,7 @@ function RowActions({
                 onClick={() => { onQr(item); setOpen(false); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-stone-700 transition-colors hover:bg-stone-50 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
-                <QrCode className="h-3.5 w-3.5" />
+                <PiQrCodeDuotone className="h-3.5 w-3.5" />
                 QR Code
               </button>
               <button
@@ -269,7 +269,7 @@ function RowActions({
                 onClick={() => { onDelete(item.id); setOpen(false); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <PiTrashDuotone className="h-3.5 w-3.5" />
                 Delete
               </button>
             </motion.div>
@@ -474,8 +474,8 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
         title="Inventory"
         description={`Manage and track all your estate sale items — ${items.length} ${items.length === 1 ? "item" : "items"} across all projects.`}
         actions={[
-          { label: "Bulk add", href: "/inventory/bulk", icon: Images, variant: "secondary" },
-          { label: "Add item", href: "/inventory/add", icon: Plus, variant: "primary" },
+          { label: "Bulk add", href: "/inventory/bulk", icon: PiImagesDuotone, variant: "secondary" },
+          { label: "Add item", href: "/inventory/add", icon: PiPlusDuotone, variant: "primary" },
         ]}
       />
 
@@ -489,7 +489,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative max-w-sm flex-1 min-w-[200px]">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <Search className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+              <PiMagnifyingGlassDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
             </div>
             <input
               type="text"
@@ -508,7 +508,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
                 : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
             }`}
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <PiSlidersDuotone className="h-4 w-4" />
             Filters
             {activeFilterCount > 0 && (
               <span className="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
@@ -522,7 +522,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
               onClick={clearFilters}
               className="inline-flex items-center gap-1 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 dark:text-zinc-500 dark:hover:text-white"
             >
-              <X className="h-3.5 w-3.5" />
+              <PiXDuotone className="h-3.5 w-3.5" />
               Clear all
             </button>
           )}
@@ -627,9 +627,9 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
                   title={sortDirection === "asc" ? "Ascending" : "Descending"}
                 >
                   {sortDirection === "asc" ? (
-                    <ArrowUp className="h-4 w-4" />
+                    <PiArrowUpDuotone className="h-4 w-4" />
                   ) : (
-                    <ArrowDown className="h-4 w-4" />
+                    <PiArrowDownDuotone className="h-4 w-4" />
                   )}
                 </button>
               </div>
@@ -659,7 +659,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
             className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30"
           >
             <div className="flex items-center gap-2 text-sm font-medium text-indigo-700 dark:text-indigo-300">
-              <CheckSquare className="h-4 w-4" />
+              <PiCheckSquareDuotone className="h-4 w-4" />
               {selectedIds.size} selected
             </div>
             <div className="h-4 w-px bg-indigo-200 dark:bg-indigo-800" />
@@ -715,7 +715,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <Package className="mx-auto mb-4 h-10 w-10 text-stone-400 dark:text-zinc-600" />
+          <PiPackageDuotone className="mx-auto mb-4 h-10 w-10 text-stone-400 dark:text-zinc-600" />
           <h3 className="text-lg font-bold text-stone-900 dark:text-white">
             {search ? "No matching items" : "No items yet"}
           </h3>
@@ -729,7 +729,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
               href="/inventory/add"
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-indigo-700"
             >
-              <Plus className="h-4 w-4" />
+              <PiPlusDuotone className="h-4 w-4" />
               Add item
             </Link>
           )}
@@ -757,29 +757,29 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
             </span>
             <button type="button" onClick={() => toggleSort("name")} className="col-span-2 lg:col-span-3 flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-stone-500 hover:text-stone-900 dark:hover:text-white transition-colors">
               Name
-              {sortField === "name" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-100" />}
+              {sortField === "name" ? (sortDirection === "asc" ? <PiArrowUpDuotone className="h-3 w-3" /> : <PiArrowDownDuotone className="h-3 w-3" />) : <PiArrowsDownUpDuotone className="h-3 w-3 opacity-0 group-hover:opacity-100" />}
             </button>
             <span className="col-span-2 text-xs font-medium uppercase tracking-wider text-stone-500">
               Project
             </span>
             <button type="button" onClick={() => toggleSort("category")} className="col-span-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-stone-500 hover:text-stone-900 dark:hover:text-white transition-colors">
               Category
-              {sortField === "category" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : null}
+              {sortField === "category" ? (sortDirection === "asc" ? <PiArrowUpDuotone className="h-3 w-3" /> : <PiArrowDownDuotone className="h-3 w-3" />) : null}
             </button>
             <button type="button" onClick={() => toggleSort("condition")} className="col-span-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-stone-500 hover:text-stone-900 dark:hover:text-white transition-colors">
               Condition
-              {sortField === "condition" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : null}
+              {sortField === "condition" ? (sortDirection === "asc" ? <PiArrowUpDuotone className="h-3 w-3" /> : <PiArrowDownDuotone className="h-3 w-3" />) : null}
             </button>
             <span className="col-span-1 text-xs font-medium uppercase tracking-wider text-stone-500">
               Qty
             </span>
             <button type="button" onClick={() => toggleSort("price")} className="col-span-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-stone-500 hover:text-stone-900 dark:hover:text-white transition-colors">
               Price
-              {sortField === "price" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : null}
+              {sortField === "price" ? (sortDirection === "asc" ? <PiArrowUpDuotone className="h-3 w-3" /> : <PiArrowDownDuotone className="h-3 w-3" />) : null}
             </button>
             <button type="button" onClick={() => toggleSort("status")} className="col-span-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-stone-500 hover:text-stone-900 dark:hover:text-white transition-colors">
               Status
-              {sortField === "status" ? (sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : null}
+              {sortField === "status" ? (sortDirection === "asc" ? <PiArrowUpDuotone className="h-3 w-3" /> : <PiArrowDownDuotone className="h-3 w-3" />) : null}
             </button>
             <span className="col-span-1 text-xs font-medium uppercase tracking-wider text-stone-500 text-right">
               Actions

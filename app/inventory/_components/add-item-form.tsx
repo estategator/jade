@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Loader2, Upload, X, Sparkles, Check, RotateCw } from "lucide-react";
+import { PiSpinnerDuotone, PiUploadDuotone, PiXDuotone, PiSparkleDuotone, PiCheckDuotone, PiArrowClockwiseDuotone } from "react-icons/pi";
 import { cn } from "@/lib/cn";
 import { PageHeader } from "@/app/components/page-header";
 import {
@@ -259,7 +259,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
                     onClick={removeImage}
                     className="rounded-lg bg-stone-900/70 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-stone-900"
                   >
-                    <X className="h-4 w-4" />
+                    <PiXDuotone className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -279,7 +279,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
                     : "border-stone-300 bg-white hover:border-indigo-300 hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-indigo-800 dark:hover:bg-zinc-800/50"
                 )}
               >
-                <Upload className="mb-3 h-8 w-8 text-stone-400 dark:text-zinc-500" />
+                <PiUploadDuotone className="mb-3 h-8 w-8 text-stone-400 dark:text-zinc-500" />
                 <p className="text-sm font-medium text-stone-900 dark:text-white">
                   Click or drag an image
                 </p>
@@ -306,7 +306,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
           {/* AI analysis status */}
           {analyzing && (
             <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30">
-              <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <PiSpinnerDuotone className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
               <span className="text-sm text-indigo-700 dark:text-indigo-300">Analyzing image…</span>
             </div>
           )}
@@ -318,7 +318,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
               className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <Sparkles className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                <PiSparkleDuotone className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
                 <span className="truncate text-sm font-medium text-indigo-700 dark:text-indigo-300">
                   {aiApplied ? "AI suggestions applied" : "AI suggestions available"}
                 </span>
@@ -331,7 +331,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
               >
                 {aiApplied ? (
                   <>
-                    <RotateCw className="h-3.5 w-3.5" />
+                    <PiArrowClockwiseDuotone className="h-3.5 w-3.5" />
                     Re-apply
                   </>
                 ) : (
@@ -492,9 +492,9 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
               className="inline-flex items-center justify-center rounded-xl border border-transparent bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitState === "submitting" ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</>
+                <><PiSpinnerDuotone className="mr-2 h-4 w-4 animate-spin" /> Saving…</>
               ) : submitState === "success" ? (
-                <><Check className="mr-2 h-4 w-4" /> Added!</>
+                <><PiCheckDuotone className="mr-2 h-4 w-4" /> Added!</>
               ) : (
                 "Add item"
               )}

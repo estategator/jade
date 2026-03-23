@@ -2,14 +2,14 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import {
-  ScanLine,
-  Package,
-  DollarSign,
-  TrendingUp,
-  BarChart3,
-  Building2,
-  Receipt,
-} from "lucide-react";
+  PiScanDuotone,
+  PiPackageDuotone,
+  PiCurrencyDollarDuotone,
+  PiTrendUpDuotone,
+  PiChartBarDuotone,
+  PiBuildingsDuotone,
+  PiReceiptDuotone,
+} from "react-icons/pi";
 
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -109,7 +109,7 @@ export default async function DashboardPage({
       label: "Total Items",
       value: stats?.totalItems ?? 0,
       fmt: (v: number) => String(v),
-      icon: Package,
+      icon: PiPackageDuotone,
       color: "text-[var(--color-brand-primary)]",
       bg: "bg-[var(--color-brand-subtle)]",
     },
@@ -117,7 +117,7 @@ export default async function DashboardPage({
       label: "Available",
       value: stats?.availableItems ?? 0,
       fmt: (v: number) => String(v),
-      icon: ScanLine,
+      icon: PiScanDuotone,
       color: "text-emerald-600 dark:text-emerald-400",
       bg: "bg-emerald-50 dark:bg-emerald-900/20",
     },
@@ -125,7 +125,7 @@ export default async function DashboardPage({
       label: "Sold",
       value: stats?.soldItems ?? 0,
       fmt: (v: number) => String(v),
-      icon: TrendingUp,
+      icon: PiTrendUpDuotone,
       color: "text-violet-600 dark:text-violet-400",
       bg: "bg-violet-50 dark:bg-violet-900/20",
     },
@@ -137,7 +137,7 @@ export default async function DashboardPage({
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
         })}`,
-      icon: DollarSign,
+      icon: PiCurrencyDollarDuotone,
       color: "text-[var(--color-brand-primary)]",
       bg: "bg-[var(--color-brand-subtle)]",
     },
@@ -149,7 +149,7 @@ export default async function DashboardPage({
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
         })}`,
-      icon: Receipt,
+      icon: PiReceiptDuotone,
       color: "text-violet-600 dark:text-violet-400",
       bg: "bg-violet-50 dark:bg-violet-900/20",
     },
@@ -159,25 +159,25 @@ export default async function DashboardPage({
     {
       label: "Scan an item",
       description: "Use AI to price and catalogue",
-      icon: ScanLine,
+      icon: PiScanDuotone,
       href: "#",
     },
     {
       label: "View inventory",
       description: "Browse your item catalogue",
-      icon: Package,
+      icon: PiPackageDuotone,
       href: "/inventory",
     },
     {
       label: "Add item",
       description: "Add a new inventory item",
-      icon: TrendingUp,
+      icon: PiTrendUpDuotone,
       href: "/inventory/add",
     },
     {
       label: "Organizations",
       description: "Manage your teams and orgs",
-      icon: Building2,
+      icon: PiBuildingsDuotone,
       href: "/organizations",
     },
   ];
@@ -223,7 +223,7 @@ export default async function DashboardPage({
           {/* Revenue over time */}
           <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-[var(--color-brand-primary)]" />
+              <PiCurrencyDollarDuotone className="h-4 w-4 text-[var(--color-brand-primary)]" />
               <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
                 Revenue (last 6 months)
               </h3>
@@ -234,7 +234,7 @@ export default async function DashboardPage({
           {/* Inventory by category */}
           <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <PiChartBarDuotone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
                 Inventory by category
               </h3>
@@ -248,7 +248,7 @@ export default async function DashboardPage({
       {recentSales.length > 0 && (
         <div className="mb-8 animate-fade-in-up [animation-delay:250ms] fill-mode-both">
           <div className="mb-4 flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            <PiReceiptDuotone className="h-5 w-5 text-violet-600 dark:text-violet-400" />
             <h2 className="text-lg font-bold text-stone-900 dark:text-white">
               Recent Sales
             </h2>
@@ -327,7 +327,7 @@ export default async function DashboardPage({
       {/* Empty state — only when data loaded successfully and actual counts are zero */}
       {!hasData && statsLoaded && (
         <div className="mt-10 rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900 animate-fade-in-up [animation-delay:400ms] fill-mode-both">
-          <ScanLine className="mx-auto mb-4 h-10 w-10 text-stone-400 dark:text-zinc-600" />
+          <PiScanDuotone className="mx-auto mb-4 h-10 w-10 text-stone-400 dark:text-zinc-600" />
           <h3 className="text-lg font-bold text-stone-900 dark:text-white">
             No items yet
           </h3>

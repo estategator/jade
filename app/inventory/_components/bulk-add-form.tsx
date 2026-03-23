@@ -6,14 +6,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Loader2,
-  Trash2,
-  ImagePlus,
-  ChevronDown,
-  ChevronUp,
-  Check,
-  RefreshCw,
-} from "lucide-react";
+  PiSpinnerDuotone,
+  PiTrashDuotone,
+  PiImageDuotone,
+  PiCaretDownDuotone,
+  PiCaretUpDuotone,
+  PiCheckDuotone,
+  PiArrowsClockwiseDuotone,
+} from "react-icons/pi";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import {
@@ -312,7 +312,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
           )}
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100 dark:bg-zinc-800">
-            <ImagePlus className="h-6 w-6 text-stone-500 dark:text-zinc-400" />
+            <PiImageDuotone className="h-6 w-6 text-stone-500 dark:text-zinc-400" />
           </div>
           <div className="text-center">
             <p className="text-sm font-medium text-stone-700 dark:text-zinc-300">
@@ -383,7 +383,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                   </div>
                 ) : (
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-100 dark:bg-zinc-800">
-                    <ImagePlus className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                    <PiImageDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
                   </div>
                 )}
 
@@ -394,7 +394,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                     </p>
                     {(item.analysisStatus === 'queued' || item.analysisStatus === 'analyzing') && (
                       <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Analyzing
+                        <PiSpinnerDuotone className="h-3 w-3 animate-spin" /> Analyzing
                       </span>
                     )}
                     {item.analysisStatus === 'failed' && (
@@ -417,7 +417,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                       className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                       title="Retry AI Analysis"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <PiArrowsClockwiseDuotone className="h-4 w-4" />
                     </button>
                   )}
                   <button
@@ -425,12 +425,12 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                     onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                     className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <PiTrashDuotone className="h-4 w-4" />
                   </button>
                   {item.expanded ? (
-                    <ChevronUp className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                    <PiCaretUpDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                    <PiCaretDownDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
                   )}
                 </div>
               </div>
@@ -524,11 +524,11 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
             className="inline-flex items-center gap-2 rounded-xl border border-transparent bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             {submitting ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</>
+              <><PiSpinnerDuotone className="h-4 w-4 animate-spin" /> Adding…</>
             ) : analysisInProgress ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Add {items.length} {items.length === 1 ? "item" : "items"} (analysis running…)</>
+              <><PiSpinnerDuotone className="h-4 w-4 animate-spin" /> Add {items.length} {items.length === 1 ? "item" : "items"} (analysis running…)</>
             ) : (
-              <><Check className="h-4 w-4" /> Add {items.length} {items.length === 1 ? "item" : "items"}</>
+              <><PiCheckDuotone className="h-4 w-4" /> Add {items.length} {items.length === 1 ? "item" : "items"}</>
             )}
           </button>
         </motion.div>

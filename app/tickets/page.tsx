@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Ticket,
-  Plus,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  CircleDot,
-} from "lucide-react";
+  PiTicketDuotone,
+  PiPlusDuotone,
+  PiClockDuotone,
+  PiCheckCircleDuotone,
+  PiWarningCircleDuotone,
+  PiSpinnerDuotone,
+  PiCircleDuotone,
+} from "react-icons/pi";
 import { supabase } from "@/lib/supabase";
 import { getActiveOrgId } from "@/lib/active-org";
 import { PageHeader } from "@/app/components/page-header";
@@ -25,22 +25,22 @@ const STATUS_CONFIG: Record<
 > = {
   open: {
     label: "Open",
-    icon: CircleDot,
+    icon: PiCircleDuotone,
     color: "text-[var(--color-brand-primary)] bg-[var(--color-brand-subtle)]",
   },
   in_progress: {
     label: "In Progress",
-    icon: Clock,
+    icon: PiClockDuotone,
     color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20",
   },
   resolved: {
     label: "Resolved",
-    icon: CheckCircle2,
+    icon: PiCheckCircleDuotone,
     color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20",
   },
   closed: {
     label: "Closed",
-    icon: AlertCircle,
+    icon: PiWarningCircleDuotone,
     color: "text-stone-500 bg-stone-100 dark:text-zinc-400 dark:bg-zinc-800",
   },
 };
@@ -88,7 +88,7 @@ export default function TicketsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-stone-400 dark:text-zinc-500" />
+        <PiSpinnerDuotone className="h-6 w-6 animate-spin text-stone-400 dark:text-zinc-500" />
       </div>
     );
   }
@@ -98,12 +98,12 @@ export default function TicketsPage() {
       <PageHeader
         title="My Tickets"
         description="Track your support tickets and their status."
-        action={{ label: "New Ticket", href: "/tickets/new", icon: Plus }}
+        action={{ label: "New Ticket", href: "/tickets/new", icon: PiPlusDuotone }}
       />
 
       {error && (
         <div className="mb-6 flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-          <AlertCircle className="h-4 w-4 shrink-0" />
+          <PiWarningCircleDuotone className="h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
@@ -138,7 +138,7 @@ export default function TicketsPage() {
           animate={{ opacity: 1 }}
           className="rounded-xl border border-stone-200 bg-white py-16 text-center dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <Ticket className="mx-auto h-10 w-10 text-stone-300 dark:text-zinc-600" />
+          <PiTicketDuotone className="mx-auto h-10 w-10 text-stone-300 dark:text-zinc-600" />
           <p className="mt-3 text-sm font-medium text-stone-900 dark:text-white">
             No tickets found
           </p>
@@ -151,7 +151,7 @@ export default function TicketsPage() {
             href="/tickets/new"
             className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-brand-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-brand-primary-hover)]"
           >
-            <Plus className="h-4 w-4" />
+            <PiPlusDuotone className="h-4 w-4" />
             Submit New Ticket
           </Link>
         </motion.div>

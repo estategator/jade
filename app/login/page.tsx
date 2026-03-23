@@ -4,7 +4,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Apple, ArrowRight, BarChart3, Loader2, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  PiArrowRightDuotone,
+  PiChartBarDuotone,
+  PiDiamondDuotone,
+  PiSpinnerDuotone,
+  PiEnvelopeDuotone,
+  PiPackageDuotone,
+  PiShieldCheckDuotone,
+  PiSparkleDuotone,
+  PiTagDuotone,
+  PiGoogleLogoDuotone,
+  PiAppleLogoDuotone,
+} from "react-icons/pi";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { supabase } from "@/lib/supabase";
@@ -21,28 +33,10 @@ type OAuthButtonProps = Readonly<{
   onClick: (provider: AuthProvider) => void;
 }>;
 
-function GoogleGlyph() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 12.2c0 4.4-3 7.8-7.6 7.8A8 8 0 1 1 12.3 4c1.9 0 3.4.7 4.7 1.8" />
-      <path d="M22 12h-9.5" />
-    </svg>
-  );
-}
-
 function OAuthButton({ provider, loadingProvider, onClick }: OAuthButtonProps) {
   const isLoading = loadingProvider === provider;
   const copy = provider === "google" ? "Continue with Google" : "Continue with Apple";
-  const Icon = provider === "google" ? GoogleGlyph : Apple;
+  const Icon = provider === "google" ? PiGoogleLogoDuotone : PiAppleLogoDuotone;
 
   return (
     <button
@@ -59,13 +53,13 @@ function OAuthButton({ provider, loadingProvider, onClick }: OAuthButtonProps) {
     >
       <span className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-stone-900 dark:bg-zinc-800 dark:text-white">
-          <Icon />
+          <Icon className="h-5 w-5" />
         </span>
         <span className="block text-sm font-semibold">{copy}</span>
       </span>
       <span className="flex items-center gap-2 text-sm font-medium text-stone-500 transition-colors group-hover:text-indigo-600 dark:text-zinc-500 dark:group-hover:text-indigo-400">
         {isLoading ? "Redirecting" : "Sign in"}
-        <ArrowRight className={cn("h-4 w-4 transition-transform", !isLoading && "group-hover:translate-x-0.5")} />
+        <PiArrowRightDuotone className={cn("h-4 w-4 transition-transform", !isLoading && "group-hover:translate-x-0.5")} />
       </span>
     </button>
   );
@@ -194,19 +188,42 @@ export default function LoginPage() {
   }
 
   const features = [
-    { icon: Sparkles, label: "AI-powered pricing & cataloging" },
-    { icon: BarChart3, label: "Real-time sales analytics" },
-    { icon: ShieldCheck, label: "Secure inventory management" },
+    { icon: PiSparkleDuotone, label: "AI-powered pricing & cataloging" },
+    { icon: PiChartBarDuotone, label: "Real-time sales analytics" },
+    { icon: PiShieldCheckDuotone, label: "Secure inventory management" },
   ];
 
   return (
     <div className="flex min-h-screen font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
       {/* ── Left branded panel (lg+) ── */}
       <div className="relative hidden w-1/2 overflow-hidden bg-indigo-600 dark:bg-indigo-700 lg:flex lg:flex-col lg:justify-between">
+        {/* Gradient mesh overlay */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_20%_80%,rgba(99,102,241,0.35),transparent),radial-gradient(ellipse_60%_40%_at_80%_20%,rgba(16,185,129,0.12),transparent)]" />
+
+        {/* Subtle dot pattern */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+
         {/* Decorative blurs */}
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-20 top-1/4 h-96 w-96 rounded-full bg-indigo-400/30 blur-3xl" />
           <div className="absolute -right-20 bottom-1/4 h-96 w-96 rounded-full bg-indigo-800/40 blur-3xl" />
+          {/* Extra highlight for premium depth */}
+          <div className="absolute left-1/2 top-0 h-64 w-64 -translate-x-1/2 rounded-full bg-white/5 blur-2xl" />
+          <div className="absolute bottom-0 right-0 h-72 w-72 translate-x-1/4 translate-y-1/4 rounded-full bg-emerald-500/10 blur-3xl" />
+        </div>
+
+        {/* Faint decorative icons */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <PiDiamondDuotone className="absolute right-8 top-10 h-20 w-20 rotate-12 text-white/[0.04]" />
+          <PiTagDuotone className="absolute bottom-32 left-6 h-16 w-16 -rotate-12 text-white/[0.05]" />
+          <PiPackageDuotone className="absolute bottom-12 right-16 h-14 w-14 rotate-6 text-white/[0.04]" />
         </div>
 
         <div className="relative z-10 flex flex-1 flex-col justify-center px-12 xl:px-16">
@@ -318,7 +335,7 @@ export default function LoginPage() {
           <form onSubmit={handleEmailSubmit} className="space-y-3">
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <Mail className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                <PiEnvelopeDuotone className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
               </div>
               <input
                 type="email"
@@ -344,7 +361,7 @@ export default function LoginPage() {
               className="inline-flex w-full items-center justify-center rounded-xl border border-transparent bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {emailLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <PiSpinnerDuotone className="h-4 w-4 animate-spin" />
               ) : mode === "signup" ? (
                 "Create account"
               ) : (

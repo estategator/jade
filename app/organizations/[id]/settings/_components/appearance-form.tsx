@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Loader2, Lock, Save, Sun, Moon, Monitor } from "lucide-react";
+import { Loader2, Lock, Save, Sun, Moon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSettings } from "@/app/components/settings-provider";
 import { updateOrgSettings } from "@/app/settings/actions";
@@ -156,8 +156,8 @@ export function AppearanceForm({
               editable={canManageSettings}
             >
               <div className="flex gap-1.5">
-                {(["light", "dark", "system"] as const).map((mode) => {
-                  const Icon = mode === "light" ? Sun : mode === "dark" ? Moon : Monitor;
+                {(["light", "dark"] as const).map((mode) => {
+                  const Icon = mode === "light" ? Sun : Moon;
                   return (
                     <button
                       key={mode}

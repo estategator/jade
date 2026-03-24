@@ -14,7 +14,7 @@ import {
   PiWarningDuotone,
   PiPrinterDuotone,
 } from "react-icons/pi";
-import { getInvoices, deleteInvoice, type Invoice } from "@/app/invoices/actions";
+import { getInvoices, deleteInvoice, type InvoiceListItem } from "@/app/invoices/actions";
 
 type Props = {
   userId: string;
@@ -53,43 +53,40 @@ function formatDate(dateStr: string): string {
 }
 
 export function InvoiceList({ userId, orgId, refreshKey }: Props) {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InvoiceListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const loadInvoices = useCallback(async () => {
-    setLoading(true);
+  // Reset page when filter changes
+  const loadInvoices = useCallback(async (pageNum: number, append: boolean) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
-    const result = await getInvoices(userId, orgId, statusFilter);
+    const result = await getInvoices(userId, orgId, statusFilter, pageNum);
     if (result.error) {
       setError(result.error);
     } else {
-      setInvoices(result.data ?? []);
+      setInvoices((prev) => append ? [...prev, ...(result.data ?? [])] : (result.data ?? []));
+      setHasMore(result.hasMore ?? false);
+      setPage(pageNum);
     }
     setLoading(false);
+    setLoadingMore(false);
   }, [userId, orgId, statusFilter]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-      const result = await getInvoices(userId, orgId, statusFilter);
-      if (cancelled) return;
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setInvoices(result.data ?? []);
-      }
-      setLoading(false);
-    }
-    fetchData();
-    return () => { cancelled = true; };
-  }, [userId, orgId, statusFilter, refreshKey]);
+    loadInvoices(0, false);
+  }, [loadInvoices, refreshKey]);
 
   const filtered = invoices.filter((inv) => {
     if (!search) return true;
@@ -110,7 +107,7 @@ export function InvoiceList({ userId, orgId, refreshKey }: Props) {
       setError(result.error);
     } else {
       setDeleteTarget(null);
-      loadInvoices();
+      loadInvoices(0, false);
     }
   }
 
@@ -166,6 +163,7 @@ export function InvoiceList({ userId, orgId, refreshKey }: Props) {
           </p>
         </div>
       ) : (
+        <>
         <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px] text-left text-sm">
@@ -259,6 +257,22 @@ export function InvoiceList({ userId, orgId, refreshKey }: Props) {
             </table>
           </div>
         </div>
+
+        {/* Load More */}
+        {hasMore && (
+          <div className="flex justify-center pt-4">
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => loadInvoices(page + 1, true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              {loadingMore && <PiSpinnerDuotone className="h-4 w-4 animate-spin" />}
+              Load more
+            </button>
+          </div>
+        )}
+        </>
       )}
 
       {/* Delete confirmation modal */}

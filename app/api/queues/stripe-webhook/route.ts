@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { tierFromStripePriceId } from '@/lib/tiers';
 import { handleCallback } from '@vercel/queue';
 import { createSaleNotifications } from '@/app/notifications/actions';
+import { restoreCheckoutSession, restoreSingleItem } from '@/app/api/checkout/cancel/route';
 
 export type WebhookPayload = {
   eventType: string;
@@ -311,77 +312,13 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       const expiredItemId = session.metadata?.inventory_item_id;
 
       if (expiredCheckoutSessionId) {
-        // ── Multi-item expiry: restore all reserved items ──
-        const { data: sessionItems } = await supabaseAdmin
-          .from('checkout_session_items')
-          .select('inventory_item_id, reserved_quantity')
-          .eq('checkout_session_id', expiredCheckoutSessionId);
-
-        if (sessionItems?.length) {
-          for (const si of sessionItems) {
-            const { data: expItem } = await supabaseAdmin
-              .from('inventory_items')
-              .select('status, quantity')
-              .eq('id', si.inventory_item_id)
-              .single();
-
-            if (expItem?.status === 'reserved') {
-              await supabaseAdmin
-                .from('inventory_items')
-                .update({
-                  status: 'available',
-                  quantity: si.reserved_quantity,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', si.inventory_item_id)
-                .eq('status', 'reserved');
-            } else if (expItem) {
-              await supabaseAdmin
-                .from('inventory_items')
-                .update({
-                  quantity: (expItem.quantity ?? 0) + si.reserved_quantity,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', si.inventory_item_id);
-            }
-          }
-        }
-
-        await supabaseAdmin
-          .from('checkout_sessions')
-          .update({ status: 'expired', updated_at: new Date().toISOString() })
-          .eq('id', expiredCheckoutSessionId)
-          .eq('status', 'pending');
-
+        // Multi-item expiry: use shared idempotent restore
+        await restoreCheckoutSession(expiredCheckoutSessionId, 'expired');
         console.log('[stripe-webhook-queue] Multi-item checkout session expired, inventory restored');
       } else if (expiredItemId) {
-        // ── Legacy single-item expiry ──
+        // Legacy single-item expiry
         const purchaseQty = parseInt(session.metadata?.purchase_quantity ?? '1', 10) || 1;
-        const { data: expiredItem } = await supabaseAdmin
-          .from('inventory_items')
-          .select('status, quantity')
-          .eq('id', expiredItemId)
-          .single();
-
-        if (expiredItem?.status === 'reserved') {
-          await supabaseAdmin
-            .from('inventory_items')
-            .update({
-              status: 'available',
-              quantity: purchaseQty,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', expiredItemId)
-            .eq('status', 'reserved');
-        } else if (expiredItem) {
-          await supabaseAdmin
-            .from('inventory_items')
-            .update({
-              quantity: (expiredItem.quantity ?? 0) + purchaseQty,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', expiredItemId);
-        }
+        await restoreSingleItem(expiredItemId, purchaseQty);
       }
       break;
     }

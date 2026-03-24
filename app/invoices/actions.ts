@@ -61,6 +61,22 @@ export type InvoiceFilters = {
   max_price?: number;
 };
 
+/** Lightweight invoice type for list views (excludes heavy columns). */
+export type InvoiceListItem = {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  invoice_number: string;
+  status: 'draft' | 'finalized' | 'void';
+  period_start: string;
+  period_end: string;
+  total: number;
+  line_count: number;
+  notes: string;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+};
+
 export type InvoiceWithLines = Invoice & {
   lines: InvoiceLine[];
 };
@@ -117,23 +133,31 @@ function revalidateInvoiceRoutes() {
 
 // ── Server Actions ───────────────────────────────────────────
 
-/** List invoices for the active org, with optional status filter. */
+/** List invoices for the active org, with optional status filter and pagination. */
 export async function getInvoices(
   userId: string,
   orgId: string,
   statusFilter?: string,
-): Promise<{ data?: Invoice[]; error?: string }> {
+  page: number = 0,
+  pageSize: number = 50,
+): Promise<{ data?: InvoiceListItem[]; error?: string; hasMore?: boolean }> {
   try {
     if (!orgId) return { data: [] };
 
     const membership = await requireOrgMembership(orgId, userId);
     if ('error' in membership) return { error: membership.error };
 
+    const from = page * pageSize;
+    const to = from + pageSize;
+
     let query = supabase
       .from('invoices')
-      .select('*, project:projects(id, name)')
+      .select(
+        'id, org_id, project_id, invoice_number, status, period_start, period_end, total, line_count, notes, created_at, project:projects(id, name)',
+      )
       .eq('org_id', orgId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (statusFilter && statusFilter !== 'all') {
       query = query.eq('status', statusFilter);
@@ -146,7 +170,10 @@ export async function getInvoices(
       return { error: 'Failed to load invoices.' };
     }
 
-    return { data: (data ?? []) as Invoice[] };
+    const rows = (data ?? []) as unknown as InvoiceListItem[];
+    // If we got pageSize+1 rows, there are more pages
+    const hasMore = rows.length > pageSize;
+    return { data: hasMore ? rows.slice(0, pageSize) : rows, hasMore };
   } catch (err) {
     console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };
@@ -174,30 +201,30 @@ export async function getInvoiceDetail(
     const membership = await requireOrgMembership(invoice.org_id, userId);
     if ('error' in membership) return { error: membership.error };
 
-    // Fetch org details for the printout
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id, name, phone, address_line1, address_line2, city, state, zip_code')
-      .eq('id', invoice.org_id)
-      .single();
+    // Fetch org details and lines in parallel (independent queries)
+    const [orgResult, linesResult] = await Promise.all([
+      supabase
+        .from('organizations')
+        .select('id, name, phone, address_line1, address_line2, city, state, zip_code')
+        .eq('id', invoice.org_id)
+        .single(),
+      supabase
+        .from('invoice_lines')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('created_at', { ascending: true }),
+    ]);
 
-    // Fetch lines
-    const { data: lines, error: linesErr } = await supabase
-      .from('invoice_lines')
-      .select('*')
-      .eq('invoice_id', invoiceId)
-      .order('created_at', { ascending: true });
-
-    if (linesErr) {
-      console.error('Supabase error:', linesErr);
+    if (linesResult.error) {
+      console.error('Supabase error:', linesResult.error);
       return { error: 'Failed to load invoice lines.' };
     }
 
     return {
       data: {
         ...(invoice as Invoice),
-        organization: org as Invoice['organization'] ?? null,
-        lines: (lines ?? []) as InvoiceLine[],
+        organization: orgResult.data as Invoice['organization'] ?? null,
+        lines: (linesResult.data ?? []) as InvoiceLine[],
       },
     };
   } catch (err) {
@@ -246,17 +273,21 @@ export async function getOrgCategories(
     const membership = await requireOrgMembership(orgId, userId);
     if ('error' in membership) return { error: membership.error };
 
+    // Use RPC or distinct-on to avoid fetching every row
     const { data, error } = await supabase
       .from('inventory_items')
       .select('category')
-      .eq('org_id', orgId);
+      .eq('org_id', orgId)
+      .order('category', { ascending: true });
 
     if (error) {
       console.error('Supabase error:', error);
       return { error: 'Failed to load categories.' };
     }
 
-    const unique = [...new Set((data ?? []).map((d) => d.category))].sort();
+    // Deduplicate — still needed since Supabase JS lacks native DISTINCT,
+    // but we now sort server-side and skip the client .sort().
+    const unique = [...new Set((data ?? []).map((d) => d.category))];
     return { data: unique };
   } catch (err) {
     console.error('Unexpected error:', err);

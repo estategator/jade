@@ -5,7 +5,7 @@ import { requireOrgMembership } from '@/lib/rbac';
 
 export type DashboardStats = {
   totalItems: number;
-  totalRevenue: number;
+  totalInventoryValue: number;
   totalSoldRevenue: number;
   availableItems: number;
   soldItems: number;
@@ -15,6 +15,8 @@ export type CategoryBreakdown = {
   category: string;
   count: number;
 };
+
+export type RevenuePeriod = '1D' | '1W' | '1M' | '6M' | 'YTD' | '1Y';
 
 export type RevenueByMonth = {
   month: string;
@@ -30,7 +32,7 @@ export type StatusBreakdown = {
 export async function getDashboardStats(userId: string, orgId?: string | null) {
   try {
     if (!orgId) {
-      return { data: { totalItems: 0, totalRevenue: 0, totalSoldRevenue: 0, availableItems: 0, soldItems: 0 } as DashboardStats };
+      return { data: { totalItems: 0, totalInventoryValue: 0, totalSoldRevenue: 0, availableItems: 0, soldItems: 0 } as DashboardStats };
     }
 
     const membership = await requireOrgMembership(orgId, userId);
@@ -48,7 +50,7 @@ export async function getDashboardStats(userId: string, orgId?: string | null) {
 
     const items = data ?? [];
     const totalItems = items.length;
-    const totalRevenue = items.reduce((sum, i) => sum + Number(i.price), 0);
+    const totalInventoryValue = items.reduce((sum, i) => sum + Number(i.price), 0);
     const totalSoldRevenue = items
       .filter((i) => i.status === 'sold')
       .reduce((sum, i) => sum + Number(i.price), 0);
@@ -56,7 +58,7 @@ export async function getDashboardStats(userId: string, orgId?: string | null) {
     const soldItems = items.filter((i) => i.status === 'sold').length;
 
     return {
-      data: { totalItems, totalRevenue, totalSoldRevenue, availableItems, soldItems } as DashboardStats,
+      data: { totalItems, totalInventoryValue, totalSoldRevenue, availableItems, soldItems } as DashboardStats,
     };
   } catch (err) {
     console.error('Unexpected error:', err);
@@ -98,44 +100,101 @@ export async function getCategoryBreakdown(userId: string, orgId?: string | null
   }
 }
 
-export async function getRevenueByMonth(userId: string, orgId?: string | null) {
+export async function getRevenueByRange(
+  userId: string,
+  orgId?: string | null,
+  period: RevenuePeriod = '6M',
+) {
   try {
     if (!orgId) return { data: [] as RevenueByMonth[] };
 
     const membership = await requireOrgMembership(orgId, userId);
     if ('error' in membership) return { error: membership.error };
 
+    const now = new Date();
+    let startDate: Date;
+    switch (period) {
+      case '1D':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        break;
+      case '1W':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        break;
+      case '1M':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        break;
+      case 'YTD':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      case '1Y':
+        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      case '6M':
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        break;
+    }
+
     const { data, error } = await supabase
-      .from('inventory_items')
-      .select('price, sold_at')
-      .eq('status', 'sold')
-      .not('sold_at', 'is', null)
-      .eq('org_id', orgId);
+      .from('sales')
+      .select('amount, created_at')
+      .eq('seller_org_id', orgId)
+      .eq('status', 'completed')
+      .gte('created_at', startDate.toISOString());
 
     if (error) {
       console.error('Supabase error:', error);
       return { error: 'Failed to load revenue data.' };
     }
 
-    const monthlyRevenue: Record<string, number> = {};
-    const now = new Date();
+    // Build bucket keys depending on period granularity
+    const buckets: Record<string, number> = {};
 
-    // Initialize last 6 months
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      monthlyRevenue[key] = 0;
-    }
-
-    for (const item of data ?? []) {
-      const d = new Date(item.sold_at);
-      const key = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      if (key in monthlyRevenue) {
-        monthlyRevenue[key] += Number(item.price);
+    if (period === '1D') {
+      // Hourly buckets for the last 24 hours
+      for (let h = 23; h >= 0; h--) {
+        const d = new Date(now);
+        d.setHours(now.getHours() - h, 0, 0, 0);
+        const key = d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+        buckets[key] = 0;
+      }
+      for (const sale of data ?? []) {
+        const d = new Date(sale.created_at);
+        const key = d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+        if (key in buckets) buckets[key] += Number(sale.amount);
+      }
+    } else if (period === '1W') {
+      // Daily buckets for the last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const key = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        buckets[key] = 0;
+      }
+      for (const sale of data ?? []) {
+        const d = new Date(sale.created_at);
+        const key = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        if (key in buckets) buckets[key] += Number(sale.amount);
+      }
+    } else {
+      // Monthly buckets for 1M, 6M, YTD, 1Y
+      const monthCount =
+        period === '1M' ? 2
+        : period === 'YTD' ? now.getMonth() + 1
+        : period === '1Y' ? 12
+        : 6; // 6M
+      for (let i = monthCount - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        buckets[key] = 0;
+      }
+      for (const sale of data ?? []) {
+        const d = new Date(sale.created_at);
+        const key = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        if (key in buckets) buckets[key] += Number(sale.amount);
       }
     }
 
-    const result: RevenueByMonth[] = Object.entries(monthlyRevenue).map(
+    const result: RevenueByMonth[] = Object.entries(buckets).map(
       ([month, revenue]) => ({ month, revenue })
     );
 

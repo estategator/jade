@@ -20,14 +20,12 @@ import { UpgradeIntentHandler } from "@/app/dashboard/upgrade-intent-handler";
 import {
   getDashboardStats,
   getCategoryBreakdown,
-  getRevenueByMonth,
+  getRevenueByRange,
   getRecentSales,
   getSalesRevenue,
 } from "./actions";
-import {
-  DashboardRevenueChart,
-  DashboardCategoryChart,
-} from "./_components/dashboard-charts";
+import { DashboardCategoryChart } from "./_components/dashboard-charts";
+import { RevenueChartWithPeriod } from "./_components/revenue-chart-with-period";
 import { DashboardErrorToast } from "./_components/dashboard-error-toast";
 
 export default async function DashboardPage({
@@ -79,7 +77,7 @@ export default async function DashboardPage({
   const [statsRes, catRes, revRes, salesRes, salesRevRes] = await Promise.all([
     getDashboardStats(user.id, activeOrgId),
     getCategoryBreakdown(user.id, activeOrgId),
-    getRevenueByMonth(user.id, activeOrgId),
+    getRevenueByRange(user.id, activeOrgId),
     getRecentSales(user.id, activeOrgId),
     getSalesRevenue(user.id, activeOrgId),
   ]);
@@ -131,10 +129,10 @@ export default async function DashboardPage({
       bg: "bg-violet-50 dark:bg-violet-900/20",
     },
     {
-      label: "Total Value",
-      value: stats?.totalRevenue ?? 0,
+      label: "Inventory Value",
+      value: stats?.totalInventoryValue ?? 0,
       fmt: (v: number) =>
-        `$${(stats?.totalRevenue ?? 0).toLocaleString("en-US", {
+        `$${(stats?.totalInventoryValue ?? 0).toLocaleString("en-US", {
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
         })}`,
@@ -224,18 +222,53 @@ export default async function DashboardPage({
           })}
       </div>
 
+      {/* Quick actions */}
+      <div className="mb-6 animate-fade-in-up [animation-delay:200ms] fill-mode-both">
+        <h2 className="mb-2 text-sm font-semibold text-stone-700 dark:text-zinc-300">
+          Quick actions
+        </h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="group flex items-center gap-2.5 rounded-lg border border-stone-200 bg-white px-3 py-2 text-left transition-all hover:border-[var(--color-brand-primary)]/20 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-[var(--color-brand-primary)]/40"
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]">
+                  <Icon className="h-3.5 w-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-stone-900 dark:text-white">
+                    {action.label}
+                  </p>
+                  <p className="truncate text-[11px] leading-tight text-stone-500 dark:text-zinc-500">
+                    {action.description}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Charts */}
       {hasData && (
-        <div className="mb-8 grid gap-4 lg:grid-cols-2 animate-fade-in-up [animation-delay:200ms] fill-mode-both">
+        <div className="mb-8 grid gap-4 lg:grid-cols-2 animate-fade-in-up [animation-delay:300ms] fill-mode-both">
           {/* Revenue over time */}
           <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex items-center gap-2">
               <PiCurrencyDollarDuotone className="h-4 w-4 text-[var(--color-brand-primary)]" />
               <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
-                Revenue (last 6 months)
+                Revenue
               </h3>
             </div>
-            <DashboardRevenueChart data={revenueData} />
+            <RevenueChartWithPeriod
+              initialData={revenueData}
+              userId={user.id}
+              orgId={activeOrgId ?? null}
+            />
           </div>
 
           {/* Inventory by category */}
@@ -302,34 +335,7 @@ export default async function DashboardPage({
         </div>
       )}
 
-      {/* Quick actions */}
-      <div className="animate-fade-in-up [animation-delay:300ms] fill-mode-both">
-        <h2 className="mb-4 text-lg font-bold text-stone-900 dark:text-white">
-          Quick actions
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="group rounded-2xl border border-stone-200 bg-white p-5 text-left transition-all hover:border-[var(--color-brand-primary)]/20 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-[var(--color-brand-primary)]/40"
-              >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <p className="text-sm font-semibold text-stone-900 dark:text-white">
-                  {action.label}
-                </p>
-                <p className="mt-1 text-xs text-stone-500 dark:text-zinc-500">
-                  {action.description}
-                </p>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+
 
       {/* Empty state — only when data loaded successfully and actual counts are zero */}
       {!hasData && statsLoaded && (

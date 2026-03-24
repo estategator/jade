@@ -12,28 +12,37 @@ async function restoreSingleItem(itemId: string, cancelQty: number) {
     return false;
   }
 
-  if (item.status === 'reserved') {
-    await supabaseAdmin
-      .from('inventory_items')
-      .update({ status: 'available', quantity: cancelQty, updated_at: new Date().toISOString() })
-      .eq('id', itemId)
-      .eq('status', 'reserved');
-  } else {
-    await supabaseAdmin
-      .from('inventory_items')
-      .update({
-        quantity: (item.quantity ?? 0) + cancelQty,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', itemId)
-      .eq('status', 'available');
-  }
+  // Always add the reserved quantity back to whatever the current quantity is,
+  // and ensure the item is marked available.
+  await supabaseAdmin
+    .from('inventory_items')
+    .update({
+      status: 'available',
+      quantity: (item.quantity ?? 0) + cancelQty,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
 
   return true;
 }
 
-async function restoreCheckoutSession(checkoutSessionId: string) {
-  // Load session items
+async function restoreCheckoutSession(checkoutSessionId: string, targetStatus: 'cancelled' | 'expired' = 'cancelled') {
+  // Atomically flip status from 'pending' — if another caller already flipped it,
+  // the update matches zero rows and we skip restoration (idempotent).
+  const { data: updated } = await supabaseAdmin
+    .from('checkout_sessions')
+    .update({ status: targetStatus, updated_at: new Date().toISOString() })
+    .eq('id', checkoutSessionId)
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle();
+
+  if (!updated) {
+    // Already processed by webhook or another cancel call
+    return false;
+  }
+
+  // Load session items and restore each
   const { data: sessionItems } = await supabaseAdmin
     .from('checkout_session_items')
     .select('inventory_item_id, reserved_quantity')
@@ -41,20 +50,15 @@ async function restoreCheckoutSession(checkoutSessionId: string) {
 
   if (!sessionItems?.length) return false;
 
-  // Restore each reserved item
   for (const si of sessionItems) {
     await restoreSingleItem(si.inventory_item_id, si.reserved_quantity);
   }
 
-  // Mark checkout session as cancelled
-  await supabaseAdmin
-    .from('checkout_sessions')
-    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-    .eq('id', checkoutSessionId)
-    .eq('status', 'pending');
-
   return true;
 }
+
+// Re-export for use in webhook handler
+export { restoreCheckoutSession, restoreSingleItem };
 
 export async function POST(req: NextRequest) {
   try {

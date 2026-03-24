@@ -5,6 +5,7 @@ import { tierFromStripePriceId } from '@/lib/tiers';
 import { handleCallback } from '@vercel/queue';
 import { createSaleNotifications } from '@/app/notifications/actions';
 import { restoreCheckoutSession, restoreSingleItem } from '@/app/api/checkout/cancel/route';
+import { createCheckoutInvoice, type CheckoutInvoiceLineInput } from '@/app/invoices/actions';
 
 export type WebhookPayload = {
   eventType: string;
@@ -144,12 +145,14 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
         if (sessionItems?.length) {
           let totalNotified = 0;
           let firstOrgId: string | null = null;
+          let firstProjectId: string | null = null;
+          const invoiceLines: CheckoutInvoiceLineInput[] = [];
 
           for (const si of sessionItems) {
             // Update inventory status
             const { data: currentItem } = await supabaseAdmin
               .from('inventory_items')
-              .select('quantity, status, project_id, price, name')
+              .select('quantity, status, project_id, price, name, category, description')
               .eq('id', si.inventory_item_id)
               .single();
 
@@ -184,6 +187,17 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
 
             const orgId = project?.org_id ?? null;
             if (!firstOrgId && orgId) firstOrgId = orgId;
+            if (!firstProjectId && currentItem.project_id) firstProjectId = currentItem.project_id;
+
+            // Collect line data for invoice generation
+            invoiceLines.push({
+              inventory_item_id: si.inventory_item_id,
+              item_name: currentItem.name ?? 'Unknown item',
+              item_category: (currentItem as Record<string, unknown>).category as string ?? 'Uncategorized',
+              item_description: (currentItem as Record<string, unknown>).description as string ?? '',
+              quantity: si.quantity,
+              unit_price: si.unit_price,
+            });
 
             // Insert sale record (one per line item)
             const { data: sale } = await supabaseAdmin.from('sales').insert({
@@ -223,6 +237,32 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             .eq('id', checkoutSessionId);
 
           console.log(`[stripe-webhook-queue] Multi-item checkout completed: ${sessionItems.length} items, ${totalNotified} notifications sent`);
+
+          // Generate invoice for the completed checkout
+          if (firstOrgId && invoiceLines.length > 0) {
+            // Resolve user_id from the checkout session for created_by
+            const { data: csRow } = await supabaseAdmin
+              .from('checkout_sessions')
+              .select('user_id')
+              .eq('id', checkoutSessionId)
+              .single();
+
+            const invoiceResult = await createCheckoutInvoice({
+              orgId: firstOrgId,
+              projectId: firstProjectId,
+              stripeCheckoutSessionId: session.id,
+              buyerEmail: session.customer_details?.email ?? null,
+              currency: session.currency ?? 'usd',
+              createdBy: csRow?.user_id ?? 'system',
+              lines: invoiceLines,
+            });
+
+            if (invoiceResult.error) {
+              console.error('[stripe-webhook-queue] Invoice creation failed:', invoiceResult.error);
+            } else {
+              console.log('[stripe-webhook-queue] Invoice created:', invoiceResult.data?.invoice_number);
+            }
+          }
         }
       } else if (itemId) {
         // ── Legacy single-item checkout ──
@@ -261,7 +301,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
         // Look up the item to get the org
         const { data: item } = await supabaseAdmin
           .from('inventory_items')
-          .select('project_id, price, name')
+          .select('project_id, price, name, category, description')
           .eq('id', itemId)
           .single();
 
@@ -300,6 +340,32 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
               currency: session.currency ?? 'usd',
               buyerEmail: session.customer_details?.email ?? null,
             });
+          }
+
+          // Generate invoice for single-item checkout
+          if (project?.org_id) {
+            const invoiceResult = await createCheckoutInvoice({
+              orgId: project.org_id,
+              projectId: item.project_id,
+              stripeCheckoutSessionId: session.id,
+              buyerEmail: session.customer_details?.email ?? null,
+              currency: session.currency ?? 'usd',
+              createdBy: 'system',
+              lines: [{
+                inventory_item_id: itemId,
+                item_name: item.name ?? 'Unknown item',
+                item_category: (item as Record<string, unknown>).category as string ?? 'Uncategorized',
+                item_description: (item as Record<string, unknown>).description as string ?? '',
+                quantity: purchaseQty,
+                unit_price: Number(item.price),
+              }],
+            });
+
+            if (invoiceResult.error) {
+              console.error('[stripe-webhook-queue] Single-item invoice creation failed:', invoiceResult.error);
+            } else {
+              console.log('[stripe-webhook-queue] Single-item invoice created:', invoiceResult.data?.invoice_number);
+            }
           }
         }
       }

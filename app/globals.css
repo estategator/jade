@@ -9,6 +9,10 @@
   --brand-accent: #10b981;
   --app-font-size: 16px;
 
+  /* Skeleton loading colors (stone palette) */
+  --skeleton-base: #e7e5e4;
+  --skeleton-highlight: #f5f5f4;
+
   /* Semantic interaction tokens (light mode) */
   --color-focus-ring: var(--brand-primary);
   --color-brand-primary: var(--brand-primary);
@@ -24,6 +28,10 @@
 :root[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
+
+  /* Skeleton loading colors (zinc palette) */
+  --skeleton-base: #27272a;
+  --skeleton-highlight: #3f3f46;
 
   /* Semantic interaction tokens (dark mode) */
   --color-brand-primary-hover: color-mix(in srgb, var(--brand-primary) 80%, white);
@@ -51,6 +59,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   font-size: var(--app-font-size);
+}
+
+/* Dark mode skeleton overrides via .dark class */
+.dark {
+  --skeleton-base: #27272a;
+  --skeleton-highlight: #3f3f46;
 }
 
 @keyframes fade-in-up {

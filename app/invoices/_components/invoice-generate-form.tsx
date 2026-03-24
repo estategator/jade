@@ -13,12 +13,14 @@ import { generateInvoice, getOrgProjects, getOrgCategories } from "@/app/invoice
 type Props = {
   userId: string;
   orgId: string;
+  initialProjects?: { id: string; name: string }[];
+  initialCategories?: string[];
   onGenerated?: () => void;
 };
 
-export function InvoiceGenerateForm({ userId, orgId, onGenerated }: Props) {
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+export function InvoiceGenerateForm({ userId, orgId, initialProjects, initialCategories, onGenerated }: Props) {
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>(initialProjects ?? []);
+  const [categories, setCategories] = useState<string[]>(initialCategories ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -35,6 +37,8 @@ export function InvoiceGenerateForm({ userId, orgId, onGenerated }: Props) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
+    // Skip fetch if initial data was provided server-side
+    if (initialProjects?.length || initialCategories?.length) return;
     let cancelled = false;
     async function loadFilters() {
       const [projResult, catResult] = await Promise.all([
@@ -47,7 +51,7 @@ export function InvoiceGenerateForm({ userId, orgId, onGenerated }: Props) {
     }
     loadFilters();
     return () => { cancelled = true; };
-  }, [userId, orgId]);
+  }, [userId, orgId, initialProjects, initialCategories]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

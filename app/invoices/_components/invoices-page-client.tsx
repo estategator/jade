@@ -4,13 +4,25 @@ import { useState } from "react";
 import { PageHeader } from "@/app/components/page-header";
 import { InvoiceGenerateForm } from "@/app/invoices/_components/invoice-generate-form";
 import { InvoiceList } from "@/app/invoices/_components/invoice-list";
+import type { InvoiceListItem } from "@/app/invoices/actions";
 
 type Props = {
   userId: string;
   orgId: string;
+  initialInvoices: InvoiceListItem[];
+  initialHasMore: boolean;
+  initialProjects: { id: string; name: string }[];
+  initialCategories: string[];
 };
 
-export function InvoicesPageClient({ userId, orgId }: Props) {
+export function InvoicesPageClient({
+  userId,
+  orgId,
+  initialInvoices,
+  initialHasMore,
+  initialProjects,
+  initialCategories,
+}: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
@@ -24,12 +36,16 @@ export function InvoicesPageClient({ userId, orgId }: Props) {
         <InvoiceGenerateForm
           userId={userId}
           orgId={orgId}
+          initialProjects={initialProjects}
+          initialCategories={initialCategories}
           onGenerated={() => setRefreshKey((k) => k + 1)}
         />
 
         <InvoiceList
           userId={userId}
           orgId={orgId}
+          initialInvoices={initialInvoices}
+          initialHasMore={initialHasMore}
           refreshKey={refreshKey}
         />
       </div>

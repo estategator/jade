@@ -19,6 +19,8 @@ import { getInvoices, deleteInvoice, type InvoiceListItem } from "@/app/invoices
 type Props = {
   userId: string;
   orgId: string;
+  initialInvoices: InvoiceListItem[];
+  initialHasMore: boolean;
   refreshKey?: number;
 };
 
@@ -52,9 +54,9 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function InvoiceList({ userId, orgId, refreshKey }: Props) {
-  const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export function InvoiceList({ userId, orgId, initialInvoices, initialHasMore, refreshKey }: Props) {
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>(initialInvoices);
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -62,7 +64,9 @@ export function InvoiceList({ userId, orgId, refreshKey }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<InvoiceListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  // Track whether user has triggered a filter change (skip initial mount fetch)
+  const [hasUserFiltered, setHasUserFiltered] = useState(false);
 
   // Reset page when filter changes
   const loadInvoices = useCallback(async (pageNum: number, append: boolean) => {
@@ -84,9 +88,13 @@ export function InvoiceList({ userId, orgId, refreshKey }: Props) {
     setLoadingMore(false);
   }, [userId, orgId, statusFilter]);
 
+  // Only re-fetch when user changes filter or refreshKey triggers;
+  // initial data is already provided server-side.
   useEffect(() => {
-    loadInvoices(0, false);
-  }, [loadInvoices, refreshKey]);
+    if (hasUserFiltered || (refreshKey !== undefined && refreshKey > 0)) {
+      loadInvoices(0, false);
+    }
+  }, [loadInvoices, refreshKey, hasUserFiltered]);
 
   const filtered = invoices.filter((inv) => {
     if (!search) return true;
@@ -130,7 +138,7 @@ export function InvoiceList({ userId, orgId, refreshKey }: Props) {
             <button
               key={s}
               type="button"
-              onClick={() => setStatusFilter(s)}
+              onClick={() => { setStatusFilter(s); setHasUserFiltered(true); }}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 statusFilter === s
                   ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"

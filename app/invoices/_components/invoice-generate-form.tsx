@@ -28,7 +28,7 @@ export function InvoiceGenerateForm({ userId, orgId, onGenerated }: Props) {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [category, setCategory] = useState("");
-  const [statusFilter, setStatusFilter] = useState("sold");
+  const [statusFilter, setStatusFilter] = useState("completed");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [notes, setNotes] = useState("");
@@ -60,6 +60,7 @@ export function InvoiceGenerateForm({ userId, orgId, onGenerated }: Props) {
     formData.set("org_id", orgId);
     formData.set("period_start", periodStart);
     formData.set("period_end", periodEnd);
+    formData.set("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
     if (projectId) formData.set("project_id", projectId);
     if (category) formData.set("category", category);
     if (statusFilter) formData.set("status_filter", statusFilter);
@@ -156,7 +157,7 @@ export function InvoiceGenerateForm({ userId, orgId, onGenerated }: Props) {
           </div>
           <div>
             <label htmlFor="status_filter" className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-zinc-300">
-              Item Status
+              Sale Status
             </label>
             <select
               id="status_filter"
@@ -164,9 +165,10 @@ export function InvoiceGenerateForm({ userId, orgId, onGenerated }: Props) {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-indigo-400"
             >
-              <option value="sold">Sold</option>
-              <option value="available">Available</option>
-              <option value="reserved">Reserved</option>
+              <option value="completed">Completed</option>
+              <option value="pending">Pending</option>
+              <option value="refunded">Refunded</option>
+              <option value="">All statuses</option>
             </select>
           </div>
         </div>

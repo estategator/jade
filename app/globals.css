@@ -123,16 +123,6 @@ body {
 
 /* ── Thermal print label ───────────────────────────────── */
 @media print {
-  @page {
-    size: 58mm auto;
-    margin: 2mm;
-  }
-
-  body {
-    background: #fff !important;
-    color: #000 !important;
-  }
-
   .thermal-label {
     width: 100% !important;
     max-width: none !important;
@@ -142,32 +132,54 @@ body {
 }
 
 /* ── Invoice print layout ──────────────────────────────── */
-body:has(.invoice-printable) {
-  @media print {
-    @page {
-      size: A4;
-      margin: 15mm;
-    }
-  }
-}
-
 @media print {
-  /* Hide sidebar, nav, and non-printable UI */
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide sidebar, nav, and all screen-only UI */
   aside,
   nav,
-  .print\\:hidden,
+  [data-sidebar],
   [data-print-hide] {
     display: none !important;
   }
 
-  /* Reset dashboard layout margin so content fills the page */
-  main {
+  /* Reset dashboard shell layout so invoice fills the page */
+  main,
+  main > div {
     margin-left: 0 !important;
     padding: 0 !important;
+    max-width: none !important;
   }
 
-  /* Invoice cards and tables: remove shadows/borders for clean print */
+  /* Remove decorative shadows/rounded corners from print */
+  .invoice-printable,
   .invoice-printable * {
     box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Keep table rows from splitting across pages */
+  .invoice-printable table {
+    page-break-inside: auto;
+  }
+  .invoice-printable tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  /* Keep totals block together */
+  .invoice-printable tfoot {
+    page-break-inside: avoid;
   }
 }

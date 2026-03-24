@@ -6,6 +6,15 @@ import { requireOrgMembership, requirePermission, auditLog } from '@/lib/rbac';
 
 // ── Types ────────────────────────────────────────────────────
 
+export type InvoiceAddress = {
+  phone?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+};
+
 export type Invoice = {
   id: string;
   org_id: string;
@@ -23,8 +32,8 @@ export type Invoice = {
   created_by: string;
   created_at: string;
   updated_at: string;
-  project?: { id: string; name: string } | null;
-  organization?: { id: string; name: string } | null;
+  project?: ({ id: string; name: string } & InvoiceAddress) | null;
+  organization?: ({ id: string; name: string } & InvoiceAddress) | null;
 };
 
 export type InvoiceLine = {
@@ -57,6 +66,42 @@ export type InvoiceWithLines = Invoice & {
 };
 
 // ── Helpers ──────────────────────────────────────────────────
+
+/**
+ * Convert a local date string (e.g. "2026-03-24") + IANA timezone
+ * to an ISO-8601 UTC string representing the start or end of that local day.
+ * This ensures date filtering respects the user's timezone.
+ */
+function localDateToUTC(
+  dateStr: string,
+  timezone: string,
+  boundary: 'start' | 'end',
+): string {
+  // Build a date-time string in the target timezone
+  const timePart = boundary === 'start' ? '00:00:00.000' : '23:59:59.999';
+  // Use Intl to find the UTC offset for this date+time in the given timezone
+  try {
+    const localDt = new Date(`${dateStr}T${timePart}`);
+    // Format in the target timezone to get the offset
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+      timeZoneName: 'longOffset',
+    });
+    const parts = formatter.formatToParts(localDt);
+    const tzOffset = parts.find(p => p.type === 'timeZoneName')?.value ?? '+00:00';
+    // tzOffset is like "GMT-05:00" or "GMT+05:30", extract the offset part
+    const offsetMatch = tzOffset.match(/GMT([+-]\d{2}:\d{2})/);
+    const offset = offsetMatch ? offsetMatch[1] : '+00:00';
+    // Return ISO string with the timezone offset so Postgres can convert to UTC
+    return `${dateStr}T${timePart}${offset}`;
+  } catch {
+    // Fallback to UTC if timezone is invalid
+    return `${dateStr}T${timePart}Z`;
+  }
+}
 
 function generateInvoiceNumber(): string {
   const now = new Date();
@@ -114,10 +159,10 @@ export async function getInvoiceDetail(
   invoiceId: string,
 ): Promise<{ data?: InvoiceWithLines; error?: string }> {
   try {
-    // Fetch the invoice
+    // Fetch the invoice with project address details
     const { data: invoice, error: invErr } = await supabase
       .from('invoices')
-      .select('*, project:projects(id, name)')
+      .select('*, project:projects(id, name, phone, address_line1, address_line2, city, state, zip_code)')
       .eq('id', invoiceId)
       .single();
 
@@ -128,6 +173,13 @@ export async function getInvoiceDetail(
     // Verify org membership
     const membership = await requireOrgMembership(invoice.org_id, userId);
     if ('error' in membership) return { error: membership.error };
+
+    // Fetch org details for the printout
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id, name, phone, address_line1, address_line2, city, state, zip_code')
+      .eq('id', invoice.org_id)
+      .single();
 
     // Fetch lines
     const { data: lines, error: linesErr } = await supabase
@@ -144,6 +196,7 @@ export async function getInvoiceDetail(
     return {
       data: {
         ...(invoice as Invoice),
+        organization: org as Invoice['organization'] ?? null,
         lines: (lines ?? []) as InvoiceLine[],
       },
     };
@@ -223,8 +276,9 @@ export async function generateInvoice(
   const projectId = (formData.get('project_id') as string) || null;
   const periodStart = formData.get('period_start') as string;
   const periodEnd = formData.get('period_end') as string;
+  const timezone = (formData.get('timezone') as string) || 'America/New_York';
   const category = (formData.get('category') as string) || null;
-  const statusFilter = (formData.get('status_filter') as string) || 'sold';
+  const statusFilter = (formData.get('status_filter') as string) || 'completed';
   const minPriceRaw = formData.get('min_price') as string;
   const maxPriceRaw = formData.get('max_price') as string;
   const notes = (formData.get('notes') as string) || '';
@@ -261,59 +315,69 @@ export async function generateInvoice(
   if (!permCheck.granted) return { error: permCheck.error };
 
   try {
-    // ── Query eligible inventory items ──
-    let itemsQuery = supabase
-      .from('inventory_items')
-      .select('id, name, description, category, price, quantity, sold_at')
-      .eq('org_id', orgId);
+    // ── Query eligible sales records (joined to inventory items for details) ──
+    let salesQuery = supabase
+      .from('sales')
+      .select('id, inventory_item_id, amount, quantity, unit_price, currency, status, created_at, inventory_items!inner(id, name, description, category, project_id)')
+      .eq('seller_org_id', orgId);
 
     if (statusFilter) {
-      itemsQuery = itemsQuery.eq('status', statusFilter);
+      salesQuery = salesQuery.eq('status', statusFilter);
     }
 
-    if (projectId) {
-      itemsQuery = itemsQuery.eq('project_id', projectId);
+    // Date range filter on sales.created_at (when the sale happened).
+    const rangeStart = localDateToUTC(periodStart, timezone, 'start');
+    const rangeEnd = localDateToUTC(periodEnd, timezone, 'end');
+    salesQuery = salesQuery
+      .gte('created_at', rangeStart)
+      .lte('created_at', rangeEnd);
+
+    const { data: salesRows, error: salesErr } = await salesQuery
+      .order('created_at', { ascending: true });
+
+    if (salesErr) {
+      console.error('Supabase error:', salesErr);
+      return { error: 'Failed to query sales data.' };
     }
 
-    // Date range filter based on sold_at for sold items, or created_at fallback
-    const dateColumn = statusFilter === 'sold' ? 'sold_at' : 'created_at';
-    itemsQuery = itemsQuery
-      .gte(dateColumn, periodStart)
-      .lte(dateColumn, periodEnd + 'T23:59:59.999Z');
-
-    if (category) {
-      itemsQuery = itemsQuery.eq('category', category);
-    }
-    if (minPrice !== null) {
-      itemsQuery = itemsQuery.gte('price', minPrice);
-    }
-    if (maxPrice !== null) {
-      itemsQuery = itemsQuery.lte('price', maxPrice);
+    if (!salesRows || salesRows.length === 0) {
+      return { error: 'No sales match the selected filters. Adjust your filters and try again.' };
     }
 
-    const { data: items, error: itemsErr } = await itemsQuery
-      .order('sold_at', { ascending: true, nullsFirst: false });
+    // ── Apply item-level filters (project, category, price) in app code ──
+    type SaleRow = (typeof salesRows)[number];
+    const filtered = salesRows.filter((sale: SaleRow) => {
+      const item = sale.inventory_items as unknown as Record<string, unknown> | null;
+      if (!item) return false;
+      if (projectId && item.project_id !== projectId) return false;
+      if (category && item.category !== category) return false;
+      if (minPrice !== null && Number(sale.amount) < minPrice) return false;
+      if (maxPrice !== null && Number(sale.amount) > maxPrice) return false;
+      return true;
+    });
 
-    if (itemsErr) {
-      console.error('Supabase error:', itemsErr);
-      return { error: 'Failed to query inventory items.' };
+    if (filtered.length === 0) {
+      return { error: 'No sales match the selected filters. Adjust your filters and try again.' };
     }
 
-    if (!items || items.length === 0) {
-      return { error: 'No items match the selected filters. Adjust your filters and try again.' };
-    }
-
-    // ── Compute totals from snapshot data ──
-    const lines = items.map((item) => ({
-      inventory_item_id: item.id,
-      item_name: item.name,
-      item_category: item.category,
-      item_description: item.description || '',
-      quantity: item.quantity ?? 1,
-      unit_price: Number(item.price),
-      line_total: Number(item.price) * (item.quantity ?? 1),
-      sold_at: item.sold_at || null,
-    }));
+    // ── Compute totals from sales data ──
+    // Each sale has quantity + unit_price. line_total = unit_price * quantity.
+    // sale.amount is the total paid (unit_price * qty), kept as a cross-check.
+    const lines = filtered.map((sale: SaleRow) => {
+      const item = sale.inventory_items as unknown as Record<string, unknown> | null;
+      const qty = Number(sale.quantity) || 1;
+      const unitPrice = Number(sale.unit_price) || Number(sale.amount) / qty;
+      return {
+        inventory_item_id: sale.inventory_item_id,
+        item_name: (item?.name as string) ?? 'Unknown Item',
+        item_category: (item?.category as string) ?? 'Uncategorized',
+        item_description: (item?.description as string) ?? '',
+        quantity: qty,
+        unit_price: unitPrice,
+        line_total: unitPrice * qty,
+        sold_at: sale.created_at || null,
+      };
+    });
 
     const subtotal = lines.reduce((sum, l) => sum + l.line_total, 0);
     const taxAmount = 0; // Tax logic can be extended later

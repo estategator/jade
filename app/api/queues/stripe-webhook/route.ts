@@ -184,6 +184,8 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             seller_org_id: project?.org_id ?? null,
             buyer_email: session.customer_details?.email ?? null,
             amount: (session.amount_total ?? 0) / 100,
+            quantity: purchaseQty,
+            unit_price: Number(item.price),
             currency: session.currency ?? 'usd',
             stripe_checkout_session_id: session.id,
             stripe_payment_intent_id: session.payment_intent as string,

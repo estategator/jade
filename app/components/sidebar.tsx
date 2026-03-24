@@ -164,6 +164,7 @@ export function Sidebar() {
     <>
       {/* ─── Desktop Sidebar ─── */}
       <aside
+        data-sidebar
         className={cn(
           "fixed left-0 top-0 z-30 hidden h-screen flex-col border-r border-stone-200/60 bg-white/80 backdrop-blur-xl transition-[width] duration-300 ease-in-out motion-reduce:transition-none dark:border-zinc-800/60 dark:bg-zinc-950/80 md:flex",
           isExpanded ? "w-64" : "w-[72px]"
@@ -358,7 +359,7 @@ export function Sidebar() {
       </aside>
 
       {/* ─── Mobile Navigation ─── */}
-      <div className="sticky top-0 z-30 flex flex-col border-b border-stone-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80 md:hidden">
+      <div data-sidebar className="sticky top-0 z-30 flex flex-col border-b border-stone-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80 md:hidden">
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-primary)] text-xs font-bold text-white shadow-sm shadow-[var(--color-brand-primary)]/25">

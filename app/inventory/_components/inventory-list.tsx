@@ -33,6 +33,8 @@ import {
   type InventoryItem,
 } from "@/app/inventory/actions";
 import { QrCodeModal } from "@/app/inventory/_components/qr-code-modal";
+import { useCart } from "@/lib/cart-context";
+import { CartDrawer } from "@/app/components/cart-drawer";
 
 type BulkAction =
   | { kind: "delete" }
@@ -184,24 +186,18 @@ function ItemThumbnail({ item }: { item: InventoryItem }) {
   );
 }
 
-/**
- * Row-level action menu that shows icon-only buttons at md and
- * collapses into an overflow menu on mobile, keeping touch targets >= 44 px.
- */
-function BuyButton({
+function AddToCartButton({
   item,
-  buyingId,
-  onBuy,
+  onAddToCart,
 }: {
   item: InventoryItem;
-  buyingId: string | null;
-  onBuy: (id: string, qty: number) => void;
+  onAddToCart: (id: string, qty: number) => void;
 }) {
   const [showQty, setShowQty] = useState(false);
   const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const maxQty = item.quantity ?? 1;
-  const isBuying = buyingId === item.id;
 
   useEffect(() => {
     if (!showQty) return;
@@ -214,25 +210,38 @@ function BuyButton({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showQty]);
 
-  function handleClick() {
+  function handleMainClick() {
     if (maxQty <= 1) {
-      onBuy(item.id, 1);
+      onAddToCart(item.id, 1);
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1200);
     } else {
       setShowQty((v) => !v);
     }
+  }
+
+  function handleConfirm() {
+    setShowQty(false);
+    onAddToCart(item.id, qty);
+    setAdded(true);
+    setQty(1);
+    setTimeout(() => setAdded(false), 1200);
   }
 
   return (
     <div className="relative" ref={popRef}>
       <button
         type="button"
-        onClick={handleClick}
-        disabled={isBuying}
-        className="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-1.5 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 min-h-[32px] min-w-[32px]"
-        title="Buy"
+        onClick={handleMainClick}
+        className={`inline-flex items-center justify-center rounded-lg p-1.5 text-white transition-colors min-h-[32px] min-w-[32px] ${
+          added
+            ? "bg-emerald-600 hover:bg-emerald-700"
+            : "bg-indigo-600 hover:bg-indigo-700"
+        }`}
+        title={added ? "Added!" : "Add to cart"}
       >
-        {isBuying ? (
-          <PiSpinnerDuotone className="h-3.5 w-3.5 animate-spin" />
+        {added ? (
+          <PiCheckSquareDuotone className="h-3.5 w-3.5" />
         ) : (
           <PiShoppingCartDuotone className="h-3.5 w-3.5" />
         )}
@@ -266,11 +275,10 @@ function BuyButton({
             <span className="text-xs text-stone-400 dark:text-zinc-500">of {maxQty}</span>
             <button
               type="button"
-              onClick={() => { setShowQty(false); onBuy(item.id, qty); }}
-              disabled={isBuying}
-              className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+              onClick={handleConfirm}
+              className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
             >
-              Buy
+              Add
             </button>
           </motion.div>
         )}
@@ -281,14 +289,12 @@ function BuyButton({
 
 function RowActions({
   item,
-  buyingId,
-  onBuy,
+  onAddToCart,
   onDelete,
   onQr,
 }: {
   item: InventoryItem;
-  buyingId: string | null;
-  onBuy: (id: string, qty: number) => void;
+  onAddToCart: (id: string, qty: number) => void;
   onDelete: (id: string) => void;
   onQr: (item: InventoryItem) => void;
 }) {
@@ -309,7 +315,7 @@ function RowActions({
   return (
       <div className="flex items-center justify-end gap-1 relative" ref={menuRef}>
         {item.status === "available" && (
-          <BuyButton item={item} buyingId={buyingId} onBuy={onBuy} />
+          <AddToCartButton item={item} onAddToCart={onAddToCart} />
         )}
         <Link
           href={`/inventory/${item.id}/edit`}
@@ -365,10 +371,10 @@ type InventoryListProps = Readonly<{
 
 export function InventoryList({ initialItems, userId }: InventoryListProps) {
   const router = useRouter();
+  const cart = useCart();
   const [items, setItems] = useState(initialItems);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
-  const [buyingId, setBuyingId] = useState<string | null>(null);
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -401,27 +407,11 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
     }
   }
 
-  async function handleBuy(itemId: string, quantity: number = 1) {
-    setBuyingId(itemId);
+  async function handleAddToCart(inventoryItemId: string, quantity: number = 1) {
     setError("");
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, quantity }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to start checkout.");
-        setBuyingId(null);
-        return;
-      }
-      if (data.url) {
-        window.location.assign(data.url);
-      }
-    } catch {
-      setError("Failed to start checkout.");
-      setBuyingId(null);
+    const result = await cart.addItem(inventoryItemId, quantity);
+    if (result.error) {
+      setError(result.error);
     }
   }
 
@@ -549,14 +539,19 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
 
   return (
     <main className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <PageHeader
-        title="Inventory"
-        description={`Manage and track all your estate sale items — ${items.length} ${items.length === 1 ? "item" : "items"} across all projects.`}
-        actions={[
-          { label: "Bulk add", href: "/inventory/bulk", icon: PiImagesDuotone, variant: "secondary" },
-          { label: "Add item", href: "/inventory/add", icon: PiPlusDuotone, variant: "primary" },
-        ]}
-      />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader
+          title="Inventory"
+          description={`Manage and track all your estate sale items — ${items.length} ${items.length === 1 ? "item" : "items"} across all projects.`}
+          actions={[
+            { label: "Bulk add", href: "/inventory/bulk", icon: PiImagesDuotone, variant: "secondary" },
+            { label: "Add item", href: "/inventory/add", icon: PiPlusDuotone, variant: "primary" },
+          ]}
+        />
+        <div className="mt-1">
+          <CartDrawer />
+        </div>
+      </div>
 
       {/* Search & Filters */}
       <motion.div
@@ -934,8 +929,7 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
               <div className="col-span-1 flex justify-end">
                 <RowActions
                   item={item}
-                  buyingId={buyingId}
-                  onBuy={handleBuy}
+                  onAddToCart={handleAddToCart}
                   onDelete={handleDelete}
                   onQr={setQrItem}
                 />

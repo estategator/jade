@@ -21,7 +21,7 @@ export default function CheckoutSuccessPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-stone-50 dark:bg-zinc-950">
+      <div className="flex items-center justify-center px-4 py-24">
         <Loader2 className="h-8 w-8 animate-spin text-[var(--color-brand-primary)]" />
       </div>
     );
@@ -29,7 +29,7 @@ export default function CheckoutSuccessPage() {
 
   if (status === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-stone-50 dark:bg-zinc-950">
+      <div className="flex items-center justify-center px-4 py-24">
         <CheckoutMessage
           icon={XCircle}
           title="Something went wrong"
@@ -42,11 +42,11 @@ export default function CheckoutSuccessPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-50 dark:bg-zinc-950">
+    <div className="flex items-center justify-center px-4 py-24">
       <CheckoutMessage
         icon={CheckCircle}
         title="Payment successful!"
-        description="Thank you for your purchase. The item has been marked as sold."
+        description="Thank you for your purchase. The items have been marked as sold."
         backLink={{ href: "/inventory", label: "Back to Inventory" }}
       />
     </div>

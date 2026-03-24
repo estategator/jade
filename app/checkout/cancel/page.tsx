@@ -4,7 +4,7 @@ import { CancelRestorer } from "./cancel-restorer";
 
 export default function CheckoutCancelPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-50 dark:bg-zinc-950">
+    <div className="flex items-center justify-center px-4 py-24">
       <Suspense
         fallback={
           <div className="flex items-center gap-2 text-stone-400 dark:text-zinc-500">

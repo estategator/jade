@@ -1,14 +1,13 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { resolveActiveOrgId } from "@/lib/rbac";
-import { getInventoryItems } from "@/app/inventory/actions";
 import { getCartItems } from "@/app/cart/actions";
 import { CartProvider } from "@/lib/cart-context";
-import { InventoryList } from "@/app/inventory/_components/inventory-list";
+import { CartReview } from "@/app/cart/_components/cart-review";
 
 export const dynamic = "force-dynamic";
 
-export default async function InventoryListPage() {
+export default async function CartPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -19,18 +18,13 @@ export default async function InventoryListPage() {
   }
 
   const activeOrgId = await resolveActiveOrgId(user.id);
-
-  const [inventoryResult, cartResult] = await Promise.all([
-    getInventoryItems(user.id, activeOrgId),
-    activeOrgId ? getCartItems(user.id, activeOrgId) : Promise.resolve({ data: [] }),
-  ]);
-  const items = inventoryResult.data ?? [];
+  const cartResult = await getCartItems(user.id, activeOrgId ?? "");
   const cartItems = cartResult.data ?? [];
 
   return (
     <CartProvider userId={user.id} orgId={activeOrgId ?? ""} initialItems={cartItems}>
       <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        <InventoryList key={activeOrgId} initialItems={items} userId={user.id} />
+        <CartReview />
       </div>
     </CartProvider>
   );

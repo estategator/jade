@@ -130,10 +130,103 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       }
 
       const itemId = session.metadata?.inventory_item_id;
+      const checkoutSessionId = session.metadata?.checkout_session_id;
       const connectedAccountId = session.metadata?.connected_account_id;
-      const purchaseQty = parseInt(session.metadata?.purchase_quantity ?? '1', 10) || 1;
 
-      if (itemId) {
+      if (checkoutSessionId) {
+        // ── Multi-item checkout via cart ──
+        const { data: sessionItems } = await supabaseAdmin
+          .from('checkout_session_items')
+          .select('inventory_item_id, quantity, unit_price, reserved_quantity')
+          .eq('checkout_session_id', checkoutSessionId);
+
+        if (sessionItems?.length) {
+          let totalNotified = 0;
+          let firstOrgId: string | null = null;
+
+          for (const si of sessionItems) {
+            // Update inventory status
+            const { data: currentItem } = await supabaseAdmin
+              .from('inventory_items')
+              .select('quantity, status, project_id, price, name')
+              .eq('id', si.inventory_item_id)
+              .single();
+
+            if (!currentItem) continue;
+
+            if (currentItem.status === 'reserved' && currentItem.quantity === 0) {
+              await supabaseAdmin
+                .from('inventory_items')
+                .update({
+                  status: 'sold',
+                  stripe_payment_id: session.payment_intent as string,
+                  sold_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', si.inventory_item_id);
+            } else {
+              await supabaseAdmin
+                .from('inventory_items')
+                .update({
+                  stripe_payment_id: session.payment_intent as string,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', si.inventory_item_id);
+            }
+
+            // Look up org
+            const { data: project } = await supabaseAdmin
+              .from('projects')
+              .select('org_id')
+              .eq('id', currentItem.project_id)
+              .single();
+
+            const orgId = project?.org_id ?? null;
+            if (!firstOrgId && orgId) firstOrgId = orgId;
+
+            // Insert sale record (one per line item)
+            const { data: sale } = await supabaseAdmin.from('sales').insert({
+              inventory_item_id: si.inventory_item_id,
+              seller_org_id: orgId,
+              buyer_email: session.customer_details?.email ?? null,
+              amount: si.unit_price * si.quantity,
+              quantity: si.quantity,
+              unit_price: si.unit_price,
+              currency: session.currency ?? 'usd',
+              stripe_checkout_session_id: session.id,
+              stripe_payment_intent_id: session.payment_intent as string,
+              stripe_connected_account_id: connectedAccountId ?? null,
+              status: 'completed',
+            }).select('id').single();
+
+            if (sale && orgId) {
+              const itemLabel = si.quantity > 1
+                ? `${currentItem.name ?? 'Unknown item'} (x${si.quantity})`
+                : (currentItem.name ?? 'Unknown item');
+              await createSaleNotifications({
+                orgId,
+                saleId: sale.id,
+                itemName: itemLabel,
+                amount: si.unit_price * si.quantity,
+                currency: session.currency ?? 'usd',
+                buyerEmail: session.customer_details?.email ?? null,
+              });
+              totalNotified++;
+            }
+          }
+
+          // Mark checkout session as completed
+          await supabaseAdmin
+            .from('checkout_sessions')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('id', checkoutSessionId);
+
+          console.log(`[stripe-webhook-queue] Multi-item checkout completed: ${sessionItems.length} items, ${totalNotified} notifications sent`);
+        }
+      } else if (itemId) {
+        // ── Legacy single-item checkout ──
+        const purchaseQty = parseInt(session.metadata?.purchase_quantity ?? '1', 10) || 1;
+
         // Fetch current item state
         const { data: currentItem } = await supabaseAdmin
           .from('inventory_items')
@@ -214,18 +307,63 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
 
     case 'checkout.session.expired': {
       const session = data as unknown as Stripe.Checkout.Session;
-      const itemId = session.metadata?.inventory_item_id;
+      const expiredCheckoutSessionId = session.metadata?.checkout_session_id;
+      const expiredItemId = session.metadata?.inventory_item_id;
 
-      if (itemId) {
+      if (expiredCheckoutSessionId) {
+        // ── Multi-item expiry: restore all reserved items ──
+        const { data: sessionItems } = await supabaseAdmin
+          .from('checkout_session_items')
+          .select('inventory_item_id, reserved_quantity')
+          .eq('checkout_session_id', expiredCheckoutSessionId);
+
+        if (sessionItems?.length) {
+          for (const si of sessionItems) {
+            const { data: expItem } = await supabaseAdmin
+              .from('inventory_items')
+              .select('status, quantity')
+              .eq('id', si.inventory_item_id)
+              .single();
+
+            if (expItem?.status === 'reserved') {
+              await supabaseAdmin
+                .from('inventory_items')
+                .update({
+                  status: 'available',
+                  quantity: si.reserved_quantity,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', si.inventory_item_id)
+                .eq('status', 'reserved');
+            } else if (expItem) {
+              await supabaseAdmin
+                .from('inventory_items')
+                .update({
+                  quantity: (expItem.quantity ?? 0) + si.reserved_quantity,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', si.inventory_item_id);
+            }
+          }
+        }
+
+        await supabaseAdmin
+          .from('checkout_sessions')
+          .update({ status: 'expired', updated_at: new Date().toISOString() })
+          .eq('id', expiredCheckoutSessionId)
+          .eq('status', 'pending');
+
+        console.log('[stripe-webhook-queue] Multi-item checkout session expired, inventory restored');
+      } else if (expiredItemId) {
+        // ── Legacy single-item expiry ──
         const purchaseQty = parseInt(session.metadata?.purchase_quantity ?? '1', 10) || 1;
         const { data: expiredItem } = await supabaseAdmin
           .from('inventory_items')
           .select('status, quantity')
-          .eq('id', itemId)
+          .eq('id', expiredItemId)
           .single();
 
         if (expiredItem?.status === 'reserved') {
-          // All units were taken in this checkout: restore to available
           await supabaseAdmin
             .from('inventory_items')
             .update({
@@ -233,17 +371,16 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
               quantity: purchaseQty,
               updated_at: new Date().toISOString(),
             })
-            .eq('id', itemId)
+            .eq('id', expiredItemId)
             .eq('status', 'reserved');
         } else if (expiredItem) {
-          // Multi-quantity: restore the decremented units
           await supabaseAdmin
             .from('inventory_items')
             .update({
               quantity: (expiredItem.quantity ?? 0) + purchaseQty,
               updated_at: new Date().toISOString(),
             })
-            .eq('id', itemId);
+            .eq('id', expiredItemId);
         }
       }
       break;

@@ -9,6 +9,7 @@ import {
   PiChartBarDuotone,
   PiBuildingsDuotone,
   PiReceiptDuotone,
+  PiUploadDuotone,
 } from "react-icons/pi";
 
 import { createClient } from "@/utils/supabase/server";
@@ -175,6 +176,12 @@ export default async function DashboardPage({
       href: "/inventory/add",
     },
     {
+      label: "Bulk add items",
+      description: "Upload multiple items at once using AI",
+      icon: PiUploadDuotone,
+      href: "/inventory/bulk",
+    },
+    {
       label: "Organizations",
       description: "Manage your teams and orgs",
       icon: PiBuildingsDuotone,
@@ -300,7 +307,7 @@ export default async function DashboardPage({
         <h2 className="mb-4 text-lg font-bold text-stone-900 dark:text-white">
           Quick actions
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {quickActions.map((action) => {
             const Icon = action.icon;
             return (

@@ -188,6 +188,97 @@ function ItemThumbnail({ item }: { item: InventoryItem }) {
  * Row-level action menu that shows icon-only buttons at md and
  * collapses into an overflow menu on mobile, keeping touch targets >= 44 px.
  */
+function BuyButton({
+  item,
+  buyingId,
+  onBuy,
+}: {
+  item: InventoryItem;
+  buyingId: string | null;
+  onBuy: (id: string, qty: number) => void;
+}) {
+  const [showQty, setShowQty] = useState(false);
+  const [qty, setQty] = useState(1);
+  const popRef = useRef<HTMLDivElement>(null);
+  const maxQty = item.quantity ?? 1;
+  const isBuying = buyingId === item.id;
+
+  useEffect(() => {
+    if (!showQty) return;
+    function handleClick(e: MouseEvent) {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) {
+        setShowQty(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showQty]);
+
+  function handleClick() {
+    if (maxQty <= 1) {
+      onBuy(item.id, 1);
+    } else {
+      setShowQty((v) => !v);
+    }
+  }
+
+  return (
+    <div className="relative" ref={popRef}>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isBuying}
+        className="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-1.5 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 min-h-[32px] min-w-[32px]"
+        title="Buy"
+      >
+        {isBuying ? (
+          <PiSpinnerDuotone className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <PiShoppingCartDuotone className="h-3.5 w-3.5" />
+        )}
+      </button>
+      <AnimatePresence>
+        {showQty && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-full z-30 mt-1 flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+          >
+            <button
+              type="button"
+              onClick={() => setQty((q) => Math.max(1, q - 1))}
+              disabled={qty <= 1}
+              className="rounded-md border border-stone-300 p-1 text-stone-500 hover:bg-stone-50 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
+            >
+              <PiArrowDownDuotone className="h-3 w-3" />
+            </button>
+            <span className="w-6 text-center text-sm font-bold text-stone-900 dark:text-white">{qty}</span>
+            <button
+              type="button"
+              onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+              disabled={qty >= maxQty}
+              className="rounded-md border border-stone-300 p-1 text-stone-500 hover:bg-stone-50 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
+            >
+              <PiArrowUpDuotone className="h-3 w-3" />
+            </button>
+            <span className="text-xs text-stone-400 dark:text-zinc-500">of {maxQty}</span>
+            <button
+              type="button"
+              onClick={() => { setShowQty(false); onBuy(item.id, qty); }}
+              disabled={isBuying}
+              className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Buy
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function RowActions({
   item,
   buyingId,
@@ -197,7 +288,7 @@ function RowActions({
 }: {
   item: InventoryItem;
   buyingId: string | null;
-  onBuy: (id: string) => void;
+  onBuy: (id: string, qty: number) => void;
   onDelete: (id: string) => void;
   onQr: (item: InventoryItem) => void;
 }) {
@@ -218,19 +309,7 @@ function RowActions({
   return (
       <div className="flex items-center justify-end gap-1 relative" ref={menuRef}>
         {item.status === "available" && (
-          <button
-            type="button"
-            onClick={() => onBuy(item.id)}
-            disabled={buyingId === item.id}
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-1.5 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 min-h-[32px] min-w-[32px]"
-            title="Buy"
-          >
-            {buyingId === item.id ? (
-              <PiSpinnerDuotone className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <PiShoppingCartDuotone className="h-3.5 w-3.5" />
-            )}
-          </button>
+          <BuyButton item={item} buyingId={buyingId} onBuy={onBuy} />
         )}
         <Link
           href={`/inventory/${item.id}/edit`}
@@ -322,14 +401,14 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
     }
   }
 
-  async function handleBuy(itemId: string) {
+  async function handleBuy(itemId: string, quantity: number = 1) {
     setBuyingId(itemId);
     setError("");
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
+        body: JSON.stringify({ itemId, quantity }),
       });
       const data = await res.json();
       if (!res.ok) {

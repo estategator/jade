@@ -1,0 +1,321 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  PiFileTextDuotone,
+  PiSpinnerDuotone,
+  PiMagnifyingGlassDuotone,
+  PiCheckCircleDuotone,
+  PiClockDuotone,
+  PiProhibitDuotone,
+  PiTrashDuotone,
+  PiWarningDuotone,
+  PiPrinterDuotone,
+} from "react-icons/pi";
+import { getInvoices, deleteInvoice, type Invoice } from "@/app/invoices/actions";
+
+type Props = {
+  userId: string;
+  orgId: string;
+  refreshKey?: number;
+};
+
+const statusConfig = {
+  draft: {
+    label: "Draft",
+    icon: PiClockDuotone,
+    className: "bg-stone-100 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300",
+  },
+  finalized: {
+    label: "Finalized",
+    icon: PiCheckCircleDuotone,
+    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  },
+  void: {
+    label: "Void",
+    icon: PiProhibitDuotone,
+    className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  },
+} as const;
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function InvoiceList({ userId, orgId, refreshKey }: Props) {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const loadInvoices = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const result = await getInvoices(userId, orgId, statusFilter);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setInvoices(result.data ?? []);
+    }
+    setLoading(false);
+  }, [userId, orgId, statusFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      const result = await getInvoices(userId, orgId, statusFilter);
+      if (cancelled) return;
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setInvoices(result.data ?? []);
+      }
+      setLoading(false);
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, [userId, orgId, statusFilter, refreshKey]);
+
+  const filtered = invoices.filter((inv) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      inv.invoice_number.toLowerCase().includes(q) ||
+      inv.project?.name?.toLowerCase().includes(q) ||
+      inv.notes.toLowerCase().includes(q)
+    );
+  });
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const result = await deleteInvoice(userId, deleteTarget.id);
+    setDeleting(false);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setDeleteTarget(null);
+      loadInvoices();
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filters bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 sm:max-w-xs">
+          <PiMagnifyingGlassDuotone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400 dark:text-zinc-500" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search invoices…"
+            className="w-full rounded-xl border border-stone-300 bg-white py-2 pl-9 pr-3 text-sm text-stone-900 shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-indigo-400"
+          />
+        </div>
+        <div className="flex gap-1.5">
+          {(["all", "draft", "finalized", "void"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStatusFilter(s)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === s
+                  ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                  : "text-stone-500 hover:bg-stone-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              }`}
+            >
+              {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <PiSpinnerDuotone className="h-6 w-6 animate-spin text-indigo-500" />
+        </div>
+      ) : error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400">
+          {error}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-stone-100 dark:bg-zinc-800">
+            <PiFileTextDuotone className="h-8 w-8 text-stone-400 dark:text-zinc-500" />
+          </div>
+          <h3 className="text-base font-semibold text-stone-900 dark:text-white">No invoices yet</h3>
+          <p className="mt-1 text-sm text-stone-500 dark:text-zinc-400">
+            Generate your first invoice using the form above.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-stone-200 bg-stone-50 dark:border-zinc-800 dark:bg-zinc-900/50">
+                  <th className="px-4 py-3 font-medium text-stone-600 dark:text-zinc-400">Invoice #</th>
+                  <th className="px-4 py-3 font-medium text-stone-600 dark:text-zinc-400">Status</th>
+                  <th className="px-4 py-3 font-medium text-stone-600 dark:text-zinc-400">Period</th>
+                  <th className="px-4 py-3 font-medium text-stone-600 dark:text-zinc-400">Project</th>
+                  <th className="px-4 py-3 font-medium text-stone-600 dark:text-zinc-400 text-right">Lines</th>
+                  <th className="px-4 py-3 font-medium text-stone-600 dark:text-zinc-400 text-right">Total</th>
+                  <th className="px-4 py-3 font-medium text-stone-600 dark:text-zinc-400">Created</th>
+                  <th className="px-4 py-3 w-24"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 dark:divide-zinc-800">
+                {filtered.map((inv) => {
+                  const sc = statusConfig[inv.status];
+                  const StatusIcon = sc.icon;
+                  return (
+                    <tr
+                      key={inv.id}
+                      className="transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/50"
+                    >
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/invoices/${inv.id}`}
+                          className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                        >
+                          {inv.invoice_number}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.className}`}>
+                          <StatusIcon className="h-3.5 w-3.5" />
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-stone-600 dark:text-zinc-400">
+                        {formatDate(inv.period_start)} – {formatDate(inv.period_end)}
+                      </td>
+                      <td className="px-4 py-3 text-stone-600 dark:text-zinc-400">
+                        {inv.project?.name ?? "All"}
+                      </td>
+                      <td className="px-4 py-3 text-right text-stone-600 dark:text-zinc-400">
+                        {inv.line_count}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-stone-900 dark:text-white">
+                        {formatCurrency(Number(inv.total))}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-stone-500 dark:text-zinc-500">
+                        {formatDate(inv.created_at)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          {inv.status === "finalized" && (
+                            <Link
+                              href={`/invoices/${inv.id}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const printWindow = window.open(`/invoices/${inv.id}`, '_blank');
+                                if (printWindow) {
+                                  printWindow.addEventListener('afterprint', () => printWindow.close());
+                                  printWindow.addEventListener('load', () => {
+                                    setTimeout(() => printWindow.print(), 500);
+                                  });
+                                }
+                              }}
+                              className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600 dark:text-zinc-500 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400"
+                              title="Print invoice"
+                            >
+                              <PiPrinterDuotone className="h-4 w-4" />
+                            </Link>
+                          )}
+                          {inv.status === "draft" && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(inv)}
+                              className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                              title="Delete draft"
+                            >
+                              <PiTrashDuotone className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => { if (!deleting) setDeleteTarget(null); }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                  <PiWarningDuotone className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-stone-900 dark:text-white">Delete Invoice</h3>
+                  <p className="mt-1 text-sm text-stone-500 dark:text-zinc-400">
+                    Are you sure you want to delete <span className="font-medium">{deleteTarget.invoice_number}</span>? This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => setDeleteTarget(null)}
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={handleDelete}
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50 dark:bg-red-500 dark:hover:bg-red-600"
+                >
+                  {deleting && <PiSpinnerDuotone className="h-4 w-4 animate-spin" />}
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

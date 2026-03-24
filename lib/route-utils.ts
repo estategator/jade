@@ -7,6 +7,7 @@ export function isAppRoute(pathname: string): boolean {
     "/inventory",
     "/pricing-optimization",
     "/marketing",
+    "/invoices",
     "/settings",
     "/organizations",
     "/upgrade",

@@ -253,7 +253,7 @@ export default async function PublicItemPage({
               {/* CTA */}
               <div className="mt-6">
                 {item.status === "available" ? (
-                  <ItemBuyButton itemId={item.id} price={item.price} />
+                  <ItemBuyButton itemId={item.id} price={item.price} maxQuantity={item.quantity ?? 1} />
                 ) : (
                   <div className="rounded-xl bg-stone-100 px-4 py-3.5 text-center dark:bg-zinc-800">
                     <p className="text-sm font-semibold text-stone-500 dark:text-zinc-400">
@@ -408,7 +408,7 @@ export default async function PublicItemPage({
                       ${item.price.toFixed(2)}
                     </p>
                   </div>
-                  <ItemBuyButton itemId={item.id} price={item.price} compact />
+                  <ItemBuyButton itemId={item.id} price={item.price} maxQuantity={item.quantity ?? 1} compact />
                 </div>
               </div>
             )}

@@ -12,7 +12,8 @@ You are the **Style Maintainer** for the Curator project (`jade/`). Your job is 
 - **Framework**: Next.js (App Router, `"use client"` for interactive components)
 - **Styling**: Tailwind CSS v4 (utility-first, `dark:` prefix for dark mode)
 - **Animation**: Framer Motion (`motion` components, `initial`/`animate`/`whileInView`)
-- **Icons**: `lucide-react`
+- **Icons (primary)**: `react-icons/pi` — Phosphor Duotone (`Pi*Duotone`) for all new icon usage
+- **Icons (legacy)**: `lucide-react` — present in older components; do not introduce new lucide imports
 - **Utilities**: `clsx` + `tailwind-merge` via local `cn()` helper
 - **Fonts**: Geist Sans (`--font-geist-sans`), Geist Mono (`--font-geist-mono`) for monospaced elements like countdowns
 
@@ -85,6 +86,136 @@ You are the **Style Maintainer** for the Curator project (`jade/`). Your job is 
 Heading text colors: `text-stone-900 dark:text-white`
 Body text colors: `text-stone-600 dark:text-zinc-400`
 Muted text: `text-stone-500` (no dark override needed when on both themes)
+
+---
+
+## Icons
+
+### Library Selection
+
+| Library | Variant | Rule |
+|---------|---------|------|
+| `react-icons/pi` | `Pi*Duotone` | **Default.** Use for all new icon usage across app pages and components |
+| `lucide-react` | — | **Legacy only.** Tolerated in existing files; do not add new `lucide-react` imports |
+
+Import individually — never import the entire library:
+
+```tsx
+// ✅ correct
+import { PiTrashDuotone, PiSpinnerDuotone } from "react-icons/pi";
+
+// ❌ wrong — lucide for new code
+import { Trash2 } from "lucide-react";
+```
+
+### Size Scale
+
+| Size classes | Use context |
+|---|---|
+| `h-3 w-3` | Status badge icons, tiny inline metadata |
+| `h-3.5 w-3.5` | Compact action buttons, table row actions, small inline tags |
+| `h-4 w-4` | **Standard.** Button labels, card headers, section titles, input prefixes |
+| `h-5 w-5` | Thumbnail placeholders, medium standalone decorations |
+| `h-6 w-6` | Avatar-style icon containers (inside a `h-6 w-6` wrapper div) |
+| `h-8 w-8` | Upload dropzone empty state, medium decorations |
+| `h-10 w-10` | Empty state hero icons |
+| `h-12 w-12` | Large empty state / marketing section icons |
+
+### Color Conventions
+
+| Context | Classes |
+|---|---|
+| Brand / primary action | `text-indigo-600 dark:text-indigo-400` |
+| Success | `text-emerald-500` (same light/dark) or `text-emerald-600 dark:text-emerald-400` |
+| Error / destructive | `text-red-600 dark:text-red-400` |
+| Warning | `text-amber-600 dark:text-amber-400` |
+| Muted / decorative | `text-stone-400 dark:text-zinc-500` |
+| Secondary (body context) | `text-stone-500 dark:text-zinc-400` |
+| Input prefix / search field | `text-stone-400 dark:text-zinc-500` |
+| On solid colored background | Inherit from parent — no explicit text color needed |
+
+### Usage Patterns
+
+**Loading spinner** — `PiSpinnerDuotone` with `animate-spin`:
+```tsx
+<PiSpinnerDuotone className="h-4 w-4 animate-spin" aria-hidden="true" />
+// Compact (inside a small button): h-3.5 w-3.5
+```
+
+**Button icon with text label** — `h-4 w-4`, before the label, parent uses `gap-2`:
+```tsx
+<button className="inline-flex items-center gap-2 ...">
+  <PiPlusDuotone className="h-4 w-4" aria-hidden="true" />
+  Add Item
+</button>
+```
+
+**Compact icon-only action button** — `h-3.5 w-3.5`; button needs a minimum touch target:
+```tsx
+<button
+  className="inline-flex items-center justify-center rounded-lg p-1.5 min-h-[32px] min-w-[32px] ..."
+  title="Delete item"
+  aria-label="Delete item"
+>
+  <PiTrashDuotone className="h-3.5 w-3.5" aria-hidden="true" />
+</button>
+```
+
+**Status badge icon** — `h-3 w-3`, inline inside the badge `<span>`:
+```tsx
+<span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ...">
+  <PiCheckCircleDuotone className="h-3 w-3" aria-hidden="true" />
+  Active
+</span>
+```
+
+**Section header icon** — `h-4 w-4` before a `text-sm font-semibold` heading:
+```tsx
+<div className="flex items-center gap-2">
+  <PiChartBarDuotone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+  <h3 className="text-sm font-semibold text-stone-900 dark:text-white">Revenue</h3>
+</div>
+```
+
+**Empty state icon** — large, centered, muted:
+```tsx
+<PiPackageDuotone
+  className="mx-auto mb-4 h-10 w-10 text-stone-300 dark:text-zinc-600"
+  aria-hidden="true"
+/>
+```
+
+**Input prefix icon** — absolutely positioned inside a relative wrapper (input needs `pl-9`):
+```tsx
+<div className="relative">
+  <PiMagnifyingGlassDuotone
+    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400 dark:text-zinc-500"
+    aria-hidden="true"
+  />
+  <input className="... pl-9" />
+</div>
+```
+
+**AI / sparkle accent** — always use `PiSparkleDuotone` with brand color:
+```tsx
+<PiSparkleDuotone className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
+```
+
+### Accessibility
+
+- All **decorative icons** must have `aria-hidden="true"` so screen readers skip them.
+- **Icon-only interactive elements** (buttons, links) must expose a label via `title` and `aria-label`.
+- Never rely on an icon alone to convey status — always pair with a text label or tooltip.
+
+```tsx
+{/* Decorative */}
+<PiArrowRightDuotone className="h-4 w-4" aria-hidden="true" />
+
+{/* Interactive icon-only button */}
+<button title="Close" aria-label="Close">
+  <PiXDuotone className="h-4 w-4" aria-hidden="true" />
+</button>
+```
 
 ---
 
@@ -281,7 +412,7 @@ transition={{ duration: 0.6, delay: 0.2 }}
    import { twMerge } from "tailwind-merge";
    function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
    ```
-3. Import icons individually from `lucide-react` — never import the entire library
+3. Import icons individually from `react-icons/pi` (Phosphor Duotone) for all new code — e.g. `import { PiTrashDuotone } from "react-icons/pi"`. `lucide-react` icons in existing files are tolerated but no new lucide imports should be added.
 4. Use Next.js `Link` for internal navigation
 5. Server actions (in `actions.ts`) for form submissions — never expose API routes for simple writes
 6. Use `FormData` for action inputs

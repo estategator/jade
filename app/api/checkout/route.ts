@@ -4,16 +4,18 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest) {
   try {
-    const { itemId } = await req.json();
+    const { itemId, quantity: requestedQty } = await req.json();
 
     if (!itemId || typeof itemId !== 'string') {
       return NextResponse.json({ error: 'Missing item ID.' }, { status: 400 });
     }
 
+    const purchaseQty = Math.max(1, Math.floor(Number(requestedQty) || 1));
+
     // Fetch the item with its project and organization
     const { data: item, error: dbError } = await supabaseAdmin
       .from('inventory_items')
-      .select('id, name, description, price, status, project_id')
+      .select('id, name, description, price, status, quantity, project_id, medium_image_url')
       .eq('id', itemId)
       .single();
 
@@ -24,6 +26,20 @@ export async function POST(req: NextRequest) {
     if (item.status !== 'available') {
       return NextResponse.json(
         { error: 'This item is no longer available for purchase.' },
+        { status: 409 },
+      );
+    }
+
+    if (item.quantity < 1) {
+      return NextResponse.json(
+        { error: 'This item is out of stock.' },
+        { status: 409 },
+      );
+    }
+
+    if (purchaseQty > item.quantity) {
+      return NextResponse.json(
+        { error: `Only ${item.quantity} available.` },
         { status: 409 },
       );
     }
@@ -45,8 +61,24 @@ export async function POST(req: NextRequest) {
           .eq('id', project.org_id)
           .single();
 
-        if (org?.stripe_onboarding_complete && org.stripe_account_id) {
-          connectedAccountId = org.stripe_account_id;
+        if (org?.stripe_account_id) {
+          if (org.stripe_onboarding_complete) {
+            connectedAccountId = org.stripe_account_id;
+          } else {
+            // DB may be stale — live-check with Stripe
+            const account = await stripe.accounts.retrieve(org.stripe_account_id);
+            if (account.charges_enabled) {
+              connectedAccountId = org.stripe_account_id;
+              // Sync DB for future requests
+              await supabaseAdmin
+                .from('organizations')
+                .update({
+                  stripe_onboarding_complete: true,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', project.org_id);
+            }
+          }
         }
       }
     }
@@ -58,12 +90,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Mark item as reserved while checkout is in progress
+    // Reserve units: decrement quantity, mark reserved only when all units are taken
+    const newQuantity = item.quantity - purchaseQty;
     await supabaseAdmin
       .from('inventory_items')
-      .update({ status: 'reserved', updated_at: new Date().toISOString() })
+      .update({
+        quantity: newQuantity,
+        status: newQuantity === 0 ? 'reserved' : 'available',
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', itemId)
-      .eq('status', 'available'); // optimistic lock
+      .eq('status', 'available');
 
     const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
@@ -77,18 +114,20 @@ export async function POST(req: NextRequest) {
               product_data: {
                 name: item.name,
                 description: item.description || undefined,
+                ...(item.medium_image_url ? { images: [item.medium_image_url] } : {}),
               },
               unit_amount: Math.round(item.price * 100),
             },
-            quantity: 1,
+            quantity: purchaseQty,
           },
         ],
         metadata: {
           inventory_item_id: item.id,
           connected_account_id: connectedAccountId,
+          purchase_quantity: String(purchaseQty),
         },
         success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/checkout/cancel?item_id=${item.id}`,
+        cancel_url: `${origin}/checkout/cancel?item_id=${item.id}&qty=${purchaseQty}`,
         expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       },
       {

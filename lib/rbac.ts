@@ -17,6 +17,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'settings:manage', 'settings:view',
     'analytics:view', 'sales:view',
     'marketing:view', 'marketing:create', 'marketing:update', 'marketing:delete',
+    'invoices:view', 'invoices:create', 'invoices:update', 'invoices:delete',
   ],
   admin: [
     'org:update',
@@ -26,6 +27,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'settings:manage', 'settings:view',
     'analytics:view', 'sales:view',
     'marketing:view', 'marketing:create', 'marketing:update', 'marketing:delete',
+    'invoices:view', 'invoices:create', 'invoices:update', 'invoices:delete',
   ],
   member: [
     'members:view',
@@ -34,6 +36,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'settings:view',
     'analytics:view', 'sales:view',
     'marketing:view', 'marketing:create',
+    'invoices:view', 'invoices:create',
   ],
 } as const;
 

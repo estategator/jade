@@ -233,7 +233,7 @@ export async function getPublicInventoryItem(id: string) {
   try {
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('id, name, description, category, price, condition, status, medium_image_url, thumbnail_url, original_image_url, ai_insights, created_at, project:projects(name, organizations(name))')
+      .select('id, name, description, category, price, condition, status, quantity, medium_image_url, thumbnail_url, original_image_url, ai_insights, created_at, project:projects(name, organizations(name))')
       .eq('id', id)
       .single();
 

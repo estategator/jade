@@ -140,3 +140,34 @@ body {
     box-shadow: none !important;
   }
 }
+
+/* ── Invoice print layout ──────────────────────────────── */
+body:has(.invoice-printable) {
+  @media print {
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+  }
+}
+
+@media print {
+  /* Hide sidebar, nav, and non-printable UI */
+  aside,
+  nav,
+  .print\\:hidden,
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* Reset dashboard layout margin so content fills the page */
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Invoice cards and tables: remove shadows/borders for clean print */
+  .invoice-printable * {
+    box-shadow: none !important;
+  }
+}

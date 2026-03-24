@@ -23,7 +23,11 @@ export type Permission =
   | 'marketing:view'
   | 'marketing:create'
   | 'marketing:update'
-  | 'marketing:delete';
+  | 'marketing:delete'
+  | 'invoices:view'
+  | 'invoices:create'
+  | 'invoices:update'
+  | 'invoices:delete';
 
 export type OrgRole = 'superadmin' | 'admin' | 'member';
 
@@ -43,9 +47,14 @@ export type AuditAction =
   | 'settings.updated'
   | 'billing.subscription_changed'
   | 'billing.stripe_connected'
+  | 'billing.stripe_disconnected'
+  | 'billing.stripe_onboarding_retry'
   | 'inventory.created'
   | 'inventory.updated'
   | 'inventory.deleted'
   | 'marketing.created'
   | 'marketing.updated'
-  | 'marketing.deleted';
+  | 'marketing.deleted'
+  | 'invoice.created'
+  | 'invoice.updated'
+  | 'invoice.deleted';

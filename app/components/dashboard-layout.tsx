@@ -22,7 +22,7 @@ function DashboardShell({ children }: DashboardLayoutProps) {
           "bg-stone-50 dark:bg-zinc-950",
         )}
       >
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-[1600px]">
           {children}
         </div>
       </main>

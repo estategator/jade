@@ -131,17 +131,38 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
 
       const itemId = session.metadata?.inventory_item_id;
       const connectedAccountId = session.metadata?.connected_account_id;
+      const purchaseQty = parseInt(session.metadata?.purchase_quantity ?? '1', 10) || 1;
 
       if (itemId) {
-        // Mark item as sold
-        await supabaseAdmin
+        // Fetch current item state
+        const { data: currentItem } = await supabaseAdmin
           .from('inventory_items')
-          .update({
-            status: 'sold',
-            stripe_payment_id: session.payment_intent as string,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', itemId);
+          .select('quantity, status')
+          .eq('id', itemId)
+          .single();
+
+        // Mark as sold only when last unit (reserved state), otherwise keep available
+        if (currentItem?.status === 'reserved' && currentItem.quantity === 0) {
+          await supabaseAdmin
+            .from('inventory_items')
+            .update({
+              status: 'sold',
+              stripe_payment_id: session.payment_intent as string,
+              sold_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', itemId);
+        } else {
+          // Multi-quantity item: unit was already decremented at checkout time,
+          // just record the payment reference on the item
+          await supabaseAdmin
+            .from('inventory_items')
+            .update({
+              stripe_payment_id: session.payment_intent as string,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', itemId);
+        }
 
         // Look up the item to get the org
         const { data: item } = await supabaseAdmin
@@ -172,10 +193,13 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
 
           // Notify all org members about the sale
           if (sale && project?.org_id) {
+            const itemLabel = purchaseQty > 1
+              ? `${item.name ?? 'Unknown item'} (x${purchaseQty})`
+              : (item.name ?? 'Unknown item');
             await createSaleNotifications({
               orgId: project.org_id,
               saleId: sale.id,
-              itemName: item.name ?? 'Unknown item',
+              itemName: itemLabel,
               amount: (session.amount_total ?? 0) / 100,
               currency: session.currency ?? 'usd',
               buyerEmail: session.customer_details?.email ?? null,
@@ -191,14 +215,34 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       const itemId = session.metadata?.inventory_item_id;
 
       if (itemId) {
-        await supabaseAdmin
+        const purchaseQty = parseInt(session.metadata?.purchase_quantity ?? '1', 10) || 1;
+        const { data: expiredItem } = await supabaseAdmin
           .from('inventory_items')
-          .update({
-            status: 'available',
-            updated_at: new Date().toISOString(),
-          })
+          .select('status, quantity')
           .eq('id', itemId)
-          .eq('status', 'reserved');
+          .single();
+
+        if (expiredItem?.status === 'reserved') {
+          // All units were taken in this checkout: restore to available
+          await supabaseAdmin
+            .from('inventory_items')
+            .update({
+              status: 'available',
+              quantity: purchaseQty,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', itemId)
+            .eq('status', 'reserved');
+        } else if (expiredItem) {
+          // Multi-quantity: restore the decremented units
+          await supabaseAdmin
+            .from('inventory_items')
+            .update({
+              quantity: (expiredItem.quantity ?? 0) + purchaseQty,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', itemId);
+        }
       }
       break;
     }

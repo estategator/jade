@@ -15,6 +15,7 @@ import {
   PiTrendUpDuotone,
   PiBellDuotone,
   PiMegaphoneDuotone,
+  PiReceiptDuotone,
   PiQuestionDuotone,
   PiCodeDuotone,
   PiTicketDuotone,
@@ -131,6 +132,7 @@ export function Sidebar() {
         { label: "Inventory", href: "/inventory", icon: PiPackageDuotone },
         { label: "Pricing", href: "/pricing-optimization", icon: PiTrendUpDuotone },
         { label: "Marketing", href: "/marketing", icon: PiMegaphoneDuotone },
+        { label: "Invoices", href: "/invoices", icon: PiReceiptDuotone },
       ],
     },
     {

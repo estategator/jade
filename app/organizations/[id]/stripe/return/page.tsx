@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CheckCircle, Loader2, AlertTriangle } from "lucide-react";
+import { CheckCircle, Loader2, AlertTriangle, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { getStripeAccountStatus } from "@/app/organizations/actions";
+import { getStripeAccountStatus, retryStripeOnboarding } from "@/app/organizations/actions";
 
 export default function StripeReturnPage() {
   const params = useParams();
   const router = useRouter();
   const orgId = params.id as string;
   const [status, setStatus] = useState<"loading" | "success" | "incomplete">("loading");
+  const [retrying, setRetrying] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function verify() {
@@ -29,6 +31,23 @@ export default function StripeReturnPage() {
     }
     verify();
   }, [orgId, router]);
+
+  async function handleRetryOnboarding() {
+    setRetrying(true);
+    setError("");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+    const result = await retryStripeOnboarding(orgId, session.user.id);
+    if (result.url) {
+      window.location.href = result.url;
+    } else {
+      setError(result.error || "Failed to restart onboarding.");
+      setRetrying(false);
+    }
+  }
 
   if (status === "loading") {
     return (
@@ -58,16 +77,32 @@ export default function StripeReturnPage() {
               Setup Incomplete
             </h1>
             <p className="mt-2 text-sm text-stone-600 dark:text-zinc-400">
-              Your Stripe account setup isn&apos;t finished yet. You can complete it from the organization page.
+              Stripe needs more information to finish setting up your account. You can complete it now or come back later from billing settings.
             </p>
+            {error && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleRetryOnboarding}
+              disabled={retrying}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {retrying ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ExternalLink className="h-4 w-4" />
+              )}
+              Complete Setup
+            </button>
           </>
         )}
         <button
           type="button"
-          onClick={() => router.push(`/organizations/${orgId}`)}
-          className="mt-6 inline-flex items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-indigo-700"
+          onClick={() => router.push(`/organizations/${orgId}/settings/billing`)}
+          className="mt-3 inline-flex items-center rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-medium text-stone-700 transition-all hover:border-stone-300 hover:bg-stone-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
         >
-          Back to Organization
+          Go to Billing Settings
         </button>
       </div>
     </div>

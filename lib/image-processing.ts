@@ -2,6 +2,24 @@ import 'server-only';
 import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { openai } from '@/lib/openai';
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 1000;
+
+/** Retry an OpenAI call with exponential backoff on 429 (rate-limit) errors. */
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      if (status !== 429 || attempt === MAX_RETRIES) throw err;
+      const delay = INITIAL_BACKOFF_MS * 2 ** attempt;
+      console.warn(`[withRetry] 429 rate-limited, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error('withRetry: unreachable');
+}
 
 export type AIAnalysisResult = {
   name: string;
@@ -95,7 +113,7 @@ export async function analyzeImage(base64Image: string): Promise<AIAnalysisResul
   if (!promptId) return null;
 
   try {
-    const response = await openai.responses.create({
+    const response = await withRetry(() => openai.responses.create({
       model: 'gpt-5.4-nano',
       prompt: {
         id: promptId,
@@ -109,7 +127,7 @@ export async function analyzeImage(base64Image: string): Promise<AIAnalysisResul
           ],
         },
       ],
-    });
+    }));
 
     const content = response.output_text ?? '';
     console.log('[analyzeImage] raw output_text:', content.slice(0, 500));
@@ -169,34 +187,42 @@ export async function analyzePricingPerCondition(base64Image: string): Promise<P
   if (!apiKey) return null;
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 512,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert estate sale appraiser. Analyze the item in the image and return ONLY a JSON object (no markdown, no code fences) with these fields:
+    const res = await withRetry(async () => {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          max_tokens: 512,
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert estate sale appraiser. Analyze the item in the image and return ONLY a JSON object (no markdown, no code fences) with these fields:
 - "name": short item name
 - "description": 1-2 sentence description
 - "category": one of ${JSON.stringify(VALID_CATEGORIES)}
 - "pricePerCondition": object with keys "excellent", "good", "fair", "poor" - each a USD price number (0-5000 range for estate items)
 
 Consider realistic price variations by condition: Excellent ~1.5x base, Good = 1x, Fair ~0.65x, Poor ~0.35x of a typical comparable.`,
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: base64Image, detail: 'low' } },
-            ],
-          },
-        ],
-      }),
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: base64Image, detail: 'low' } },
+              ],
+            },
+          ],
+        }),
+      });
+      if (r.status === 429) {
+        const err = new Error('Rate limited') as Error & { status: number };
+        err.status = 429;
+        throw err;
+      }
+      return r;
     });
 
     if (!res.ok) return null;
@@ -290,6 +316,8 @@ export async function normalizeSourceImage(buffer: Buffer): Promise<Buffer> {
 }
 
 export async function processItemImage(itemId: string, storagePath: string): Promise<void> {
+  const startMs = Date.now();
+  console.log(`[processItemImage] START item=${itemId} at ${new Date().toISOString()}`);
   try {
     await supabaseAdmin
       .from('inventory_items')
@@ -330,7 +358,9 @@ export async function processItemImage(itemId: string, storagePath: string): Pro
 
     // AI analysis using the medium-sized image
     const medBase64 = `data:image/webp;base64,${medium.toString('base64')}`;
+    console.log(`[processItemImage] AI call START item=${itemId} at +${Date.now() - startMs}ms`);
     const aiResult = await analyzeImage(medBase64);
+    console.log(`[processItemImage] AI call END item=${itemId} at +${Date.now() - startMs}ms`);
 
     // Hydrate primary item fields from AI output when still at defaults
     const fieldUpdates: Record<string, unknown> = {
@@ -362,8 +392,10 @@ export async function processItemImage(itemId: string, storagePath: string): Pro
       .from('inventory_items')
       .update(fieldUpdates)
       .eq('id', itemId);
+
+    console.log(`[processItemImage] DONE item=${itemId} total=${Date.now() - startMs}ms`);
   } catch (err) {
-    console.error(`Image processing failed for item ${itemId}:`, err);
+    console.error(`[processItemImage] FAILED item=${itemId} at +${Date.now() - startMs}ms:`, err);
     await supabaseAdmin
       .from('inventory_items')
       .update({ processing_status: 'failed' })

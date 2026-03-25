@@ -33,4 +33,6 @@ async function handleProcessImage(
   await processItemImage(itemId, storagePath);
 }
 
-export const POST = handleCallback(handleProcessImage);
+export const POST = handleCallback(handleProcessImage, {
+  visibilityTimeoutSeconds: 55,
+});

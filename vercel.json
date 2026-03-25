@@ -1,6 +1,7 @@
 {
   "functions": {
     "app/api/queues/process-image/route.ts": {
+      "maxDuration": 60,
       "experimentalTriggers": [
         { "type": "queue/v2beta", "topic": "process-image" }
       ]

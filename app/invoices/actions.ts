@@ -639,163 +639,32 @@ export async function deleteInvoice(
   }
 }
 
-// ── Checkout-triggered invoice creation ──────────────────────
-
-export type CheckoutInvoiceLineInput = {
-  inventory_item_id: string;
-  item_name: string;
-  item_category: string;
-  item_description: string;
-  quantity: number;
-  unit_price: number;
-};
-
-export type CreateCheckoutInvoiceInput = {
-  orgId: string;
-  projectId?: string | null;
-  stripeCheckoutSessionId: string;
-  buyerEmail: string | null;
-  currency: string;
-  createdBy: string;
-  lines: CheckoutInvoiceLineInput[];
-};
+// ── Checkout invoice lookup (for success page) ──────────────
 
 /**
- * Create a finalized invoice from a successful checkout.
- * Called from the Stripe webhook handler after payment is confirmed.
- * Idempotent — if an invoice already exists for this checkout_session_id
- * it returns the existing one instead of creating a duplicate.
+ * Look up an auto-generated invoice by Stripe checkout session ID.
+ * Used by the checkout success page to display the invoice number.
  */
-export async function createCheckoutInvoice(
-  input: CreateCheckoutInvoiceInput,
-): Promise<{ data?: Invoice; error?: string }> {
-  const { orgId, projectId, stripeCheckoutSessionId, buyerEmail, currency, createdBy, lines } = input;
-
-  if (!orgId || !stripeCheckoutSessionId || lines.length === 0) {
-    return { error: 'Missing required fields for checkout invoice.' };
-  }
+export async function getInvoiceByStripeSession(
+  stripeCheckoutSessionId: string,
+): Promise<{ data?: { id: string; invoice_number: string } | null; error?: string }> {
+  if (!stripeCheckoutSessionId) return { data: null };
 
   try {
-    // Idempotency check — return existing invoice if already created
-    const { data: existing } = await supabase
+    const { data, error } = await supabase
       .from('invoices')
-      .select('*')
+      .select('id, invoice_number')
       .eq('stripe_checkout_session_id', stripeCheckoutSessionId)
       .maybeSingle();
 
-    if (existing) {
-      console.log('[checkout-invoice] Invoice already exists for Stripe session:', stripeCheckoutSessionId);
-      return { data: existing as Invoice };
+    if (error) {
+      console.error('[invoice-lookup] Error:', error);
+      return { error: 'Failed to look up invoice.' };
     }
 
-    // Compute totals
-    const invoiceLines = lines.map((l) => ({
-      ...l,
-      line_total: l.unit_price * l.quantity,
-      sold_at: new Date().toISOString(),
-    }));
-
-    const subtotal = invoiceLines.reduce((sum, l) => sum + l.line_total, 0);
-    const taxAmount = 0;
-    const total = subtotal + taxAmount;
-
-    const today = new Date().toISOString().slice(0, 10);
-    const invoiceNumber = generateInvoiceNumber();
-
-    const filtersUsed = {
-      org_id: orgId,
-      period_start: today,
-      period_end: today,
-      source: 'checkout' as const,
-      stripe_checkout_session_id: stripeCheckoutSessionId,
-      buyer_email: buyerEmail,
-      currency,
-    };
-
-    // Insert invoice header
-    const { data: invoice, error: invoiceErr } = await supabase
-      .from('invoices')
-      .insert({
-        org_id: orgId,
-        project_id: projectId ?? null,
-        invoice_number: invoiceNumber,
-        status: 'finalized',
-        source: 'checkout',
-        stripe_checkout_session_id: stripeCheckoutSessionId,
-        period_start: today,
-        period_end: today,
-        subtotal,
-        tax_amount: taxAmount,
-        total,
-        line_count: invoiceLines.length,
-        notes: buyerEmail
-          ? `Auto-generated from checkout. Buyer: ${buyerEmail}`
-          : 'Auto-generated from checkout.',
-        filters_used: filtersUsed,
-        created_by: createdBy,
-      })
-      .select('*')
-      .single();
-
-    if (invoiceErr || !invoice) {
-      // Handle duplicate (race condition with idempotency check above)
-      if (invoiceErr?.code === '23505') {
-        const { data: raceExisting } = await supabase
-          .from('invoices')
-          .select('*')
-          .eq('stripe_checkout_session_id', stripeCheckoutSessionId)
-          .maybeSingle();
-        if (raceExisting) return { data: raceExisting as Invoice };
-      }
-      console.error('[checkout-invoice] Insert error:', invoiceErr);
-      return { error: 'Failed to create checkout invoice.' };
-    }
-
-    // Insert invoice lines
-    const lineRows = invoiceLines.map((l) => ({
-      invoice_id: invoice.id,
-      inventory_item_id: l.inventory_item_id,
-      item_name: l.item_name,
-      item_category: l.item_category,
-      item_description: l.item_description,
-      quantity: l.quantity,
-      unit_price: l.unit_price,
-      line_total: l.line_total,
-      sold_at: l.sold_at,
-    }));
-
-    const { error: linesErr } = await supabase
-      .from('invoice_lines')
-      .insert(lineRows);
-
-    if (linesErr) {
-      console.error('[checkout-invoice] Lines insert error:', linesErr);
-      // Clean up the header if lines fail
-      await supabase.from('invoices').delete().eq('id', invoice.id);
-      return { error: 'Failed to create checkout invoice lines.' };
-    }
-
-    await auditLog({
-      orgId,
-      actorId: createdBy,
-      action: 'invoice.created',
-      targetType: 'invoice',
-      targetId: invoice.id,
-      metadata: {
-        invoice_number: invoiceNumber,
-        line_count: invoiceLines.length,
-        total,
-        source: 'checkout',
-        stripe_checkout_session_id: stripeCheckoutSessionId,
-      },
-    });
-
-    console.log('[checkout-invoice] Created invoice', invoiceNumber, 'for Stripe session:', stripeCheckoutSessionId);
-
-    revalidateInvoiceRoutes();
-    return { data: invoice as Invoice };
+    return { data: data as { id: string; invoice_number: string } | null };
   } catch (err) {
-    console.error('[checkout-invoice] Unexpected error:', err);
-    return { error: 'An unexpected error occurred creating the checkout invoice.' };
+    console.error('[invoice-lookup] Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
   }
 }

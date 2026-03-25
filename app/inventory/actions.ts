@@ -568,9 +568,12 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
 
     const toProcess: { itemId: string; storagePath: string }[] = [];
 
-    for (let i = 0; i < items.length; i++) {
-      const imageFile = formData.get(`image-${i}`) as File | null;
-      if (imageFile && imageFile.size > 0) {
+    // Normalize, upload, and update all images in parallel
+    await Promise.all(
+      items.map(async (_, i) => {
+        const imageFile = formData.get(`image-${i}`) as File | null;
+        if (!imageFile || imageFile.size <= 0) return;
+
         const itemId = insertedItems[i].id;
         const storagePath = `${itemId}/source.webp`;
         const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
@@ -595,8 +598,8 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
 
           toProcess.push({ itemId, storagePath });
         }
-      }
-    }
+      }),
+    );
 
     // Enqueue each image for parallel processing via Vercel Queues
     await Promise.all(

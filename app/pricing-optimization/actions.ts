@@ -29,20 +29,26 @@ export async function processPricingBatch(
     }
 
     const buffers: Buffer[] = [];
+    const validationErrors: string[] = [];
+
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         return { error: `${file.name} is not an image file` };
       }
-
       if (file.size > MAX_FILE_SIZE) {
         return { error: `${file.name} exceeds 10MB size limit` };
       }
-
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const normalized = await normalizeSourceImage(buffer);
-      buffers.push(normalized);
     }
+
+    // Normalize all images in parallel
+    const normalized = await Promise.all(
+      files.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        return normalizeSourceImage(buffer);
+      })
+    );
+    buffers.push(...normalized);
 
     // Batch analyze all images
     const results = await batchAnalyzePricingImages(buffers);

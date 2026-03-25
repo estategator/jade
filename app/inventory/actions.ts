@@ -566,9 +566,7 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
       return { error: `Failed to add items: ${(error as any)?.message || 'Unknown error'}` };
     }
 
-    const toProcess: { itemId: string; storagePath: string }[] = [];
-
-    // Normalize, upload, and update all images in parallel
+    // Normalize, upload, update, and enqueue all images in parallel
     await Promise.all(
       items.map(async (_, i) => {
         const imageFile = formData.get(`image-${i}`) as File | null;
@@ -596,20 +594,13 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
             })
             .eq('id', itemId);
 
-          toProcess.push({ itemId, storagePath });
+          await enqueue(
+            TOPICS.PROCESS_IMAGE,
+            { itemId, storagePath },
+            async (data) => processItemImage(data.itemId, data.storagePath),
+          );
         }
       }),
-    );
-
-    // Enqueue each image for parallel processing via Vercel Queues
-    await Promise.all(
-      toProcess.map(({ itemId, storagePath }) =>
-        enqueue(
-          TOPICS.PROCESS_IMAGE,
-          { itemId, storagePath },
-          async (data) => processItemImage(data.itemId, data.storagePath),
-        )
-      ),
     );
 
     revalidateInventoryRoutes();

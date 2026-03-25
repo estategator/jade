@@ -1,8 +1,10 @@
 import 'server-only';
 import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { openai } from '@/lib/openai';
+import { openai, ANALYSIS_MODEL } from '@/lib/openai';
 import { enqueue, TOPICS } from '@/lib/queue';
+import { generateObject } from 'ai';
+import { z } from 'zod';
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1000;
 
@@ -103,68 +105,92 @@ function generateMockPricingAnalysis(): PricingAnalysisResult {
   };
 }
 
+const analysisSchema = z.object({
+  sale_summary: z.object({
+    total_items_identified: z.number(),
+    dominant_category: z.string(),
+    general_aesthetic: z.string(),
+  }),
+  identified_items: z.array(z.object({
+    item_name: z.string(),
+    category: z.string(),
+    quantity_and_completeness: z.object({
+      count: z.number(),
+      is_complete_set: z.boolean(),
+      notes: z.string(),
+    }),
+    description: z.string(),
+    appraisal_notes: z.object({
+      condition: z.string(),
+      authenticity_flags: z.string(),
+      logistical_warnings: z.string(),
+    }),
+    pricing_strategy: z.object({
+      currency: z.string(),
+      fair_market_value_retail: z.number(),
+      suggested_day_1_estate_price: z.number(),
+      day_3_liquidation_price: z.number(),
+      scrap_or_melt_value: z.number(),
+      pricing_justification: z.string(),
+    }),
+  })),
+});
+
+const ANALYSIS_SYSTEM_PROMPT = `Role: You are a Master Estate Sale Appraiser, Antiques Authenticator, and Liquidation Strategist.
+Task: Analyze the provided image(s) to identify all high-value, notable, or highly salable objects. You must account for real-world estate sale edge cases, including replicas, incomplete sets, scrap value, and item mobility.
+Analysis Requirements & Edge Cases to Consider:
+- Authenticity & Provenance: Look for signs of reproductions. Flag items that require physical inspection (e.g., "Check bottom for hallmarks," "Requires jeweler loupe for diamond authenticity").
+- Completeness: Is it part of a set? (e.g., A teapot missing its lid loses 80% of its value. A set of 5 dining chairs is worth significantly less than an even set of 6).
+- Scrap vs. Aesthetic Value: For jewelry or silver items, determine if the value is in the craftsmanship or just the melt/scrap weight.
+- Logistics & "Heavy Furniture Penalty": Massive items (pianos, giant armoires, pool tables) have high Fair Market Value but terrible liquidity. Adjust the "Suggested Estate Price" drastically lower to ensure they are removed from the property.
+- Condition Extremes: Differentiate between "Patina" (adds value to antiques) and "Damage" (ruins value).`;
+
 export async function analyzeImage(base64Image: string): Promise<AIAnalysisResult | null> {
   if (process.env.AI_NOT_AVAILABLE_FOR_TESTING === 'true') {
     await new Promise((r) => setTimeout(r, 500));
     return generateMockAnalysis();
   }
 
-  const promptId = process.env.OPENAI_ITEM_ANALYSIS_PROMPT_ID;
-  const promptVersion = process.env.OPENAI_ITEM_ANALYSIS_PROMPT_VERSION;
-  if (!promptId) return null;
-
   try {
-    const response = await withRetry(() => openai.responses.create({
-      model: 'gpt-5.4-nano',
-      prompt: {
-        id: promptId,
-        version: promptVersion,
-      },
-      input: [
+    const dataUriMatch = base64Image.match(/^data:([^;]+);base64,(.+)$/);
+    const imageBuffer = Buffer.from(dataUriMatch?.[2] ?? base64Image, 'base64');
+
+    const { object: result } = await withRetry(() => generateObject({
+      model: openai(ANALYSIS_MODEL),
+      schema: analysisSchema,
+      system: ANALYSIS_SYSTEM_PROMPT,
+      messages: [
         {
           role: 'user',
           content: [
-            { type: 'input_image', image_url: base64Image, detail: 'low' },
+            { type: 'image', image: imageBuffer },
           ],
         },
       ],
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'low',
+        },
+      },
     }));
 
-    const content = response.output_text ?? '';
-    console.log('[analyzeImage] raw output_text:', content.slice(0, 500));
-    const cleaned = content.replace(/```json?\s*/gi, '').replace(/```/g, '').trim();
-    const raw = JSON.parse(cleaned);
-    console.log('[analyzeImage] parsed JSON keys:', Object.keys(raw));
+    console.log('[analyzeImage] structured result, items:', result.identified_items.length);
 
-    let parsed: AIAnalysisResult;
-
-    // New schema: { sale_summary, identified_items[] }
-    if (Array.isArray(raw.identified_items) && raw.identified_items.length > 0) {
-      const item = raw.identified_items[0];
-      const pricing = item.pricing_strategy;
-      console.log('[analyzeImage] new schema detected, item keys:', Object.keys(item));
-
-      parsed = {
-        name: item.item_name ?? '',
-        description: item.description ?? '',
-        category: item.category ?? 'Other',
-        condition: inferCondition(item.appraisal_notes?.condition ?? item.condition),
-        price: pricing?.suggested_day_1_estate_price ?? pricing?.fair_market_value_retail ?? 0,
-      };
-    } else {
-      // Legacy schema: { primary_object, pricing_strategy } or flat
-      const primary = raw.primary_object ?? raw;
-      const pricing = raw.pricing_strategy;
-      console.log('[analyzeImage] legacy/flat schema, primary keys:', Object.keys(primary));
-
-      parsed = {
-        name: primary.name ?? raw.name ?? '',
-        description: primary.description ?? raw.description ?? '',
-        category: primary.category ?? raw.category ?? 'Other',
-        condition: inferCondition(primary.condition_notes ?? primary.condition ?? raw.condition),
-        price: pricing?.suggested_estate_price ?? pricing?.fair_market_value ?? raw.price ?? 0,
-      };
+    if (!result.identified_items.length) {
+      console.warn('[analyzeImage] No items identified');
+      return null;
     }
+
+    const item = result.identified_items[0];
+    const pricing = item.pricing_strategy;
+
+    const parsed: AIAnalysisResult = {
+      name: item.item_name,
+      description: item.description,
+      category: item.category,
+      condition: inferCondition(item.appraisal_notes.condition),
+      price: pricing.suggested_day_1_estate_price ?? pricing.fair_market_value_retail ?? 0,
+    };
 
     if (!VALID_CATEGORIES.includes(parsed.category)) parsed.category = 'Other';
     if (!VALID_CONDITIONS.includes(parsed.condition)) parsed.condition = 'Good';
@@ -184,70 +210,23 @@ export async function analyzePricingPerCondition(base64Image: string): Promise<P
     return generateMockPricingAnalysis();
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-
   try {
-    const res = await withRetry(async () => {
-      const r = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          max_tokens: 512,
-          messages: [
-            {
-              role: 'system',
-              content: `You are an expert estate sale appraiser. Analyze the item in the image and return ONLY a JSON object (no markdown, no code fences) with these fields:
-- "name": short item name
-- "description": 1-2 sentence description
-- "category": one of ${JSON.stringify(VALID_CATEGORIES)}
-- "pricePerCondition": object with keys "excellent", "good", "fair", "poor" - each a USD price number (0-5000 range for estate items)
+    const result = await analyzeImage(base64Image);
+    if (!result) return null;
 
-Consider realistic price variations by condition: Excellent ~1.5x base, Good = 1x, Fair ~0.65x, Poor ~0.35x of a typical comparable.`,
-            },
-            {
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: base64Image, detail: 'low' } },
-              ],
-            },
-          ],
-        }),
-      });
-      if (r.status === 429) {
-        const err = new Error('Rate limited') as Error & { status: number };
-        err.status = 429;
-        throw err;
-      }
-      return r;
-    });
+    const basePrice = result.price;
 
-    if (!res.ok) return null;
-
-    const json = await res.json();
-    const content: string = json.choices?.[0]?.message?.content ?? '';
-    const cleaned = content.replace(/```json?\s*/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleaned) as PricingAnalysisResult;
-
-    // Validate
-    if (!VALID_CATEGORIES.includes(parsed.category)) parsed.category = 'Other';
-    if (!parsed.pricePerCondition || typeof parsed.pricePerCondition !== 'object') {
-      return null;
-    }
-
-    const prices = parsed.pricePerCondition;
-    for (const condition of VALID_CONDITIONS) {
-      const key = condition.toLowerCase() as keyof PricePerCondition;
-      if (typeof prices[key] !== 'number' || prices[key] < 0) {
-        prices[key] = 0;
-      }
-    }
-
-    return parsed;
+    return {
+      name: result.name,
+      description: result.description,
+      category: result.category,
+      pricePerCondition: {
+        excellent: Math.round(basePrice * 1.5 * 100) / 100,
+        good: Math.round(basePrice * 100) / 100,
+        fair: Math.round(basePrice * 0.65 * 100) / 100,
+        poor: Math.round(basePrice * 0.35 * 100) / 100,
+      },
+    };
   } catch (err) {
     console.error('Pricing analysis error:', err);
     return null;

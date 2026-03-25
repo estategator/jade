@@ -20,6 +20,7 @@ export async function enqueue<T>(
 ): Promise<void> {
   // In local dev (no VERCEL env), process inline
   if (!process.env.VERCEL) {
+    console.warn(`LOCAL: Vercel Queue not available (local dev), processing inline for topic "${topic}".`);
     await processInline(payload);
     return;
   }

@@ -527,7 +527,6 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
   }
 
   if (!items.length) return { error: 'No items to add.' };
-  // Project ID is optional now
 
   // Resolve org_id for each distinct project_id to prevent null org_id
   const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
@@ -542,23 +541,39 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
     }
   }
 
-  const rows = items.map((item) => ({
-    name: item.name,
-    description: item.description || '',
-    category: item.category || 'Other',
-    price: item.price,
-    condition: item.condition || 'Good',
-    status: 'available' as const,
-    user_id: item.user_id,
-    project_id: item.project_id || null,
-    org_id: item.project_id ? (projOrgMap[item.project_id] ?? null) : null,
-    processing_status: 'none' as const,
-  }));
-
   try {
+    // 1. Normalize images in parallel (AI analysis already done client-side via analyzeItemAction).
+    const imageData = await Promise.all(
+      items.map(async (_, i) => {
+        const imageFile = formData.get(`image-${i}`) as File | null;
+        if (!imageFile || imageFile.size <= 0) return null;
+
+        const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
+        const sourceBuffer = await normalizeSourceImage(rawBuffer);
+        return { index: i, sourceBuffer };
+      }),
+    );
+
+    // 2. Build rows — fields are already populated from client-side analysis.
+    const rows = items.map((item, i) => {
+      const hasImage = imageData.some((d) => d?.index === i);
+      return {
+        name: item.name || '',
+        description: item.description || '',
+        category: item.category || 'Other',
+        price: item.price || 0,
+        condition: item.condition || 'Good',
+        status: 'available' as const,
+        user_id: item.user_id,
+        project_id: item.project_id || null,
+        org_id: item.project_id ? (projOrgMap[item.project_id] ?? null) : null,
+        processing_status: hasImage ? ('queued' as const) : ('none' as const),
+      };
+    });
+
     const { data: insertedItems, error } = await supabase
       .from('inventory_items')
-      .insert(rows as any) // Cast to any to avoid type complexity with optional fields
+      .insert(rows as any)
       .select('id');
 
     if (error || !insertedItems) {
@@ -566,20 +581,17 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
       return { error: `Failed to add items: ${(error as any)?.message || 'Unknown error'}` };
     }
 
-    // Normalize, upload, update, and enqueue all images in parallel
+    // 3. Upload source images and enqueue thumbnail generation in parallel.
     await Promise.all(
-      items.map(async (_, i) => {
-        const imageFile = formData.get(`image-${i}`) as File | null;
-        if (!imageFile || imageFile.size <= 0) return;
+      imageData.map(async (data) => {
+        if (!data) return;
 
-        const itemId = insertedItems[i].id;
+        const itemId = insertedItems[data.index].id;
         const storagePath = `${itemId}/source.webp`;
-        const rawBuffer = Buffer.from(await imageFile.arrayBuffer());
-        const sourceBuffer = await normalizeSourceImage(rawBuffer);
 
         const { error: uploadErr } = await supabase.storage
           .from('inventory-images')
-          .upload(storagePath, sourceBuffer, { contentType: 'image/webp' });
+          .upload(storagePath, data.sourceBuffer, { contentType: 'image/webp' });
 
         if (!uploadErr) {
           const { data: { publicUrl } } = supabase.storage
@@ -588,16 +600,13 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
 
           await supabase
             .from('inventory_items')
-            .update({
-              original_image_url: publicUrl,
-              processing_status: 'queued',
-            })
+            .update({ original_image_url: publicUrl })
             .eq('id', itemId);
 
           await enqueue(
             TOPICS.PROCESS_IMAGE,
             { itemId, storagePath },
-            async (data) => processItemImage(data.itemId, data.storagePath),
+            async (d) => processItemImage(d.itemId, d.storagePath),
           );
         }
       }),
@@ -722,6 +731,44 @@ export async function analyzeItemAction(formData: FormData) {
   } catch (err) {
     console.error('[analyzeItemAction] error:', err);
     return { error: 'An unexpected error occurred during analysis.' };
+  }
+}
+
+export type BatchAnalysisItem = {
+  index: number;
+  result: AIAnalysisResult | null;
+  error?: string;
+};
+
+/** Analyze multiple images in a single request, all in parallel server-side. */
+export async function batchAnalyzeItemsAction(formData: FormData): Promise<{ data?: BatchAnalysisItem[]; error?: string }> {
+  try {
+    const countStr = formData.get('count') as string;
+    const count = parseInt(countStr, 10);
+    if (!count || count < 1) return { error: 'No images provided.' };
+
+    const results = await Promise.all(
+      Array.from({ length: count }, async (_, i) => {
+        const imageFile = formData.get(`image-${i}`) as File | null;
+        if (!imageFile || imageFile.size === 0) {
+          return { index: i, result: null, error: 'No image' };
+        }
+
+        try {
+          const buffer = Buffer.from(await imageFile.arrayBuffer());
+          const result = await analyzeUploadedSimpleImage(buffer);
+          return { index: i, result, error: result ? undefined : 'Analysis failed' };
+        } catch (err) {
+          console.error(`[batchAnalyzeItemsAction] image-${i} error:`, err);
+          return { index: i, result: null, error: 'Analysis error' };
+        }
+      }),
+    );
+
+    return { data: results };
+  } catch (err) {
+    console.error('[batchAnalyzeItemsAction] error:', err);
+    return { error: 'An unexpected error occurred.' };
   }
 }
 

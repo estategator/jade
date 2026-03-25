@@ -349,13 +349,6 @@ export async function processItemImage(itemId: string, storagePath: string): Pro
 
     console.log(`[processItemImage] derivatives done item=${itemId} at +${Date.now() - startMs}ms, enqueueing analysis`);
 
-    // Dispatch AI analysis as a separate queued job for true parallelism
-    await enqueue(
-      TOPICS.ANALYZE_IMAGE,
-      { itemId },
-      async (data) => analyzeItemImage(data.itemId),
-    );
-
     console.log(`[processItemImage] DONE item=${itemId} total=${Date.now() - startMs}ms`);
   } catch (err) {
     console.error(`[processItemImage] FAILED item=${itemId} at +${Date.now() - startMs}ms:`, err);

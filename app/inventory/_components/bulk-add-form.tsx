@@ -19,6 +19,7 @@ import { twMerge } from "tailwind-merge";
 import {
   createBulkInventoryItemsWithImages,
   analyzeItemAction,
+  batchAnalyzeItemsAction,
   type UserProject,
 } from "@/app/inventory/actions";
 import { PageHeader } from "@/app/components/page-header";
@@ -138,14 +139,78 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
       imageFile: file,
       imagePreview: URL.createObjectURL(file),
       expanded: false,
-      analysisStatus: "queued",
+      analysisStatus: "analyzing" as const,
     }));
 
     setItems((prev) => [...prev, ...newItems]);
 
-    // Trigger analysis for all new items in parallel
-    for (const item of newItems) {
-      if (item.imageFile) analyzeItem(item.id, item.imageFile);
+    // Intelligent batching: 1 image → single action, 2+ → batch action
+    if (imageFiles.length === 1) {
+      const item = newItems[0];
+      analyzeItem(item.id, imageFiles[0]);
+    } else {
+      // Chunk into batches of 5 so no single request is too large,
+      // and fire all batches concurrently.
+      const BATCH_SIZE = 5;
+      const chunks: { startIdx: number; files: File[]; items: BulkItem[] }[] = [];
+      for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
+        chunks.push({
+          startIdx: i,
+          files: imageFiles.slice(i, i + BATCH_SIZE),
+          items: newItems.slice(i, i + BATCH_SIZE),
+        });
+      }
+
+      for (const chunk of chunks) {
+        const formData = new FormData();
+        formData.append("count", chunk.files.length.toString());
+        chunk.files.forEach((file, i) => formData.append(`image-${i}`, file));
+
+        batchAnalyzeItemsAction(formData).then((response) => {
+          if (response.error || !response.data) {
+            setItems((prev) =>
+              prev.map((it) =>
+                chunk.items.some((n) => n.id === it.id)
+                  ? { ...it, analysisStatus: "failed" as const, analysisError: response.error || "Batch analysis failed" }
+                  : it
+              )
+            );
+            return;
+          }
+
+          setItems((prev) =>
+            prev.map((it) => {
+              const itemIndex = chunk.items.findIndex((n) => n.id === it.id);
+              if (itemIndex === -1) return it;
+
+              const analysisItem = response.data!.find((r) => r.index === itemIndex);
+              if (!analysisItem || !analysisItem.result) {
+                return { ...it, analysisStatus: "failed" as const, analysisError: analysisItem?.error || "Analysis failed" };
+              }
+
+              const data = analysisItem.result;
+              return {
+                ...it,
+                name: it.name || data.name,
+                description: it.description || data.description,
+                category: it.category === "Other" && data.category ? data.category : it.category,
+                condition: it.condition === "Good" && data.condition ? data.condition : it.condition,
+                price: !it.price && data.price ? data.price.toString() : it.price,
+                analysisStatus: "complete" as const,
+              };
+            })
+          );
+        }).catch((err) => {
+          console.error("Batch analysis error:", err);
+          setItems((prev) =>
+            prev.map((it) =>
+              chunk.items.some((n) => n.id === it.id)
+                ? { ...it, analysisStatus: "failed" as const, analysisError: "Network or server error" }
+                : it
+            )
+          );
+        });
+      }
     }
   }
 

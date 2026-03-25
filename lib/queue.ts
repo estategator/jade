@@ -19,10 +19,13 @@ export async function enqueue<T>(
   payload: T,
   processInline: (data: T) => Promise<void>,
 ): Promise<void> {
-  // In local dev (no VERCEL env), process inline
+  // In local dev (no VERCEL env), process concurrently without awaiting
+  // so that Promise.all batches of enqueue calls actually run in parallel.
   if (!process.env.VERCEL) {
     console.warn(`LOCAL: Vercel Queue not available (local dev), processing inline for topic "${topic}".`);
-    await processInline(payload);
+    processInline(payload).catch((err) =>
+      console.error(`LOCAL inline processing failed for topic "${topic}":`, err),
+    );
     return;
   }
 
@@ -30,7 +33,9 @@ export async function enqueue<T>(
     await send(topic, payload);
   } catch (err) {
     console.error(`Vercel Queue send failed for topic "${topic}":`, err);
-    // Fallback to inline processing so we don't drop the event
-    await processInline(payload);
+    // Fallback: fire-and-forget so we don't block the caller
+    processInline(payload).catch((fallbackErr) =>
+      console.error(`Fallback inline processing failed for topic "${topic}":`, fallbackErr),
+    );
   }
 }

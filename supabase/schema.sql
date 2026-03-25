@@ -209,7 +209,7 @@ create table if not exists inventory_items (
   thumbnail_url      text,
   medium_image_url   text,
   processing_status  text not null default 'none'
-                check (processing_status in ('none', 'queued', 'processing', 'complete', 'failed')),
+                check (processing_status in ('none', 'queued', 'processing', 'analyzing', 'complete', 'failed')),
   ai_insights        jsonb,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()

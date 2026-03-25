@@ -2,6 +2,7 @@ import 'server-only';
 import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { openai } from '@/lib/openai';
+import { enqueue, TOPICS } from '@/lib/queue';
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1000;
 
@@ -356,16 +357,62 @@ export async function processItemImage(itemId: string, storagePath: string): Pro
     const thumbUrl = supabaseAdmin.storage.from('inventory-images').getPublicUrl(thumbPath).data.publicUrl;
     const medUrl = supabaseAdmin.storage.from('inventory-images').getPublicUrl(medPath).data.publicUrl;
 
-    // AI analysis using the medium-sized image
-    const medBase64 = `data:image/webp;base64,${medium.toString('base64')}`;
-    console.log(`[processItemImage] AI call START item=${itemId} at +${Date.now() - startMs}ms`);
-    const aiResult = await analyzeImage(medBase64);
-    console.log(`[processItemImage] AI call END item=${itemId} at +${Date.now() - startMs}ms`);
+    // Persist derived image URLs and transition to 'analyzing' so thumbnails
+    // are visible in the UI while AI analysis runs in a separate worker.
+    await supabaseAdmin
+      .from('inventory_items')
+      .update({
+        thumbnail_url: thumbUrl,
+        medium_image_url: medUrl,
+        processing_status: 'analyzing',
+      })
+      .eq('id', itemId);
 
-    // Hydrate primary item fields from AI output when still at defaults
+    console.log(`[processItemImage] derivatives done item=${itemId} at +${Date.now() - startMs}ms, enqueueing analysis`);
+
+    // Dispatch AI analysis as a separate queued job for true parallelism
+    await enqueue(
+      TOPICS.ANALYZE_IMAGE,
+      { itemId },
+      async (data) => analyzeItemImage(data.itemId),
+    );
+
+    console.log(`[processItemImage] DONE item=${itemId} total=${Date.now() - startMs}ms`);
+  } catch (err) {
+    console.error(`[processItemImage] FAILED item=${itemId} at +${Date.now() - startMs}ms:`, err);
+    await supabaseAdmin
+      .from('inventory_items')
+      .update({ processing_status: 'failed' })
+      .eq('id', itemId);
+  }
+}
+
+/**
+ * Run AI analysis on an inventory item's medium image.
+ * Invoked as a separate queued job after image derivatives are generated
+ * by processItemImage, enabling concurrent analysis across items.
+ */
+export async function analyzeItemImage(itemId: string): Promise<void> {
+  const startMs = Date.now();
+  console.log(`[analyzeItemImage] START item=${itemId} at ${new Date().toISOString()}`);
+  try {
+    const medPath = `${itemId}/medium.webp`;
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from('inventory-images')
+      .download(medPath);
+
+    if (downloadError || !fileData) {
+      throw new Error(`Medium image download failed: ${downloadError?.message}`);
+    }
+
+    const medium = Buffer.from(await fileData.arrayBuffer());
+    const medBase64 = `data:image/webp;base64,${medium.toString('base64')}`;
+
+    console.log(`[analyzeItemImage] AI call START item=${itemId} at +${Date.now() - startMs}ms`);
+    const aiResult = await analyzeImage(medBase64);
+    console.log(`[analyzeItemImage] AI call END item=${itemId} at +${Date.now() - startMs}ms`);
+
     const fieldUpdates: Record<string, unknown> = {
-      thumbnail_url: thumbUrl,
-      medium_image_url: medUrl,
       ai_insights: aiResult,
       processing_status: 'complete',
     };
@@ -393,9 +440,9 @@ export async function processItemImage(itemId: string, storagePath: string): Pro
       .update(fieldUpdates)
       .eq('id', itemId);
 
-    console.log(`[processItemImage] DONE item=${itemId} total=${Date.now() - startMs}ms`);
+    console.log(`[analyzeItemImage] DONE item=${itemId} total=${Date.now() - startMs}ms`);
   } catch (err) {
-    console.error(`[processItemImage] FAILED item=${itemId} at +${Date.now() - startMs}ms:`, err);
+    console.error(`[analyzeItemImage] FAILED item=${itemId} at +${Date.now() - startMs}ms:`, err);
     await supabaseAdmin
       .from('inventory_items')
       .update({ processing_status: 'failed' })

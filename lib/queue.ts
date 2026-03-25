@@ -5,6 +5,7 @@ import { send } from '@vercel/queue';
 export const TOPICS = {
   STRIPE_WEBHOOK: 'stripe-webhook',
   PROCESS_IMAGE: 'process-image',
+  ANALYZE_IMAGE: 'analyze-image',
 } as const;
 
 /**

@@ -161,9 +161,10 @@ const statusColors: Record<string, string> = {
 function ItemThumbnail({ item }: { item: InventoryItem }) {
   const imageUrl = item.thumbnail_url || item.medium_image_url;
   const isProcessing = item.processing_status === "queued" || item.processing_status === "processing";
+  const isAnalyzing = item.processing_status === "analyzing";
   const isFailed = item.processing_status === "failed";
   const isComplete = item.processing_status === "complete" || item.processing_status === "none";
-  const shouldShowImage = isComplete && !!imageUrl && !isFailed;
+  const shouldShowImage = (isComplete || isAnalyzing) && !!imageUrl && !isFailed;
 
   return (
     <div className="flex items-center justify-center h-10 w-10 rounded-lg border border-stone-200 bg-stone-50 dark:border-zinc-700 dark:bg-zinc-800 flex-shrink-0">

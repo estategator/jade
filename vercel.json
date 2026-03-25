@@ -6,6 +6,12 @@
         { "type": "queue/v2beta", "topic": "process-image" }
       ]
     },
+    "app/api/queues/analyze-image/route.ts": {
+      "maxDuration": 60,
+      "experimentalTriggers": [
+        { "type": "queue/v2beta", "topic": "analyze-image" }
+      ]
+    },
     "app/api/queues/stripe-webhook/route.ts": {
       "experimentalTriggers": [
         { "type": "queue/v2beta", "topic": "stripe-webhook" }

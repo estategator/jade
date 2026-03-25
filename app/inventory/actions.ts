@@ -36,7 +36,7 @@ export type InventoryItem = {
   original_image_url: string | null;
   thumbnail_url: string | null;
   medium_image_url: string | null;
-  processing_status: 'none' | 'queued' | 'processing' | 'complete' | 'failed';
+  processing_status: 'none' | 'queued' | 'processing' | 'analyzing' | 'complete' | 'failed';
   ai_insights: AIAnalysisResult | null;
   project?: { id: string; name: string; org_id: string; organizations?: { name: string; stripe_onboarding_complete?: boolean } };
 };

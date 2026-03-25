@@ -139,11 +139,11 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
             </div>
           )}
 
-          {(item.processing_status === "queued" || item.processing_status === "processing") && (
+          {(item.processing_status === "queued" || item.processing_status === "processing" || item.processing_status === "analyzing") && (
             <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30">
               <PiSpinnerDuotone className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                {item.processing_status === "queued" ? "Queued…" : "Processing…"}
+                {item.processing_status === "queued" ? "Queued…" : item.processing_status === "analyzing" ? "Analyzing…" : "Processing…"}
               </p>
             </div>
           )}

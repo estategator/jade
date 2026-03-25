@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { SettingsProvider } from "@/app/components/settings-provider";
@@ -103,6 +104,7 @@ export default async function RootLayout({
           )}
         </SettingsProvider>
         <Toaster position="top-right" richColors closeButton />
+        <Analytics />
       </body>
     </html>
   );

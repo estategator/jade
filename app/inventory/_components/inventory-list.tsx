@@ -30,6 +30,7 @@ import {
   bulkDeleteInventoryItems,
   bulkUpdateInventoryStatus,
   type InventoryItem,
+  type InventoryPagination,
 } from "@/app/inventory/actions";
 import { QrCodeModal } from "@/app/inventory/_components/qr-code-modal";
 import { useCart } from "@/lib/cart-context";
@@ -366,10 +367,11 @@ function RowActions({
 
 type InventoryListProps = Readonly<{
   initialItems: InventoryItem[];
+  pagination: InventoryPagination;
   userId: string;
 }>;
 
-export function InventoryList({ initialItems, userId }: InventoryListProps) {
+export function InventoryList({ initialItems, pagination, userId }: InventoryListProps) {
   const router = useRouter();
   const cart = useCart();
   const [items, setItems] = useState(initialItems);
@@ -386,6 +388,19 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState<BulkAction | null>(null);
+
+  const currentPage = pagination.page;
+  const totalPages = pagination.totalPages;
+  const startItem = pagination.totalCount === 0 ? 0 : (currentPage - 1) * pagination.pageSize + 1;
+  const endItem = Math.min(currentPage * pagination.pageSize, pagination.totalCount);
+
+  function handlePageChange(nextPage: number) {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === currentPage) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set("page", String(nextPage));
+    params.set("pageSize", String(pagination.pageSize));
+    router.push(`/inventory?${params.toString()}`);
+  }
 
   useEffect(() => {
     setItems(initialItems);
@@ -550,8 +565,8 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
             Inventory
           </h1>
           <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">
-            Manage and track all your estate sale items — {items.length}{" "}
-            {items.length === 1 ? "item" : "items"} across all projects.
+            Manage and track all your estate sale items — {pagination.totalCount}{" "}
+            {pagination.totalCount === 1 ? "item" : "items"} across all projects.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -829,12 +844,13 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
           )}
         </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="overflow-hidden rounded-2xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-        >
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="overflow-hidden rounded-2xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+          >
           {/* Table header */}
           <div className="hidden border-b border-stone-200 px-4 py-3 lg:grid lg:grid-cols-[32px_1fr] lg:gap-4 lg:px-5 dark:border-zinc-800">
             <div className="flex items-center justify-center">
@@ -957,7 +973,35 @@ export function InventoryList({ initialItems, userId }: InventoryListProps) {
               </div>
             </div>
           ))}
-        </motion.div>
+          </motion.div>
+
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800 dark:bg-zinc-900">
+            <p className="text-sm text-stone-600 dark:text-zinc-400">
+              Showing {startItem}-{endItem} of {pagination.totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                Previous
+              </button>
+              <span className="text-sm font-medium text-stone-700 dark:text-zinc-300">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* QR Code Modal */}

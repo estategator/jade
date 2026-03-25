@@ -14,8 +14,8 @@ import {
   PiCheckDuotone,
   PiArrowsClockwiseDuotone,
 } from "react-icons/pi";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/cn";
+import { INVENTORY_CATEGORIES, INVENTORY_CONDITIONS } from "@/lib/inventory";
 import {
   createBulkInventoryItemsWithImages,
   analyzeItemAction,
@@ -23,16 +23,6 @@ import {
   type UserProject,
 } from "@/app/inventory/actions";
 import { PageHeader } from "@/app/components/page-header";
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-const categories = [
-  "Furniture", "Art", "Jewelry", "Electronics", "Antiques",
-  "Collectibles", "Clothing", "Books", "Kitchenware", "Tools", "Other",
-];
-const conditions = ["Excellent", "Good", "Fair", "Poor"];
 
 type BulkItem = {
   id: string;
@@ -46,6 +36,7 @@ type BulkItem = {
   price: string;
   analysisStatus: 'none' | 'queued' | 'analyzing' | 'complete' | 'failed';
   analysisError?: string;
+  aiInsights?: unknown;
 };
 
 function newEmptyItem(): BulkItem {
@@ -95,6 +86,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
           if (result.error || !result.data) {
             return {
               ...it,
+              aiInsights: null,
               analysisStatus: "failed",
               analysisError: result.error || "Analysis failed",
             };
@@ -108,16 +100,17 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
             category: it.category === "Other" && data.category ? data.category : it.category,
             condition: it.condition === "Good" && data.condition ? data.condition : it.condition,
             price: !it.price && data.price ? data.price.toString() : it.price,
+            aiInsights: data,
             analysisStatus: "complete",
           };
         })
       );
-    } catch (err) {
-      console.error("Analysis client error:", err);
+    } catch (analysisError) {
+      console.error("Analysis client error:", analysisError);
       setItems((prev) =>
         prev.map((it) =>
           it.id === id
-            ? { ...it, analysisStatus: "failed", analysisError: "Network or server error" }
+            ? { ...it, aiInsights: null, analysisStatus: "failed", analysisError: "Network or server error" }
             : it
         )
       );
@@ -144,34 +137,33 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
 
     setItems((prev) => [...prev, ...newItems]);
 
-    // Intelligent batching: 1 image → single action, 2+ → batch action
     if (imageFiles.length === 1) {
       const item = newItems[0];
       analyzeItem(item.id, imageFiles[0]);
-    } else {
-      // Chunk into batches of 5 so no single request is too large,
-      // and fire all batches concurrently.
-      const BATCH_SIZE = 5;
-      const chunks: { startIdx: number; files: File[]; items: BulkItem[] }[] = [];
-      for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
-        chunks.push({
-          startIdx: i,
-          files: imageFiles.slice(i, i + BATCH_SIZE),
-          items: newItems.slice(i, i + BATCH_SIZE),
-        });
-      }
+      return;
+    }
 
-      for (const chunk of chunks) {
-        const formData = new FormData();
-        formData.append("count", chunk.files.length.toString());
-        chunk.files.forEach((file, i) => formData.append(`image-${i}`, file));
+    const BATCH_SIZE = 15;
+    const chunks: { files: File[]; items: BulkItem[] }[] = [];
+    for (let index = 0; index < imageFiles.length; index += BATCH_SIZE) {
+      chunks.push({
+        files: imageFiles.slice(index, index + BATCH_SIZE),
+        items: newItems.slice(index, index + BATCH_SIZE),
+      });
+    }
 
-        batchAnalyzeItemsAction(formData).then((response) => {
+    for (const chunk of chunks) {
+      const formData = new FormData();
+      formData.append("count", chunk.files.length.toString());
+      chunk.files.forEach((file, index) => formData.append(`image-${index}`, file));
+
+      batchAnalyzeItemsAction(formData)
+        .then((response) => {
           if (response.error || !response.data) {
             setItems((prev) =>
               prev.map((it) =>
-                chunk.items.some((n) => n.id === it.id)
-                  ? { ...it, analysisStatus: "failed" as const, analysisError: response.error || "Batch analysis failed" }
+                chunk.items.some((candidate) => candidate.id === it.id)
+                  ? { ...it, aiInsights: null, analysisStatus: "failed" as const, analysisError: response.error || "Batch analysis failed" }
                   : it
               )
             );
@@ -180,12 +172,17 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
 
           setItems((prev) =>
             prev.map((it) => {
-              const itemIndex = chunk.items.findIndex((n) => n.id === it.id);
+              const itemIndex = chunk.items.findIndex((candidate) => candidate.id === it.id);
               if (itemIndex === -1) return it;
 
-              const analysisItem = response.data!.find((r) => r.index === itemIndex);
+              const analysisItem = response.data!.find((result) => result.index === itemIndex);
               if (!analysisItem || !analysisItem.result) {
-                return { ...it, analysisStatus: "failed" as const, analysisError: analysisItem?.error || "Analysis failed" };
+                return {
+                  ...it,
+                  aiInsights: null,
+                  analysisStatus: "failed" as const,
+                  analysisError: analysisItem?.error || "Analysis failed",
+                };
               }
 
               const data = analysisItem.result;
@@ -196,26 +193,27 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                 category: it.category === "Other" && data.category ? data.category : it.category,
                 condition: it.condition === "Good" && data.condition ? data.condition : it.condition,
                 price: !it.price && data.price ? data.price.toString() : it.price,
+                aiInsights: data,
                 analysisStatus: "complete" as const,
               };
             })
           );
-        }).catch((err) => {
-          console.error("Batch analysis error:", err);
+        })
+        .catch((analysisError) => {
+          console.error("Batch analysis error:", analysisError);
           setItems((prev) =>
             prev.map((it) =>
-              chunk.items.some((n) => n.id === it.id)
-                ? { ...it, analysisStatus: "failed" as const, analysisError: "Network or server error" }
+              chunk.items.some((candidate) => candidate.id === it.id)
+                ? { ...it, aiInsights: null, analysisStatus: "failed" as const, analysisError: "Network or server error" }
                 : it
             )
           );
         });
-      }
     }
   }
 
   function retryAnalysis(id: string) {
-    const item = items.find((it) => it.id === id);
+    const item = items.find((candidate) => candidate.id === id);
     if (item?.imageFile) {
       analyzeItem(id, item.imageFile);
     }
@@ -252,20 +250,32 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
     setItems((prev) => [...prev, newEmptyItem()]);
   }
 
-  const analysisInProgress = items.some(
-    (it) => it.analysisStatus === 'queued' || it.analysisStatus === 'analyzing'
+  const imageItems = items.filter((item) => item.imageFile);
+  const analysisCounts = imageItems.reduce(
+    (counts, item) => {
+      if (item.analysisStatus === "complete") counts.complete += 1;
+      if (item.analysisStatus === "failed") counts.failed += 1;
+      if (item.analysisStatus === "analyzing") counts.analyzing += 1;
+      if (item.analysisStatus === "queued") counts.queued += 1;
+      return counts;
+    },
+    { complete: 0, failed: 0, analyzing: 0, queued: 0 }
+  );
+  const analyzedImageCount = analysisCounts.complete + analysisCounts.failed;
+  const analysisProgressPercent = imageItems.length > 0
+    ? Math.round((analyzedImageCount / imageItems.length) * 100)
+    : 0;
+  const analysisInProgress = imageItems.some(
+    (item) => item.analysisStatus === "queued" || item.analysisStatus === "analyzing"
   );
 
   const canSubmit =
     items.length > 0 &&
     items.every(
       (it) =>
-        // Items with completed/failed analysis must have name+price filled.
-        // Items still analyzing are allowed through — the queue worker will hydrate.
-        (it.analysisStatus === 'queued' || it.analysisStatus === 'analyzing') ||
-        (it.name.trim() &&
-        !isNaN(parseFloat(it.price)) &&
-        parseFloat(it.price) >= 0)
+        it.analysisStatus !== 'queued' &&
+        it.analysisStatus !== 'analyzing' &&
+        (it.name.trim() && !isNaN(parseFloat(it.price)) && parseFloat(it.price) >= 0)
     );
 
   async function handleSubmit() {
@@ -285,6 +295,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
       category: it.category,
       price: parseFloat(it.price) || 0,
       condition: it.condition,
+      ai_insights: it.aiInsights ?? undefined,
       user_id: userId,
       project_id: projectId || undefined,
     }));
@@ -311,7 +322,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
     <main className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <PageHeader
         title="Bulk add items"
-        description="Drop multiple images to add many items at once. AI will analyze each image in the background."
+        description="Select images, wait for analysis to populate the form, then upload everything once it looks right."
         backLink={{ href: "/inventory", label: "Back to inventory" }}
       />
 
@@ -384,7 +395,10 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
               Drop images here or click to browse
             </p>
             <p className="mt-1 text-xs text-stone-500 dark:text-zinc-500">
-              JPG, PNG, WebP &middot; Up to 10 MB each &middot; optimized automatically
+              Add as many JPG, PNG, or WebP images as you need &middot; 10 MB max each
+            </p>
+            <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400">
+              Analysis starts after selection. You can upload only after every image has finished populating.
             </p>
           </div>
           <input
@@ -403,18 +417,38 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-6 flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+          className="mt-6 rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
         >
-          <p className="text-sm text-stone-600 dark:text-zinc-400">
-            {items.length} {items.length === 1 ? "item" : "items"}
-          </p>
-          <button
-            type="button"
-            onClick={addEmptyItem}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
-          >
-            + Add manually
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-stone-600 dark:text-zinc-400">
+                {items.length} {items.length === 1 ? "item" : "items"}
+                {imageItems.length > 0 && ` · ${imageItems.length} ${imageItems.length === 1 ? "image" : "images"} in analysis queue`}
+              </p>
+              {imageItems.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500 dark:text-zinc-500">
+                    <span>{analyzedImageCount} / {imageItems.length} analyzed</span>
+                    {analysisCounts.analyzing > 0 && <span>{analysisCounts.analyzing} analyzing</span>}
+                    {analysisCounts.failed > 0 && <span>{analysisCounts.failed} need attention</span>}
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-zinc-800">
+                    <div
+                      className="h-full rounded-full bg-indigo-500 transition-[width] duration-300"
+                      style={{ width: `${analysisProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={addEmptyItem}
+              className="shrink-0 text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+            >
+              + Add manually
+            </button>
+          </div>
         </motion.div>
       )}
 
@@ -533,7 +567,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                         onChange={(e) => updateItem(item.id, "category", e.target.value)}
                         className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-indigo-500 dark:focus:bg-zinc-800"
                       >
-                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                        {INVENTORY_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
 
@@ -544,7 +578,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                         onChange={(e) => updateItem(item.id, "condition", e.target.value)}
                         className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:border-indigo-500 dark:focus:bg-zinc-800"
                       >
-                        {conditions.map((c) => <option key={c} value={c}>{c}</option>)}
+                        {INVENTORY_CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
 
@@ -591,9 +625,9 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
             {submitting ? (
               <><PiSpinnerDuotone className="h-4 w-4 animate-spin" /> Adding…</>
             ) : analysisInProgress ? (
-              <><PiSpinnerDuotone className="h-4 w-4 animate-spin" /> Add {items.length} {items.length === 1 ? "item" : "items"} (analysis running…)</>
+              <><PiSpinnerDuotone className="h-4 w-4 animate-spin" /> Analyzing {analyzedImageCount} of {imageItems.length} images…</>
             ) : (
-              <><PiCheckDuotone className="h-4 w-4" /> Add {items.length} {items.length === 1 ? "item" : "items"}</>
+              <><PiCheckDuotone className="h-4 w-4" /> Upload {items.length} {items.length === 1 ? "item" : "items"}</>
             )}
           </button>
         </motion.div>

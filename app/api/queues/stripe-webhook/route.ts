@@ -5,6 +5,8 @@ import { tierFromStripePriceId } from '@/lib/tiers';
 import { handleCallback } from '@vercel/queue';
 import { createSaleNotifications } from '@/app/notifications/actions';
 import { restoreCheckoutSession, restoreSingleItem } from '@/app/api/checkout/cancel/route';
+import { enqueue, TOPICS } from '@/lib/queue';
+import { type InvoiceGenerationPayload } from '@/app/api/queues/invoice-generation/route';
 
 export type WebhookPayload = {
   eventType: string;
@@ -92,7 +94,7 @@ async function syncSubscriptionToOrg(sub: Stripe.Subscription, opts?: { clear?: 
   else console.log('[stripe-webhook-queue] sync_subscription SUCCESS for org:', orgId, 'tier:', tier);
 }
 
-// ── Invoice generation helper (inline — no cross-module imports) ─
+// ── Invoice line type (shared with invoice-generation queue) ─
 
 type InvoiceLineInput = {
   inventory_item_id: string;
@@ -103,105 +105,27 @@ type InvoiceLineInput = {
   unit_price: number;
 };
 
-function generateInvoiceNumber(): string {
-  const now = new Date();
-  const d = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  const r = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `INV-${d}-${r}`;
-}
-
-async function createCheckoutInvoiceInline(opts: {
-  orgId: string;
-  projectId: string | null;
-  stripeCheckoutSessionId: string;
-  buyerEmail: string | null;
-  currency: string;
-  createdBy: string;
-  lines: InvoiceLineInput[];
-}): Promise<{ invoice_number: string } | null> {
-  const { orgId, projectId, stripeCheckoutSessionId, buyerEmail, currency, createdBy, lines } = opts;
-
-  try {
-    // Idempotency: check if invoice already exists
-    const { data: existing } = await supabaseAdmin
-      .from('invoices')
-      .select('invoice_number')
-      .eq('stripe_checkout_session_id', stripeCheckoutSessionId)
-      .maybeSingle();
-
-    if (existing) {
-      console.log('[invoice] Already exists:', existing.invoice_number);
-      return existing;
-    }
-
-    const invoiceLines = lines.map((l) => ({
-      ...l,
-      line_total: l.unit_price * l.quantity,
-      sold_at: new Date().toISOString(),
-    }));
-    const subtotal = invoiceLines.reduce((sum, l) => sum + l.line_total, 0);
-    const today = new Date().toISOString().slice(0, 10);
-    const invoiceNumber = generateInvoiceNumber();
-
-    console.log('[invoice] Creating:', invoiceNumber, 'session:', stripeCheckoutSessionId, 'org:', orgId, 'lines:', lines.length);
-
-    const { data: invoice, error: invErr } = await supabaseAdmin
-      .from('invoices')
-      .insert({
-        org_id: orgId,
-        project_id: projectId,
-        invoice_number: invoiceNumber,
-        status: 'finalized',
-        source: 'checkout',
-        stripe_checkout_session_id: stripeCheckoutSessionId,
-        period_start: today,
-        period_end: today,
-        subtotal,
-        tax_amount: 0,
-        total: subtotal,
-        line_count: lines.length,
-        notes: buyerEmail ? `Auto-generated from checkout. Buyer: ${buyerEmail}` : 'Auto-generated from checkout.',
-        filters_used: { org_id: orgId, source: 'checkout', stripe_checkout_session_id: stripeCheckoutSessionId, buyer_email: buyerEmail, currency },
-        created_by: createdBy,
-      })
-      .select('id, invoice_number')
-      .single();
-
-    if (invErr || !invoice) {
-      if (invErr?.code === '23505') {
-        console.log('[invoice] Duplicate caught, fetching existing');
-        const { data: dup } = await supabaseAdmin.from('invoices').select('invoice_number').eq('stripe_checkout_session_id', stripeCheckoutSessionId).maybeSingle();
-        return dup ?? null;
+/**
+ * Enqueue an invoice generation job.
+ *
+ * The actual creation is handled by the invoice-generation queue
+ * processor, which calls `createCheckoutInvoice` from `lib/checkout-invoice.ts`.
+ * Local dev falls back to inline processing via the shared `enqueue` helper.
+ */
+async function enqueueInvoiceGeneration(payload: InvoiceGenerationPayload): Promise<void> {
+  await enqueue(
+    TOPICS.INVOICE_GENERATION,
+    payload,
+    async (data) => {
+      // Inline fallback for local dev / queue send failures
+      const { createCheckoutInvoice } = await import('@/lib/checkout-invoice');
+      const result = await createCheckoutInvoice(data);
+      if (result.error) {
+        throw new Error(`Invoice generation failed: ${result.error}`);
       }
-      console.error('[invoice] INSERT FAILED:', invErr?.message, invErr?.code, invErr?.details, invErr?.hint);
-      return null;
-    }
-
-    const lineRows = invoiceLines.map((l) => ({
-      invoice_id: invoice.id,
-      inventory_item_id: l.inventory_item_id,
-      item_name: l.item_name,
-      item_category: l.item_category,
-      item_description: l.item_description,
-      quantity: l.quantity,
-      unit_price: l.unit_price,
-      line_total: l.line_total,
-      sold_at: l.sold_at,
-    }));
-
-    const { error: linesErr } = await supabaseAdmin.from('invoice_lines').insert(lineRows);
-    if (linesErr) {
-      console.error('[invoice] Lines INSERT FAILED:', linesErr.message, linesErr.code);
-      await supabaseAdmin.from('invoices').delete().eq('id', invoice.id);
-      return null;
-    }
-
-    console.log('[invoice] SUCCESS:', invoice.invoice_number);
-    return { invoice_number: invoice.invoice_number };
-  } catch (err) {
-    console.error('[invoice] UNEXPECTED ERROR:', err);
-    return null;
-  }
+      console.log('[invoice-generation] inline fallback SUCCESS:', result.data?.invoice_number);
+    },
+  );
 }
 
 // ── Event processing ────────────────────────────────────────
@@ -349,7 +273,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
 
           console.log(`[stripe-webhook-queue] Multi-item checkout completed: ${sessionItems.length} items, ${totalNotified} notifications sent`);
 
-          // Generate invoice for the completed checkout
+          // Enqueue invoice generation for the completed checkout
           if (firstOrgId && invoiceLines.length > 0) {
             // Resolve a valid user UUID for created_by
             const { data: csRow } = await supabaseAdmin
@@ -369,7 +293,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             }
 
             if (invoiceCreatedBy) {
-              const invoiceResult = await createCheckoutInvoiceInline({
+              await enqueueInvoiceGeneration({
                 orgId: firstOrgId,
                 projectId: firstProjectId,
                 stripeCheckoutSessionId: session.id,
@@ -378,12 +302,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
                 createdBy: invoiceCreatedBy,
                 lines: invoiceLines,
               });
-
-              if (invoiceResult) {
-                console.log('[stripe-webhook-queue] Invoice created:', invoiceResult.invoice_number);
-              } else {
-                console.error('[stripe-webhook-queue] Invoice creation failed');
-              }
+              console.log('[stripe-webhook-queue] Invoice generation enqueued for session:', session.id);
             } else {
               console.error('[stripe-webhook-queue] Skipping invoice: no valid user for created_by');
             }
@@ -467,7 +386,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             });
           }
 
-          // Generate invoice for single-item checkout
+          // Enqueue invoice generation for single-item checkout
           if (project?.org_id) {
             const { data: orgRow } = await supabaseAdmin
               .from('organizations')
@@ -476,7 +395,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
               .single();
 
             if (orgRow?.created_by) {
-              const invoiceResult = await createCheckoutInvoiceInline({
+              await enqueueInvoiceGeneration({
                 orgId: project.org_id,
                 projectId: item.project_id,
                 stripeCheckoutSessionId: session.id,
@@ -492,12 +411,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
                   unit_price: Number(item.price),
                 }],
               });
-
-              if (invoiceResult) {
-                console.log('[stripe-webhook-queue] Single-item invoice created:', invoiceResult.invoice_number);
-              } else {
-                console.error('[stripe-webhook-queue] Single-item invoice failed');
-              }
+              console.log('[stripe-webhook-queue] Single-item invoice generation enqueued for session:', session.id);
             } else {
               console.error('[stripe-webhook-queue] Skipping single-item invoice: no valid user for created_by');
             }

@@ -1,6 +1,13 @@
 import 'server-only';
 import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import {
+  INVENTORY_CATEGORIES,
+  INVENTORY_CONDITIONS,
+  isInventoryCategory,
+  isInventoryCondition,
+  type AIAnalysisResult,
+} from '@/lib/inventory';
 import { openai, ANALYSIS_MODEL } from '@/lib/openai';
 import { enqueue, TOPICS } from '@/lib/queue';
 import { generateObject } from 'ai';
@@ -24,14 +31,6 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   throw new Error('withRetry: unreachable');
 }
 
-export type AIAnalysisResult = {
-  name: string;
-  description: string;
-  category: string;
-  condition: string;
-  price: number;
-};
-
 export type PricePerCondition = {
   excellent: number;
   good: number;
@@ -46,15 +45,6 @@ export type PricingAnalysisResult = {
   pricePerCondition: PricePerCondition;
 };
 
-// Re-exported from app/inventory/actions.ts for client use.
-// Keep both definitions in sync.
-
-const VALID_CATEGORIES = [
-  'Furniture', 'Art', 'Jewelry', 'Electronics', 'Antiques',
-  'Collectibles', 'Clothing', 'Books', 'Kitchenware', 'Tools', 'Other',
-];
-const VALID_CONDITIONS = ['Excellent', 'Good', 'Fair', 'Poor'];
-
 /** Map free-text condition notes (from the prompt) to the closest valid condition value. */
 function inferCondition(raw: unknown): string {
   if (typeof raw !== 'string' || !raw) return 'Good';
@@ -63,7 +53,7 @@ function inferCondition(raw: unknown): string {
   if (lower.includes('poor') || lower.includes('damaged') || lower.includes('broken')) return 'Poor';
   if (lower.includes('fair') || lower.includes('worn') || lower.includes('used')) return 'Fair';
   // Check if the value is already one of the valid conditions (case-insensitive)
-  const matched = VALID_CONDITIONS.find((c) => c.toLowerCase() === lower.trim());
+  const matched = INVENTORY_CONDITIONS.find((condition) => condition.toLowerCase() === lower.trim());
   return matched ?? 'Good';
 }
 
@@ -75,8 +65,8 @@ const MOCK_NAMES = [
 
 function generateMockAnalysis(): AIAnalysisResult {
   const name = MOCK_NAMES[Math.floor(Math.random() * MOCK_NAMES.length)];
-  const category = VALID_CATEGORIES[Math.floor(Math.random() * (VALID_CATEGORIES.length - 1))];
-  const condition = VALID_CONDITIONS[Math.floor(Math.random() * VALID_CONDITIONS.length)];
+  const category = INVENTORY_CATEGORIES[Math.floor(Math.random() * (INVENTORY_CATEGORIES.length - 1))];
+  const condition = INVENTORY_CONDITIONS[Math.floor(Math.random() * INVENTORY_CONDITIONS.length)];
   const price = Math.round((Math.random() * 500 + 5) * 100) / 100;
   return {
     name,
@@ -89,7 +79,7 @@ function generateMockAnalysis(): AIAnalysisResult {
 
 function generateMockPricingAnalysis(): PricingAnalysisResult {
   const name = MOCK_NAMES[Math.floor(Math.random() * MOCK_NAMES.length)];
-  const category = VALID_CATEGORIES[Math.floor(Math.random() * (VALID_CATEGORIES.length - 1))];
+  const category = INVENTORY_CATEGORIES[Math.floor(Math.random() * (INVENTORY_CATEGORIES.length - 1))];
   const basePrice = Math.round((Math.random() * 500 + 20) * 100) / 100;
 
   return {
@@ -192,8 +182,8 @@ export async function analyzeImage(base64Image: string): Promise<AIAnalysisResul
       price: pricing.suggested_day_1_estate_price ?? pricing.fair_market_value_retail ?? 0,
     };
 
-    if (!VALID_CATEGORIES.includes(parsed.category)) parsed.category = 'Other';
-    if (!VALID_CONDITIONS.includes(parsed.condition)) parsed.condition = 'Good';
+    if (!isInventoryCategory(parsed.category)) parsed.category = 'Other';
+    if (!isInventoryCondition(parsed.condition)) parsed.condition = 'Good';
     if (typeof parsed.price !== 'number' || parsed.price < 0) parsed.price = 0;
 
     console.log('[analyzeImage] final result:', JSON.stringify(parsed));
@@ -295,7 +285,11 @@ export async function normalizeSourceImage(buffer: Buffer): Promise<Buffer> {
   return pipeline.webp({ quality: SOURCE_QUALITY }).toBuffer();
 }
 
-export async function processItemImage(itemId: string, storagePath: string): Promise<void> {
+export async function processItemImage(
+  itemId: string,
+  storagePath: string,
+  options?: { skipAnalysis?: boolean },
+): Promise<void> {
   const startMs = Date.now();
   console.log(`[processItemImage] START item=${itemId} at ${new Date().toISOString()}`);
   try {
@@ -336,18 +330,29 @@ export async function processItemImage(itemId: string, storagePath: string): Pro
     const thumbUrl = supabaseAdmin.storage.from('inventory-images').getPublicUrl(thumbPath).data.publicUrl;
     const medUrl = supabaseAdmin.storage.from('inventory-images').getPublicUrl(medPath).data.publicUrl;
 
-    // Persist derived image URLs and transition to 'analyzing' so thumbnails
-    // are visible in the UI while AI analysis runs in a separate worker.
+    const nextStatus = options?.skipAnalysis ? 'complete' : 'analyzing';
+
+    // Persist derived image URLs and transition to the next processing stage.
     await supabaseAdmin
       .from('inventory_items')
       .update({
         thumbnail_url: thumbUrl,
         medium_image_url: medUrl,
-        processing_status: 'analyzing',
+        processing_status: nextStatus,
       })
       .eq('id', itemId);
 
-    console.log(`[processItemImage] derivatives done item=${itemId} at +${Date.now() - startMs}ms, enqueueing analysis`);
+    if (options?.skipAnalysis) {
+      console.log(`[processItemImage] derivatives done item=${itemId} at +${Date.now() - startMs}ms, analysis skipped`);
+    } else {
+      console.log(`[processItemImage] derivatives done item=${itemId} at +${Date.now() - startMs}ms, enqueueing analysis`);
+
+      await enqueue(
+        TOPICS.ANALYZE_IMAGE,
+        { itemId },
+        async (data) => analyzeItemImage(data.itemId),
+      );
+    }
 
     console.log(`[processItemImage] DONE item=${itemId} total=${Date.now() - startMs}ms`);
   } catch (err) {

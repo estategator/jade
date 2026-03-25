@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
   const { data: item, error } = await supabaseAdmin
     .from('inventory_items')
-    .select('original_image_url')
+    .select('original_image_url, ai_insights')
     .eq('id', itemId)
     .single();
 
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   }
 
   const storagePath = decodeURIComponent(pathMatch[1]);
-  await processItemImage(itemId, storagePath);
+  await processItemImage(itemId, storagePath, { skipAnalysis: !!item.ai_insights });
 
   return NextResponse.json({ success: true });
 }

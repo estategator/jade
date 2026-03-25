@@ -7,19 +7,19 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { PiSpinnerDuotone, PiUploadDuotone, PiXDuotone, PiSparkleDuotone, PiCheckDuotone, PiArrowClockwiseDuotone } from "react-icons/pi";
 import { cn } from "@/lib/cn";
+import {
+  INVENTORY_CATEGORIES,
+  INVENTORY_CONDITIONS,
+  isInventoryCategory,
+  isInventoryCondition,
+  type AIAnalysisResult,
+} from "@/lib/inventory";
 import { PageHeader } from "@/app/components/page-header";
 import {
   createInventoryItem,
   analyzeItemAction,
   type UserProject,
-  type AIAnalysisResult,
 } from "@/app/inventory/actions";
-
-const categories = [
-  "Furniture", "Art", "Jewelry", "Electronics", "Antiques",
-  "Collectibles", "Clothing", "Books", "Kitchenware", "Tools", "Other",
-];
-const conditions = ["Excellent", "Good", "Fair", "Poor"];
 
 const FIELD_DEFAULTS = {
   name: "",
@@ -85,11 +85,11 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
       console.log("[AddItemForm]  → setDescription:", data.description.slice(0, 60));
       setDescription(data.description);
     }
-    if (data.category && categories.includes(data.category) && (!onlyClean || !dirty.has("category"))) {
+    if (data.category && isInventoryCategory(data.category) && (!onlyClean || !dirty.has("category"))) {
       console.log("[AddItemForm]  → setCategory:", data.category);
       setCategory(data.category);
     }
-    if (data.condition && conditions.includes(data.condition) && (!onlyClean || !dirty.has("condition"))) {
+    if (data.condition && isInventoryCondition(data.condition) && (!onlyClean || !dirty.has("condition"))) {
       console.log("[AddItemForm]  → setCondition:", data.condition);
       setCondition(data.condition);
     }
@@ -202,6 +202,9 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
     formData.append("quantity", quantity);
     formData.append("user_id", userId);
     formData.append("project_id", projectId);
+    if (insights) {
+      formData.append("ai_insights", JSON.stringify(insights));
+    }
     if (imageFile) {
       formData.append("image", imageFile);
     }
@@ -429,13 +432,13 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
             <div>
               <label htmlFor="category" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">Category</label>
               <select id="category" name="category" disabled={isBusy} value={category} onChange={(e) => { setCategory(e.target.value); markDirty("category"); }} className={selectClass}>
-                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                {INVENTORY_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
               <label htmlFor="condition" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">Condition</label>
               <select id="condition" name="condition" disabled={isBusy} value={condition} onChange={(e) => { setCondition(e.target.value); markDirty("condition"); }} className={selectClass}>
-                {conditions.map((c) => <option key={c} value={c}>{c}</option>)}
+                {INVENTORY_CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>

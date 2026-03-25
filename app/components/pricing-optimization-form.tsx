@@ -2,15 +2,23 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Loader2, Check, X, ImageOff, ZoomIn, Rows3, LayoutGrid, Package, Trash2 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import {
+  PiUploadDuotone,
+  PiSpinnerDuotone,
+  PiCheckDuotone,
+  PiXDuotone,
+  PiImageBrokenDuotone,
+  PiMagnifyingGlassPlusDuotone,
+  PiRowsDuotone,
+  PiGridFourDuotone,
+  PiPackageDuotone,
+  PiTrashDuotone,
+  PiCheckCircleDuotone,
+  PiCameraDuotone,
+} from 'react-icons/pi';
+import { cn } from '@/lib/cn';
 import { processPricingBatch, addPricingResultToInventory, type PricingBatchResult } from '@/app/pricing-optimization/actions';
 import { type UserProject } from '@/app/inventory/actions';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 type PricingOptimizationFormProps = Readonly<{
   projects: UserProject[];
@@ -89,6 +97,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
   const [viewDensity, setViewDensityState] = useState<ViewDensity>('comfortable');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const isCompact = viewDensity === 'compact';
 
   useEffect(() => {
@@ -149,6 +158,11 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
     }
   }
 
+  function showSuccess(msg: string) {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(''), 3000);
+  }
+
   async function handleAddToInventory(index: number) {
     const item = results[index];
     if (!item?.selectedCondition) return;
@@ -173,6 +187,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
         prev.map((r, i) => (i === index ? { ...r, adding: false, error: result.error } : r))
       );
     } else {
+      showSuccess(`"${item.name}" added to inventory`);
       setResults((prev) => prev.filter((_, i) => i !== index));
       setSelected((prev) => {
         const next = new Set<number>();
@@ -224,6 +239,9 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
       setResults((prev) => prev.filter((_, i) => !succeeded.has(i)));
     }
 
+    if (succeeded.size > 0) {
+      showSuccess(`${succeeded.size} item${succeeded.size > 1 ? 's' : ''} added to inventory`);
+    }
     setSelected(new Set());
     setBulkAdding(false);
   }
@@ -280,19 +298,39 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
         </div>
       )}
 
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="fixed top-20 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-medium shadow-lg"
+          >
+            <PiCheckCircleDuotone className="h-5 w-5" />
+            {successMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Upload Area */}
       {results.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-8 sm:p-12 rounded-2xl border-2 border-dashed border-stone-200 dark:border-zinc-700 hover:border-indigo-400 dark:hover:border-indigo-600 transition-colors cursor-pointer bg-stone-50 dark:bg-zinc-900/30"
+          className={cn(
+            'p-8 sm:p-12 rounded-2xl border-2 border-dashed transition-all cursor-pointer',
+            dragging
+              ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/10 scale-[1.01]'
+              : 'border-stone-200 dark:border-zinc-700 hover:border-indigo-400 dark:hover:border-indigo-600 bg-stone-50 dark:bg-zinc-900/30'
+          )}
           onDragOver={(e) => {
             e.preventDefault();
             setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => !loading && fileInputRef.current?.click()}
         >
           <input
             ref={fileInputRef}
@@ -305,18 +343,48 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
           />
 
           <div className="text-center">
-            <Upload className="mx-auto h-12 w-12 text-stone-400 dark:text-zinc-500 mb-4" />
-            <h3 className="text-lg font-semibold text-stone-900 dark:text-white mb-2">
-              {dragging ? 'Drop images here' : 'Upload item images'}
-            </h3>
-            <p className="text-sm text-stone-600 dark:text-zinc-400 mb-4">
-              Drag & drop up to 10 images, or click to browse. Max 10MB each.
-            </p>
-            {loading && (
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-400" />
-                <span className="text-sm text-indigo-600 dark:text-indigo-400">Analyzing images...</span>
-              </div>
+            {loading ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="space-y-5"
+              >
+                <PiCameraDuotone className="mx-auto h-12 w-12 text-indigo-500 dark:text-indigo-400" />
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-stone-900 dark:text-white">
+                    Analyzing your items…
+                  </h3>
+                  <p className="text-sm text-stone-500 dark:text-zinc-400">
+                    AI is identifying items and generating pricing recommendations
+                  </p>
+                </div>
+                <div className="mx-auto max-w-xs">
+                  <div className="h-1.5 rounded-full bg-stone-200 dark:bg-zinc-700 overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-indigo-500"
+                      initial={{ width: '5%' }}
+                      animate={{ width: '85%' }}
+                      transition={{ duration: 8, ease: 'easeOut' }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <>
+                <PiUploadDuotone className={cn(
+                  'mx-auto h-12 w-12 mb-4 transition-colors',
+                  dragging ? 'text-indigo-500 dark:text-indigo-400' : 'text-stone-400 dark:text-zinc-500'
+                )} />
+                <h3 className="text-lg font-semibold text-stone-900 dark:text-white mb-2">
+                  {dragging ? 'Drop images here' : 'Upload item images'}
+                </h3>
+                <p className="text-sm text-stone-600 dark:text-zinc-400 mb-1">
+                  Drag & drop up to 10 images, or click to browse
+                </p>
+                <p className="text-xs text-stone-400 dark:text-zinc-500">
+                  JPG, PNG, WebP — max 10 MB each
+                </p>
+              </>
             )}
           </div>
         </motion.div>
@@ -351,7 +419,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
                   className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-lg text-stone-600 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 transition-colors"
                 >
                   {selected.size === results.length && results.length > 0 ? (
-                    <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <PiCheckDuotone className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                   ) : (
                     <div className="h-3.5 w-3.5 rounded border border-stone-300 dark:border-zinc-600" />
                   )}
@@ -371,7 +439,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
                     )}
                     aria-label="Comfortable view"
                   >
-                    <LayoutGrid className="h-4 w-4" />
+                    <PiGridFourDuotone className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setViewDensity('compact')}
@@ -383,7 +451,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
                     )}
                     aria-label="Compact view"
                   >
-                    <Rows3 className="h-4 w-4" />
+                    <PiRowsDuotone className="h-4 w-4" />
                   </button>
                 </div>
                 <button
@@ -416,9 +484,9 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
                       )}
                     >
                       {bulkAdding ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <PiSpinnerDuotone className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Package className="h-4 w-4" />
+                        <PiPackageDuotone className="h-4 w-4" />
                       )}
                       Add {selected.size} to Inventory
                     </button>
@@ -432,7 +500,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
                           : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
                       )}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <PiTrashDuotone className="h-4 w-4" />
                       Remove {selected.size}
                     </button>
                     <button
@@ -512,7 +580,7 @@ function ImagePreviewModal({ src, name, onClose }: { src: string; name: string; 
           className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
           aria-label="Close preview"
         >
-          <X className="h-5 w-5" />
+          <PiXDuotone className="h-5 w-5" />
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -668,7 +736,7 @@ function PricingResultCard({
               aria-label={isSelected ? 'Deselect item' : 'Select item'}
             >
               {isSelected ? (
-                <Check className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                <PiCheckDuotone className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
               ) : (
                 <div className="h-3.5 w-3.5 rounded-sm border border-stone-300 dark:border-zinc-600" />
               )}
@@ -690,7 +758,7 @@ function PricingResultCard({
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                  <ZoomIn
+                  <PiMagnifyingGlassPlusDuotone
                     className={cn(
                       'text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg',
                       compact ? 'h-5 w-5' : 'h-7 w-7'
@@ -705,7 +773,7 @@ function PricingResultCard({
                   compact ? 'h-32 sm:h-full' : 'h-48 sm:h-full'
                 )}
               >
-                <ImageOff
+                <PiImageBrokenDuotone
                   className={cn(
                     'text-stone-300 dark:text-zinc-600',
                     compact ? 'h-8 w-8' : 'h-10 w-10'
@@ -755,29 +823,28 @@ function PricingResultCard({
               compact={compact}
             />
 
-            {/* Quick condition chips - comfortable only */}
-            {!compact && (
-              <div className="flex flex-wrap gap-2">
-                {conditionStops.map((condition) => {
-                  const config = conditionConfig[condition];
-                  const isActive = item.selectedCondition === condition;
-                  return (
-                    <button
-                      key={condition}
-                      onClick={() => onSelectCondition(condition)}
-                      className={cn(
-                        'px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
-                        isActive
-                          ? cn(config.bgLight, config.bgDark, config.textLight, config.textDark)
-                          : 'bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 hover:bg-stone-200 dark:hover:bg-zinc-700'
-                      )}
-                    >
-                      {config.label} &middot; ${item.pricePerCondition[condition].toFixed(0)}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {/* Condition chips with price summary */}
+            <div className={cn('flex flex-wrap gap-2', compact && 'gap-1.5')}>
+              {conditionStops.map((condition) => {
+                const config = conditionConfig[condition];
+                const isActive = item.selectedCondition === condition;
+                return (
+                  <button
+                    key={condition}
+                    onClick={() => onSelectCondition(condition)}
+                    className={cn(
+                      'rounded-lg font-medium transition-all',
+                      compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs',
+                      isActive
+                        ? cn(config.bgLight, config.bgDark, config.textLight, config.textDark, 'ring-1', config.borderLight, config.borderDark)
+                        : 'bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 hover:bg-stone-200 dark:hover:bg-zinc-700'
+                    )}
+                  >
+                    {config.label} · ${item.pricePerCondition[condition].toFixed(0)}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Per-item error */}
             {item.error && (
@@ -798,8 +865,8 @@ function PricingResultCard({
             >
               {item.adding ? (
                 <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Adding...
+                  <PiSpinnerDuotone className="h-4 w-4 animate-spin" />
+                  Adding…
                 </span>
               ) : (
                 'Add to Inventory'

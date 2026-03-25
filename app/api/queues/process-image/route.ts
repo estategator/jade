@@ -5,13 +5,14 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 type ProcessImagePayload = {
   itemId: string;
   storagePath: string;
+  skipAnalysis?: boolean;
 };
 
 async function handleProcessImage(
   payload: ProcessImagePayload,
   _metadata: { messageId: string },
 ): Promise<void> {
-  const { itemId, storagePath } = payload;
+  const { itemId, storagePath, skipAnalysis } = payload;
 
   if (!itemId || !storagePath) {
     console.error('[process-image] Missing itemId or storagePath in payload');
@@ -30,7 +31,7 @@ async function handleProcessImage(
     return;
   }
 
-  await processItemImage(itemId, storagePath);
+  await processItemImage(itemId, storagePath, { skipAnalysis });
 }
 
 export const POST = handleCallback(handleProcessImage, {

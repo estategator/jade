@@ -6,20 +6,20 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { PiSpinnerDuotone, PiSparkleDuotone, PiArrowsClockwiseDuotone, PiArrowClockwiseDuotone, PiImageDuotone } from "react-icons/pi";
+import {
+  INVENTORY_CATEGORIES,
+  INVENTORY_CONDITIONS,
+  isInventoryCategory,
+  isInventoryCondition,
+  type AIAnalysisResult,
+} from "@/lib/inventory";
 import { PageHeader } from "@/app/components/page-header";
 import {
   updateInventoryItem,
   retryImageProcessing,
   type InventoryItem,
   type UserProject,
-  type AIAnalysisResult,
 } from "@/app/inventory/actions";
-
-const categories = [
-  "Furniture", "Art", "Jewelry", "Electronics", "Antiques",
-  "Collectibles", "Clothing", "Books", "Kitchenware", "Tools", "Other",
-];
-const conditions = ["Excellent", "Good", "Fair", "Poor"];
 const statuses = ["available", "reserved", "sold"] as const;
 
 const inputClass =
@@ -56,8 +56,8 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
     if (!insights) return;
     if (insights.name) setName(insights.name);
     if (insights.description) setDescription(insights.description);
-    if (insights.category && categories.includes(insights.category)) setCategory(insights.category);
-    if (insights.condition && conditions.includes(insights.condition)) setCondition(insights.condition);
+    if (insights.category && isInventoryCategory(insights.category)) setCategory(insights.category);
+    if (insights.condition && isInventoryCondition(insights.condition)) setCondition(insights.condition);
     if (insights.price != null) setPrice(String(insights.price));
     setAiApplied(true);
   }
@@ -252,13 +252,13 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
             <div>
               <label htmlFor="category" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">Category</label>
               <select id="category" name="category" value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
-                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                {INVENTORY_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
               <label htmlFor="condition" className="mb-1.5 block text-sm font-medium text-stone-900 dark:text-white">Condition</label>
               <select id="condition" name="condition" value={condition} onChange={(e) => setCondition(e.target.value)} className={selectClass}>
-                {conditions.map((c) => <option key={c} value={c}>{c}</option>)}
+                {INVENTORY_CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>

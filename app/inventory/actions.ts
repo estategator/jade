@@ -3,22 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { processItemImage, analyzeUploadedSimpleImage, normalizeSourceImage } from '@/lib/image-processing';
-import { requireOrgMembership, requirePermission, auditLog } from '@/lib/rbac';
+import type { AIAnalysisResult, InventoryProcessingStatus } from '@/lib/inventory';
+import { requirePermission } from '@/lib/rbac';
 import { enqueue, TOPICS } from '@/lib/queue';
 
-export type AIAnalysisResult = {
-  name: string;
-  description: string;
-  category: string;
-  condition: string;
-  price: number;
-  pricePerCondition?: {
-    excellent: number;
-    good: number;
-    fair: number;
-    poor: number;
-  };
-};
+export type { AIAnalysisResult } from '@/lib/inventory';
 
 export type InventoryItem = {
   id: string;
@@ -36,7 +25,7 @@ export type InventoryItem = {
   original_image_url: string | null;
   thumbnail_url: string | null;
   medium_image_url: string | null;
-  processing_status: 'none' | 'queued' | 'processing' | 'analyzing' | 'complete' | 'failed';
+  processing_status: InventoryProcessingStatus;
   ai_insights: AIAnalysisResult | null;
   project?: { id: string; name: string; org_id: string; organizations?: { name: string; stripe_onboarding_complete?: boolean } };
 };
@@ -88,6 +77,18 @@ export type UserProject = {
   name: string;
   org_id: string;
   org_name: string;
+};
+
+export type InventoryPagination = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
+export type PaginatedInventoryResult = {
+  data: InventoryItem[];
+  pagination: InventoryPagination;
 };
 
 const INVENTORY_REVALIDATE_PATHS = ['/inventory', '/inventory/add', '/inventory/bulk'] as const;
@@ -155,19 +156,49 @@ export async function getUserProjects(userId: string, orgId?: string | null) {
   }
 }
 
-export async function getInventoryItems(userId: string, orgId?: string | null) {
+export async function getInventoryItems(
+  userId: string,
+  orgId?: string | null,
+  page: number = 1,
+  pageSize: number = 20,
+) {
   try {
+    const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+    const safePageSize = Number.isFinite(pageSize)
+      ? Math.max(1, Math.min(100, Math.floor(pageSize)))
+      : 20;
+
     const orgIdsResult = await getAccessibleOrgIds(userId);
     if (orgIdsResult.error) {
       return { error: 'Failed to load inventory.' };
     }
 
     const orgIds = orgIdsResult.data ?? [];
-    if (!orgIds.length) return { data: [] as InventoryItem[] };
+    if (!orgIds.length) {
+      return {
+        data: [] as InventoryItem[],
+        pagination: {
+          page: 1,
+          pageSize: safePageSize,
+          totalCount: 0,
+          totalPages: 1,
+        },
+      } as PaginatedInventoryResult;
+    }
 
     // Filter by specific org if provided
     const filteredOrgIds = orgId ? orgIds.filter((id) => id === orgId) : orgIds;
-    if (orgId && !filteredOrgIds.length) return { data: [] as InventoryItem[] };
+    if (orgId && !filteredOrgIds.length) {
+      return {
+        data: [] as InventoryItem[],
+        pagination: {
+          page: 1,
+          pageSize: safePageSize,
+          totalCount: 0,
+          totalPages: 1,
+        },
+      } as PaginatedInventoryResult;
+    }
 
     // Resolve project IDs up front to avoid relying on embedded relation filtering semantics.
     const { data: projects, error: projErr } = await supabase
@@ -181,13 +212,40 @@ export async function getInventoryItems(userId: string, orgId?: string | null) {
     }
 
     const projectIds = (projects ?? []).map((p) => p.id);
-    if (!projectIds.length) return { data: [] as InventoryItem[] };
+    if (!projectIds.length) {
+      return {
+        data: [] as InventoryItem[],
+        pagination: {
+          page: 1,
+          pageSize: safePageSize,
+          totalCount: 0,
+          totalPages: 1,
+        },
+      } as PaginatedInventoryResult;
+    }
+
+    const { count, error: countError } = await supabase
+      .from('inventory_items')
+      .select('id', { count: 'exact', head: true })
+      .in('project_id', projectIds);
+
+    if (countError) {
+      console.error('Supabase error:', countError);
+      return { error: 'Failed to load inventory.' };
+    }
+
+    const totalCount = count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalCount / safePageSize));
+    const clampedPage = Math.min(safePage, totalPages);
+    const from = (clampedPage - 1) * safePageSize;
+    const to = from + safePageSize - 1;
 
     // Get inventory items for user's orgs
     const { data, error } = await supabase
       .from('inventory_items')
       .select('*, project:projects(id, name, org_id, organizations(name, stripe_onboarding_complete))')
       .in('project_id', projectIds)
+      .range(from, to)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -195,7 +253,15 @@ export async function getInventoryItems(userId: string, orgId?: string | null) {
       return { error: 'Failed to load inventory.' };
     }
 
-    return { data: data as InventoryItem[] };
+    return {
+      data: data as InventoryItem[],
+      pagination: {
+        page: clampedPage,
+        pageSize: safePageSize,
+        totalCount,
+        totalPages,
+      },
+    } as PaginatedInventoryResult;
   } catch (err) {
     console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };
@@ -258,6 +324,16 @@ export async function createInventoryItem(formData: FormData) {
   const projectId = formData.get('project_id') as string;
   const imageFile = formData.get('image') as File | null;
   const quantity = parseInt(formData.get('quantity') as string, 10);
+  const aiInsightsJson = formData.get('ai_insights') as string | null;
+
+  let aiInsights: AIAnalysisResult | null = null;
+  if (aiInsightsJson) {
+    try {
+      aiInsights = JSON.parse(aiInsightsJson) as AIAnalysisResult;
+    } catch (err) {
+      console.warn('[createInventoryItem] Invalid ai_insights payload:', err);
+    }
+  }
 
   if (!name) return { error: 'Name is required.' };
   if (isNaN(price) || price < 0) return { error: 'Valid price is required.' };
@@ -291,6 +367,7 @@ export async function createInventoryItem(formData: FormData) {
         user_id: userId,
         org_id: project.org_id,
         project_id: projectId,
+        ai_insights: aiInsights,
         processing_status: hasImage ? 'queued' : 'none',
       })
       .select('id')
@@ -330,8 +407,8 @@ export async function createInventoryItem(formData: FormData) {
 
       await enqueue(
         TOPICS.PROCESS_IMAGE,
-        { itemId: item.id, storagePath },
-        async (data) => processItemImage(data.itemId, data.storagePath),
+        { itemId: item.id, storagePath, skipAnalysis: !!aiInsights },
+        async (data) => processItemImage(data.itemId, data.storagePath, { skipAnalysis: data.skipAnalysis }),
       );
     }
 
@@ -511,6 +588,7 @@ export type BulkItemInput = {
   category: string;
   price: number;
   condition: string;
+  ai_insights?: AIAnalysisResult | null;
   user_id: string;
   project_id?: string | null;
 };
@@ -542,7 +620,7 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
   }
 
   try {
-    // 1. Normalize images in parallel (AI analysis already done client-side via analyzeItemAction).
+    // 1. Normalize uploaded source images in parallel before storage.
     const imageData = await Promise.all(
       items.map(async (_, i) => {
         const imageFile = formData.get(`image-${i}`) as File | null;
@@ -554,7 +632,7 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
       }),
     );
 
-    // 2. Build rows — fields are already populated from client-side analysis.
+    // 2. Build rows from the in-place analysis results collected in the UI.
     const rows = items.map((item, i) => {
       const hasImage = imageData.some((d) => d?.index === i);
       return {
@@ -567,18 +645,19 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
         user_id: item.user_id,
         project_id: item.project_id || null,
         org_id: item.project_id ? (projOrgMap[item.project_id] ?? null) : null,
+        ai_insights: item.ai_insights ?? null,
         processing_status: hasImage ? ('queued' as const) : ('none' as const),
       };
     });
 
     const { data: insertedItems, error } = await supabase
       .from('inventory_items')
-      .insert(rows as any)
+      .insert(rows)
       .select('id');
 
     if (error || !insertedItems) {
       console.error('Supabase bulk insert error:', error);
-      return { error: `Failed to add items: ${(error as any)?.message || 'Unknown error'}` };
+      return { error: `Failed to add items: ${error?.message ?? 'Unknown error'}` };
     }
 
     // 3. Upload source images and enqueue thumbnail generation in parallel.
@@ -605,8 +684,8 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
 
           await enqueue(
             TOPICS.PROCESS_IMAGE,
-            { itemId, storagePath },
-            async (d) => processItemImage(d.itemId, d.storagePath),
+            { itemId, storagePath, skipAnalysis: !!items[data.index]?.ai_insights },
+            async (d) => processItemImage(d.itemId, d.storagePath, { skipAnalysis: d.skipAnalysis }),
           );
         }
       }),
@@ -671,7 +750,7 @@ export async function retryImageProcessing(itemId: string) {
   try {
     const { data: item, error } = await supabase
       .from('inventory_items')
-      .select('original_image_url, processing_status')
+      .select('original_image_url, processing_status, ai_insights')
       .eq('id', itemId)
       .single();
 
@@ -698,8 +777,8 @@ export async function retryImageProcessing(itemId: string) {
 
     await enqueue(
       TOPICS.PROCESS_IMAGE,
-      { itemId, storagePath },
-      async (data) => processItemImage(data.itemId, data.storagePath),
+      { itemId, storagePath, skipAnalysis: !!item.ai_insights },
+      async (data) => processItemImage(data.itemId, data.storagePath, { skipAnalysis: data.skipAnalysis }),
     );
 
     return { success: true };

@@ -6,6 +6,7 @@ export const TOPICS = {
   STRIPE_WEBHOOK: 'stripe-webhook',
   PROCESS_IMAGE: 'process-image',
   ANALYZE_IMAGE: 'analyze-image',
+  INVOICE_GENERATION: 'invoice-generation',
 } as const;
 
 /**

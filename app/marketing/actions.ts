@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { requirePermission, requireOrgMembership, auditLog } from '@/lib/rbac';
+import { generateText, generateImage } from 'ai';
+import { openai } from '@/lib/openai';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -398,8 +400,6 @@ export async function generateMarketingContent(
       return { data: generated };
     }
 
-    const { openai } = await import('@/lib/openai');
-
     const templateInfo = asset.template_id ? ` Template type: ${asset.template_id}.` : '';
     const existingContext = [
       asset.headline && `Current headline: "${asset.headline}"`,
@@ -422,16 +422,14 @@ No markdown, no code fences. Just the JSON object.`;
       ? `Generate marketing copy based on this direction: ${prompt}\n\n${existingContext ? `Context: ${existingContext}` : ''}`
       : `Generate fresh marketing copy for an estate sale material titled "${asset.title}".${existingContext ? ` ${existingContext}` : ''}`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 300,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+    const response = await generateText({
+      model: openai('gpt-5.4-2026-03-05'),
+
+      system: systemPrompt,
+      prompt: userPrompt,
     });
 
-    const content = response.choices?.[0]?.message?.content ?? '';
+    const content = response.text ?? '';
     const cleaned = content.replace(/```json?\s*/gi, '').replace(/```/g, '').trim();
     const generated = JSON.parse(cleaned) as GeneratedContent;
 
@@ -502,26 +500,17 @@ export async function generateMarketingImage(
       return { imageUrl: mockUrl };
     }
 
-    const { openai } = await import('@/lib/openai');
-
     const templateInfo = asset.template_id ? `Template: ${asset.template_id}. ` : '';
     const fullPrompt = `${templateInfo}Create a professional marketing image for an estate sale. ${imagePrompt}. Style: clean, modern, professional marketing material. Do not include any text in the image.`;
 
-    const response = await openai.images.generate({
-      model: 'dall-e-3',
+    const response = await generateImage({
+      model: openai.image('dall-e-3'),
       prompt: fullPrompt,
-      n: 1,
       size: '1024x1024',
-      quality: 'standard',
+      providerOptions: { openai: { quality: 'standard' } },
     });
 
-    const generatedUrl = response.data?.[0]?.url;
-    if (!generatedUrl) throw new Error('No image returned from API');
-
-    // Download the generated image and upload to Supabase storage
-    const imageResponse = await fetch(generatedUrl);
-    if (!imageResponse.ok) throw new Error('Failed to download generated image');
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const imageBuffer = Buffer.from(response.image.uint8Array);
 
     const storagePath = `${orgId}/${assetId}/generated.webp`;
 

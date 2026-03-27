@@ -12,6 +12,12 @@ export type WebhookPayload = {
   eventType: string;
   eventId: string;
   data: Record<string, unknown>;
+  /** Present for v2 thin events — contains a reference, not the full object. */
+  relatedObject?: {
+    id: string;
+    type: string;
+    url: string;
+  };
 };
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -510,6 +516,56 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
           })
           .eq('stripe_account_id', account.id);
       }
+      break;
+    }
+
+    // ── v2 Stripe Connect (thin payload) ─────────────────────
+
+    case 'v2.core.account.created':
+    case 'v2.core.account.updated': {
+      const accountId = payload.relatedObject?.id;
+      if (!accountId) {
+        console.warn(`[stripe-webhook-queue] ${eventType}: no relatedObject.id, skipping`);
+        break;
+      }
+
+      // Fetch full account from Stripe since thin events don't include it
+      const { stripe: stripeClient } = await import('@/lib/stripe');
+      const fullAccount = await stripeClient.accounts.retrieve(accountId);
+      const chargesEnabled = fullAccount.charges_enabled ?? false;
+
+      await supabaseAdmin
+        .from('payment_provider_connections')
+        .update({
+          onboarding_complete: chargesEnabled,
+          status: chargesEnabled ? 'connected' : 'pending',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('provider', 'stripe')
+        .eq('external_account_id', accountId);
+
+      console.log(`[stripe-webhook-queue] ${eventType}: account ${accountId} charges_enabled=${chargesEnabled}`);
+      break;
+    }
+
+    case 'v2.core.account.closed': {
+      const accountId = payload.relatedObject?.id;
+      if (!accountId) {
+        console.warn('[stripe-webhook-queue] v2.core.account.closed: no relatedObject.id, skipping');
+        break;
+      }
+
+      await supabaseAdmin
+        .from('payment_provider_connections')
+        .update({
+          status: 'disconnected',
+          onboarding_complete: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('provider', 'stripe')
+        .eq('external_account_id', accountId);
+
+      console.log(`[stripe-webhook-queue] v2.core.account.closed: account ${accountId} disconnected`);
       break;
     }
   }

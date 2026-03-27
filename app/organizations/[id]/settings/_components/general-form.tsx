@@ -5,27 +5,11 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Loader2, Save, Upload, X, Phone } from "lucide-react";
 import { updateOrganization, getOrganization } from "@/app/organizations/actions";
-
-const US_STATES = [
-  { value: "", label: "Select state" },
-  { value: "AL", label: "AL" }, { value: "AK", label: "AK" }, { value: "AZ", label: "AZ" },
-  { value: "AR", label: "AR" }, { value: "CA", label: "CA" }, { value: "CO", label: "CO" },
-  { value: "CT", label: "CT" }, { value: "DE", label: "DE" }, { value: "FL", label: "FL" },
-  { value: "GA", label: "GA" }, { value: "HI", label: "HI" }, { value: "ID", label: "ID" },
-  { value: "IL", label: "IL" }, { value: "IN", label: "IN" }, { value: "IA", label: "IA" },
-  { value: "KS", label: "KS" }, { value: "KY", label: "KY" }, { value: "LA", label: "LA" },
-  { value: "ME", label: "ME" }, { value: "MD", label: "MD" }, { value: "MA", label: "MA" },
-  { value: "MI", label: "MI" }, { value: "MN", label: "MN" }, { value: "MS", label: "MS" },
-  { value: "MO", label: "MO" }, { value: "MT", label: "MT" }, { value: "NE", label: "NE" },
-  { value: "NV", label: "NV" }, { value: "NH", label: "NH" }, { value: "NJ", label: "NJ" },
-  { value: "NM", label: "NM" }, { value: "NY", label: "NY" }, { value: "NC", label: "NC" },
-  { value: "ND", label: "ND" }, { value: "OH", label: "OH" }, { value: "OK", label: "OK" },
-  { value: "OR", label: "OR" }, { value: "PA", label: "PA" }, { value: "RI", label: "RI" },
-  { value: "SC", label: "SC" }, { value: "SD", label: "SD" }, { value: "TN", label: "TN" },
-  { value: "TX", label: "TX" }, { value: "UT", label: "UT" }, { value: "VT", label: "VT" },
-  { value: "VA", label: "VA" }, { value: "WA", label: "WA" }, { value: "WV", label: "WV" },
-  { value: "WI", label: "WI" }, { value: "WY", label: "WY" }, { value: "DC", label: "DC" },
-];
+import {
+  AddressAutocomplete,
+  US_STATES,
+  type AddressParts,
+} from "@/app/components/address-autocomplete";
 
 type GeneralFormProps = Readonly<{
   orgId: string;
@@ -69,6 +53,14 @@ export function GeneralForm({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const orgFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOrgAddressSelect = useCallback((parts: AddressParts) => {
+    setAddressLine1(parts.address_line1);
+    setAddressLine2(parts.address_line2);
+    setCity(parts.city);
+    setState(parts.state);
+    setZipCode(parts.zip_code);
+  }, []);
 
   const handleSave = useCallback(async () => {
     setError("");
@@ -193,14 +185,14 @@ export function GeneralForm({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="org-address1" className="settings-label">Street address</label>
-                <input
+                <AddressAutocomplete
                   id="org-address1"
-                  type="text"
                   value={addressLine1}
-                  onChange={(e) => setAddressLine1(e.target.value)}
-                  placeholder="123 Main St"
-                  className="settings-input"
+                  onChange={setAddressLine1}
+                  onSelect={handleOrgAddressSelect}
+                  placeholder="Start typing an address…"
                   disabled={!canManageSettings}
+                  className="mt-1"
                 />
               </div>
               <div>

@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createClient } from '@/utils/supabase/server';
 import { resolveActiveOrgId } from '@/lib/rbac';
+import {
+  resolveDefaultProvider,
+  createProviderCheckout,
+  type ProviderAccount,
+  type CheckoutLineItem,
+} from '@/lib/payment-providers/checkout';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -18,28 +23,8 @@ type ResolvedItem = {
   purchaseQty: number;
 };
 
-async function resolveConnectedAccount(orgId: string): Promise<string | null> {
-  const { data: org } = await supabaseAdmin
-    .from('organizations')
-    .select('stripe_account_id, stripe_onboarding_complete')
-    .eq('id', orgId)
-    .single();
-
-  if (!org?.stripe_account_id) return null;
-
-  if (org.stripe_onboarding_complete) return org.stripe_account_id;
-
-  // Live-check with Stripe
-  const account = await stripe.accounts.retrieve(org.stripe_account_id);
-  if (account.charges_enabled) {
-    await supabaseAdmin
-      .from('organizations')
-      .update({ stripe_onboarding_complete: true, updated_at: new Date().toISOString() })
-      .eq('id', orgId);
-    return org.stripe_account_id;
-  }
-
-  return null;
+async function resolveConnectedAccount(orgId: string): Promise<ProviderAccount | null> {
+  return resolveDefaultProvider(orgId);
 }
 
 async function reserveItems(items: ResolvedItem[]) {
@@ -92,8 +77,8 @@ async function handleSingleItemCheckout(req: NextRequest, itemId: string, reques
     return NextResponse.json({ error: 'This seller has not set up payments yet.' }, { status: 400 });
   }
 
-  const connectedAccountId = await resolveConnectedAccount(project.org_id);
-  if (!connectedAccountId) {
+  const providerAccount = await resolveConnectedAccount(project.org_id);
+  if (!providerAccount) {
     return NextResponse.json({ error: 'This seller has not set up payments yet.' }, { status: 400 });
   }
 
@@ -102,36 +87,35 @@ async function handleSingleItemCheckout(req: NextRequest, itemId: string, reques
 
   const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
-  const session = await stripe.checkout.sessions.create(
+  const checkoutLineItems: CheckoutLineItem[] = [
     {
-      mode: 'payment',
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: item.name,
-              description: item.description || undefined,
-              ...(item.medium_image_url ? { images: [item.medium_image_url] } : {}),
-            },
-            unit_amount: Math.round(item.price * 100),
-          },
-          quantity: purchaseQty,
-        },
-      ],
-      metadata: {
-        inventory_item_id: item.id,
-        connected_account_id: connectedAccountId,
-        purchase_quantity: String(purchaseQty),
-      },
-      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/checkout/cancel?item_id=${item.id}&qty=${purchaseQty}`,
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+      name: item.name,
+      description: item.description,
+      unitAmountCents: Math.round(item.price * 100),
+      quantity: purchaseQty,
+      imageUrl: item.medium_image_url,
     },
-    { stripeAccount: connectedAccountId },
-  );
+  ];
 
-  return NextResponse.json({ url: session.url });
+  const metadata: Record<string, string> = {
+    inventory_item_id: item.id,
+    connected_account_id: providerAccount.externalAccountId,
+    purchase_quantity: String(purchaseQty),
+    cancel_url: `${origin}/checkout/cancel?item_id=${item.id}&qty=${purchaseQty}`,
+  };
+
+  try {
+    const result = await createProviderCheckout(
+      providerAccount,
+      checkoutLineItems,
+      metadata,
+      origin,
+    );
+    return NextResponse.json({ url: result.url });
+  } catch (err) {
+    console.error('Provider checkout error:', err);
+    return NextResponse.json({ error: 'Failed to create checkout session.' }, { status: 500 });
+  }
 }
 
 // ── Cart-based multi-item checkout ──────────────────────────
@@ -166,12 +150,9 @@ async function handleCartCheckout(req: NextRequest) {
   }
 
   // Validate all items and resolve connected account (must be same org)
-  let connectedAccountId: string | null = null;
+  let providerAccount: ProviderAccount | null = null;
   const lineItems: ResolvedItem[] = [];
-  const stripeLineItems: Array<{
-    price_data: { currency: string; product_data: { name: string; description?: string; images?: string[] }; unit_amount: number };
-    quantity: number;
-  }> = [];
+  const checkoutLineItems: CheckoutLineItem[] = [];
 
   for (const ci of cartItems) {
     const item = ci.inventory_item as unknown as {
@@ -202,25 +183,20 @@ async function handleCartCheckout(req: NextRequest) {
     }
 
     // All items must belong to the same connected account
-    if (!connectedAccountId) {
-      connectedAccountId = await resolveConnectedAccount(project.org_id);
-      if (!connectedAccountId) {
+    if (!providerAccount) {
+      providerAccount = await resolveConnectedAccount(project.org_id);
+      if (!providerAccount) {
         return NextResponse.json({ error: 'This seller has not set up payments yet.' }, { status: 400 });
       }
     }
 
     lineItems.push({ ...item, purchaseQty: ci.quantity });
-    stripeLineItems.push({
-      price_data: {
-        currency: 'usd',
-        product_data: {
-          name: item.name,
-          description: item.description || undefined,
-          ...(item.medium_image_url ? { images: [item.medium_image_url] } : {}),
-        },
-        unit_amount: Math.round(item.price * 100),
-      },
+    checkoutLineItems.push({
+      name: item.name,
+      description: item.description,
+      unitAmountCents: Math.round(item.price * 100),
       quantity: ci.quantity,
+      imageUrl: item.medium_image_url,
     });
   }
 
@@ -235,7 +211,7 @@ async function handleCartCheckout(req: NextRequest) {
     .insert({
       user_id: user.id,
       org_id: orgId,
-      stripe_connected_account_id: connectedAccountId,
+      stripe_connected_account_id: providerAccount!.externalAccountId,
       total_amount: totalAmount,
       status: 'pending',
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
@@ -261,36 +237,44 @@ async function handleCartCheckout(req: NextRequest) {
 
   const origin = req.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
-  // Create Stripe session
-  const session = await stripe.checkout.sessions.create(
-    {
-      mode: 'payment',
-      line_items: stripeLineItems,
-      metadata: {
-        checkout_session_id: checkoutSession.id,
-        connected_account_id: connectedAccountId,
-      },
-      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/checkout/cancel?cs_id=${checkoutSession.id}`,
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-    },
-    { stripeAccount: connectedAccountId! },
-  );
+  const metadata: Record<string, string> = {
+    checkout_session_id: checkoutSession.id,
+    connected_account_id: providerAccount!.externalAccountId,
+    cancel_url: `${origin}/checkout/cancel?cs_id=${checkoutSession.id}`,
+  };
 
-  // Save Stripe session ID to our checkout session
-  await supabaseAdmin
-    .from('checkout_sessions')
-    .update({ stripe_checkout_session_id: session.id, updated_at: new Date().toISOString() })
-    .eq('id', checkoutSession.id);
+  try {
+    const result = await createProviderCheckout(
+      providerAccount!,
+      checkoutLineItems,
+      metadata,
+      origin,
+    );
 
-  // Clear the cart after successful session creation
-  await supabaseAdmin
-    .from('cart_items')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('org_id', orgId);
+    // Save provider session ID to our checkout session
+    await supabaseAdmin
+      .from('checkout_sessions')
+      .update({
+        stripe_checkout_session_id: result.providerSessionId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', checkoutSession.id);
 
-  return NextResponse.json({ url: session.url });
+    // Clear the cart after successful session creation
+    await supabaseAdmin
+      .from('cart_items')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('org_id', orgId);
+
+    return NextResponse.json({ url: result.url });
+  } catch (err) {
+    console.error('Provider checkout error:', err);
+    return NextResponse.json(
+      { error: 'Failed to create checkout session.' },
+      { status: 500 },
+    );
+  }
 }
 
 // ── Route handler ───────────────────────────────────────────

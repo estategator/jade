@@ -4,6 +4,9 @@
 export function isAppRoute(pathname: string): boolean {
   const appRoutes = [
     "/dashboard",
+    "/onboarding",
+    "/clients",
+    "/contracts",
     "/inventory",
     "/cart",
     "/checkout",

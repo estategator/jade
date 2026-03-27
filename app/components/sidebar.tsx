@@ -19,6 +19,10 @@ import {
   PiQuestionDuotone,
   PiCodeDuotone,
   PiTicketDuotone,
+  PiListDuotone,
+  PiXDuotone,
+  PiUsersDuotone,
+  PiFileTextDuotone,
 } from "react-icons/pi";
 import { supabase } from "@/lib/supabase";
 import { OrgSwitcher } from "@/app/components/org-switcher";
@@ -84,11 +88,25 @@ interface NavSection {
 }
 
 export function Sidebar() {
-  const { isExpanded, toggle } = useSidebar();
+  const { isExpanded, toggle, isMobileOpen, closeMobile, toggleMobile } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isDeveloper, setIsDeveloper] = useState(false);
+
+  /* Close mobile drawer on route change */
+  useEffect(() => {
+    closeMobile();
+  }, [pathname, closeMobile]);
+
+  /* Close mobile drawer on Escape key */
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && isMobileOpen) closeMobile();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isMobileOpen, closeMobile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +151,13 @@ export function Sidebar() {
         { label: "Pricing", href: "/pricing-optimization", icon: PiTrendUpDuotone },
         { label: "Marketing", href: "/marketing", icon: PiMegaphoneDuotone },
         { label: "Invoices", href: "/invoices", icon: PiReceiptDuotone },
+      ],
+    },
+    {
+      title: "Clients",
+      items: [
+        { label: "Clients", href: "/clients", icon: PiUsersDuotone },
+        { label: "Contracts", href: "/contracts", icon: PiFileTextDuotone },
       ],
     },
     {
@@ -359,59 +384,187 @@ export function Sidebar() {
       </aside>
 
       {/* ─── Mobile Navigation ─── */}
-      <div data-sidebar className="sticky top-0 z-30 flex flex-col border-b border-stone-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80 md:hidden">
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-primary)] text-xs font-bold text-white shadow-sm shadow-[var(--color-brand-primary)]/25">
-              C
-            </div>
-            <OrgSwitcher dropdownDirection="down" />
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <button
-              type="button"
-              onClick={handleSignOut}
-              aria-label="Sign out"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-            >
-              <PiSignOutDuotone className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
 
-        <nav className="flex gap-0.5 overflow-x-auto border-t border-stone-100 px-3 py-1.5 dark:border-zinc-800/50">
-          {navSections.flatMap((section) =>
-            section.items.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-label={item.label}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "relative inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
-                    active
-                      ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
-                      : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-white"
-                  )}
+      {/* Top bar with hamburger */}
+      <div
+        data-sidebar
+        className="sticky top-0 z-30 flex items-center justify-between border-b border-stone-200/60 bg-white/80 px-4 py-2.5 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80 md:hidden"
+      >
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleMobile}
+            aria-label={isMobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMobileOpen}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] active:scale-95 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {isMobileOpen ? (
+                <motion.span
+                  key="close"
+                  initial={{ opacity: 0, rotate: -90 }}
+                  animate={{ opacity: 1, rotate: 0 }}
+                  exit={{ opacity: 0, rotate: 90 }}
+                  transition={{ duration: 0.15 }}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="whitespace-nowrap">{item.label}</span>
-                  {item.badge != null && item.badge > 0 && (
-                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1 text-[9px] font-bold leading-none text-white">
-                      {item.badge > 9 ? "9+" : item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })
+                  <PiXDuotone className="h-5 w-5" />
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="hamburger"
+                  initial={{ opacity: 0, rotate: 90 }}
+                  animate={{ opacity: 1, rotate: 0 }}
+                  exit={{ opacity: 0, rotate: -90 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <PiListDuotone className="h-5 w-5" />
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-brand-primary)] text-[11px] font-bold text-white shadow-sm shadow-[var(--color-brand-primary)]/25">
+            C
+          </div>
+          <span className="text-sm font-bold tracking-tight text-stone-900 dark:text-white">
+            Curator
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          {/* Notification badge in top bar */}
+          {unreadCount > 0 && (
+            <Link
+              href="/notifications"
+              aria-label={`${unreadCount} unread notifications`}
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl text-stone-500 transition-colors hover:bg-stone-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              <PiBellDuotone className="h-4.5 w-4.5" />
+              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1 text-[9px] font-bold leading-none text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            </Link>
           )}
-        </nav>
+          <ThemeToggle />
+        </div>
       </div>
+
+      {/* Slide-in drawer overlay */}
+      <AnimatePresence>
+        {isMobileOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+              onClick={closeMobile}
+              aria-hidden="true"
+            />
+
+            {/* Drawer panel */}
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              className="fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] flex-col border-r border-stone-200/60 bg-white shadow-2xl shadow-black/10 dark:border-zinc-800/60 dark:bg-zinc-950 dark:shadow-black/30 md:hidden"
+            >
+              {/* Drawer header */}
+              <div className="flex h-14 items-center justify-between border-b border-stone-100 px-4 dark:border-zinc-800/50">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--color-brand-primary)] text-sm font-bold text-white shadow-sm shadow-[var(--color-brand-primary)]/25">
+                    C
+                  </div>
+                  <span className="text-base font-bold tracking-tight text-stone-900 dark:text-white">
+                    Curator
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeMobile}
+                  aria-label="Close menu"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] active:scale-95 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                >
+                  <PiXDuotone className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Drawer navigation */}
+              <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+                {navSections.map((section, sectionIdx) => (
+                  <div key={section.title} className={cn(sectionIdx > 0 && "mt-5")}>
+                    <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-stone-400 dark:text-zinc-500">
+                      {section.title}
+                    </div>
+                    <div className="space-y-0.5">
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        const active = isActive(item.href);
+
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            aria-label={item.label}
+                            aria-current={active ? "page" : undefined}
+                            className={cn(
+                              "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]",
+                              active
+                                ? "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]"
+                                : "text-stone-600 hover:bg-stone-50 hover:text-stone-900 active:bg-stone-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-white dark:active:bg-zinc-800"
+                            )}
+                          >
+                            {/* Active left rail */}
+                            {active && (
+                              <div className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-[var(--color-brand-primary)]" />
+                            )}
+                            <Icon className="h-5 w-5 shrink-0" />
+                            <span className="flex-1 truncate">{item.label}</span>
+                            {item.badge != null && item.badge > 0 && (
+                              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1.5 text-[10px] font-bold leading-none text-white">
+                                {item.badge > 99 ? "99+" : item.badge}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+
+              {/* Drawer footer */}
+              <div className="border-t border-stone-100 p-3 dark:border-zinc-800/50">
+                <div className="space-y-2">
+                  <div className="rounded-xl border border-stone-100 bg-stone-50/50 p-2 dark:border-zinc-800/50 dark:bg-zinc-900/50">
+                    <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400 dark:text-zinc-500">
+                      Workspace
+                    </p>
+                    <OrgSwitcher dropdownDirection="up" />
+                  </div>
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <ThemeToggle />
+                      <span className="text-xs text-stone-400 dark:text-zinc-500">
+                        Theme
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    >
+                      <PiSignOutDuotone className="h-3.5 w-3.5" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

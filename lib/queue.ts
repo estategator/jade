@@ -4,9 +4,14 @@ import { send } from '@vercel/queue';
 /** Well-known topic names. Keep in sync with vercel.json experimentalTriggers. */
 export const TOPICS = {
   STRIPE_WEBHOOK: 'stripe-webhook',
+  SQUARE_WEBHOOK: 'square-webhook',
+  CLOVER_WEBHOOK: 'clover-webhook',
   PROCESS_IMAGE: 'process-image',
   ANALYZE_IMAGE: 'analyze-image',
   INVOICE_GENERATION: 'invoice-generation',
+  CONTRACT_WEBHOOK: 'contract-webhook',
+  WELCOME_EMAIL: 'welcome-email',
+  WALKTHROUGH_WEBHOOK: 'walkthrough-webhook',
 } as const;
 
 /**

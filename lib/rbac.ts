@@ -11,6 +11,7 @@ import type { Permission, OrgRole, AuditAction, MemberStatus } from '@/lib/rbac-
 const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   superadmin: [
     'org:update', 'org:delete', 'billing:manage',
+    'onboarding:view', 'onboarding:create', 'onboarding:update', 'onboarding:delete', 'onboarding:share',
     'members:invite', 'members:remove', 'members:update_role', 'members:view',
     'projects:create', 'projects:update', 'projects:delete', 'projects:view',
     'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:view',
@@ -21,6 +22,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   ],
   admin: [
     'org:update',
+    'onboarding:view', 'onboarding:create', 'onboarding:update', 'onboarding:delete', 'onboarding:share',
     'members:invite', 'members:remove', 'members:update_role', 'members:view',
     'projects:create', 'projects:update', 'projects:delete', 'projects:view',
     'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:view',
@@ -30,6 +32,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'invoices:view', 'invoices:create', 'invoices:update', 'invoices:delete',
   ],
   member: [
+    'onboarding:view',
     'members:view',
     'projects:view',
     'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:view',

@@ -7,6 +7,10 @@ import {
   Palette,
   Users,
   CreditCard,
+  Landmark,
+  Globe,
+  FileSignature,
+  Link2,
   Shield,
   ScrollText,
   Database,
@@ -38,6 +42,14 @@ const sections: NavSection[] = [
     heading: "Billing",
     items: [
       { key: "billing", label: "Plans & Billing", segment: "/billing", icon: CreditCard },
+    ],
+  },
+  {
+    heading: "Connections",
+    items: [
+      { key: "financial-connections", label: "Financials", segment: "/connections/financials", icon: Landmark },
+      { key: "listing-connections", label: "Listing Websites", segment: "/connections/listings", icon: Globe },
+      { key: "document-connections", label: "Documents", segment: "/connections/documents", icon: FileSignature },
     ],
   },
   {

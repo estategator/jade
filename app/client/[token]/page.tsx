@@ -1,0 +1,229 @@
+import Image from "next/image";
+import { notFound } from "next/navigation";
+import { CheckCircle2, Circle, Package, ShieldCheck, Tag } from "lucide-react";
+
+import { getClientProjectShareView } from "@/app/onboarding/actions";
+
+export const dynamic = "force-dynamic";
+
+const statusClasses: Record<string, string> = {
+  available:
+    "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-300",
+  sold: "bg-stone-100 text-stone-500 ring-1 ring-stone-300 dark:bg-zinc-800 dark:text-zinc-400",
+  reserved:
+    "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)] ring-1 ring-[var(--color-brand-primary)]/20",
+};
+
+export default async function ClientProjectSharePage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
+  const result = await getClientProjectShareView(token);
+
+  if (!("data" in result)) {
+    notFound();
+  }
+
+  const { client, project, workflow, items, events } = result.data;
+  const availableItems = items.filter((item) => item.status === "available").length;
+  const soldItems = items.filter((item) => item.status === "sold").length;
+
+  return (
+    <main className="min-h-screen bg-stone-50 dark:bg-zinc-950">
+      <section className="relative overflow-hidden border-b border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.16),_transparent_45%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.16),_transparent_45%)]" />
+        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-brand-primary)]">
+              Curator client transparency
+            </p>
+            <h1 className="mt-3 text-4xl font-bold tracking-tight text-stone-900 dark:text-white">
+              {project.name}
+            </h1>
+            <p className="mt-3 text-base text-stone-600 dark:text-zinc-400">
+              {project.description || `Progress tracking and inventory transparency for ${client.fullName}.`}
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3 text-sm text-stone-600 dark:text-zinc-400">
+              <span className="rounded-full border border-stone-200 bg-white px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-900">
+                Client: {client.fullName}
+              </span>
+              <span className="rounded-full border border-stone-200 bg-white px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-900">
+                Workflow progress: {workflow.progressPercent}%
+              </span>
+              <span className="rounded-full border border-stone-200 bg-white px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-900">
+                Stage: {workflow.stage.replaceAll("_", " ")}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+              <p className="text-sm text-stone-500 dark:text-zinc-500">Total items</p>
+              <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">{items.length}</p>
+            </div>
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+              <p className="text-sm text-stone-500 dark:text-zinc-500">Available</p>
+              <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">{availableItems}</p>
+            </div>
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+              <p className="text-sm text-stone-500 dark:text-zinc-500">Sold</p>
+              <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">{soldItems}</p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="rounded-xl bg-[var(--color-brand-subtle)] p-2 text-[var(--color-brand-primary)]">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-stone-900 dark:text-white">
+                  Project progress
+                </h2>
+                <p className="text-sm text-stone-500 dark:text-zinc-500">
+                  This checklist shows how the sale is moving forward.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {workflow.steps.map((step) => {
+                const complete = step.status === "completed";
+
+                return (
+                  <div
+                    key={step.id}
+                    className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    {complete ? (
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-500" />
+                    ) : (
+                      <Circle className="mt-0.5 h-5 w-5 text-stone-300 dark:text-zinc-600" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-stone-900 dark:text-white">{step.title}</p>
+                      <p className="text-xs text-stone-500 dark:text-zinc-500">{step.description}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
+                <Package className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-stone-900 dark:text-white">
+                  Inventory and pricing
+                </h2>
+                <p className="text-sm text-stone-500 dark:text-zinc-500">
+                  Review the items currently prepared for the sale.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {items.length === 0 ? (
+                <div className="sm:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500 dark:border-zinc-700 dark:text-zinc-500">
+                  Inventory details will appear here once items are added.
+                </div>
+              ) : (
+                items.map((item) => {
+                  const imageUrl = item.medium_image_url || item.thumbnail_url;
+                  const statusClass = statusClasses[item.status] ?? statusClasses.available;
+
+                  return (
+                    <article
+                      key={item.id}
+                      className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 dark:border-zinc-800 dark:bg-zinc-950"
+                    >
+                      <div className="relative aspect-square bg-stone-100 dark:bg-zinc-900">
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={item.name}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 50vw, 25vw"
+                            unoptimized
+                          />
+                        ) : null}
+                      </div>
+                      <div className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-stone-900 dark:text-white">{item.name}</p>
+                            <p className="text-xs text-stone-500 dark:text-zinc-500">{item.category}</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusClass}`}>
+                            {item.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm text-stone-600 dark:text-zinc-400">
+                          <span className="inline-flex items-center gap-1">
+                            <Tag className="h-3.5 w-3.5" />
+                            {item.condition}
+                          </span>
+                          <span className="font-semibold text-stone-900 dark:text-white">
+                            ${item.price.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <p className="text-xs leading-5 text-stone-500 dark:text-zinc-500">
+                          {item.description || "Description coming soon."}
+                        </p>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        <aside className="rounded-3xl border border-stone-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="text-xl font-semibold text-stone-900 dark:text-white">
+            Recent updates
+          </h2>
+          <p className="mt-1 text-sm text-stone-500 dark:text-zinc-500">
+            Timeline of changes to the project, inventory, and readiness.
+          </p>
+
+          <div className="mt-6 space-y-4">
+            {events.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500 dark:border-zinc-700 dark:text-zinc-500">
+                Updates will appear here as the project advances.
+              </div>
+            ) : (
+              events.map((event) => (
+                <div
+                  key={event.id}
+                  className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <p className="text-sm font-semibold text-stone-900 dark:text-white">{event.title}</p>
+                  {event.body ? (
+                    <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">{event.body}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs uppercase tracking-wide text-stone-400 dark:text-zinc-500">
+                    {new Date(event.created_at).toLocaleString()}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
+}

@@ -3,7 +3,6 @@ import { createClient } from "@/utils/supabase/server";
 import {
   getOrganization,
   getPermissionsForOrg,
-  getStripeAccountStatus,
 } from "@/app/organizations/actions";
 import { BillingManager } from "../_components/billing-manager";
 
@@ -20,10 +19,9 @@ export default async function OrgSettingsBillingPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [orgResult, permsResult, stripeResult] = await Promise.all([
+  const [orgResult, permsResult] = await Promise.all([
     getOrganization(orgId),
     getPermissionsForOrg(orgId, user.id),
-    getStripeAccountStatus(orgId),
   ]);
 
   if (orgResult.error || !orgResult.data) redirect("/organizations");
@@ -35,7 +33,6 @@ export default async function OrgSettingsBillingPage({
       orgId={orgId}
       org={orgResult.data}
       canManageBilling={canManageBilling}
-      initialStripeStatus={stripeResult.data ?? null}
     />
   );
 }

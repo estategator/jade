@@ -1,6 +1,7 @@
 'use server';
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { logProjectTransparencyEvent } from '@/lib/project-transparency';
 import { getMemberLimit } from '@/lib/tiers';
 import { requirePermission, auditLog, getUserPermissions as _getUserPermissions } from '@/lib/rbac';
 import type { Permission } from '@/lib/rbac-types';
@@ -1225,6 +1226,20 @@ export async function toggleProjectPublished(projectId: string, userId: string, 
     if (error) {
       console.error('Supabase error:', error);
       return { error: 'Failed to update publish status.' };
+    }
+
+    if (published) {
+      await logProjectTransparencyEvent({
+        orgId: project.org_id,
+        projectId,
+        actorId: userId,
+        eventType: 'project_published',
+        title: 'Project published',
+        body: 'The sale project is now published and ready for broader visibility.',
+        payload: {
+          published,
+        },
+      });
     }
 
     return { success: true, published };

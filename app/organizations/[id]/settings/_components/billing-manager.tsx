@@ -1,152 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Loader2,
   CreditCard,
-  ExternalLink,
   Sparkles,
-  Unlink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TierBadge } from "@/app/components/tier-badge";
-import ConfirmDeleteModal from "@/app/components/confirm-delete-modal";
 import { TIERS, type SubscriptionTier } from "@/lib/tiers";
 import {
-  createStripeConnectAccount,
-  getStripeOnboardingLink,
-  getStripeAccountStatus,
-  retryStripeOnboarding,
-  disconnectStripeAccount,
   createBillingPortalSession,
   type Organization,
   type SubscriptionStatus,
 } from "@/app/organizations/actions";
 
-type StripeStatus = {
-  connected: boolean;
-  onboardingComplete: boolean;
-  accountId: string | null;
-  detailsSubmitted?: boolean;
-  payoutsEnabled?: boolean;
-  requirements?: {
-    currentlyDue: string[];
-    errors: string[];
-  } | null;
-};
-
 type BillingManagerProps = Readonly<{
   orgId: string;
   org: Organization;
   canManageBilling: boolean;
-  initialStripeStatus: StripeStatus | null;
 }>;
 
 export function BillingManager({
   orgId,
   org,
   canManageBilling,
-  initialStripeStatus,
 }: BillingManagerProps) {
-  const searchParams = useSearchParams();
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(
-    initialStripeStatus
-  );
-  const [stripeLoading, setStripeLoading] = useState(false);
-  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
-
-  async function handleDisconnect() {
-    setError("");
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setError("Not authenticated."); return; }
-      const result = await disconnectStripeAccount(orgId, session.user.id);
-      if (result.success) {
-        setStripeStatus({ connected: false, onboardingComplete: false, accountId: null });
-        setSuccess("Stripe account disconnected.");
-        setShowDisconnectConfirm(false);
-      } else {
-        setError(result.error || "Failed to disconnect.");
-      }
-    } catch { setError("Failed to disconnect Stripe account."); }
-  }
-
-  // Handle Stripe return intent
-  useEffect(() => {
-    const stripeReturn = searchParams.get("stripeReturn");
-    if (stripeReturn === "true") {
-      setSuccess("Stripe setup updated. Refreshing status...");
-      getStripeAccountStatus(orgId).then((result) => {
-        if (result.data) setStripeStatus(result.data);
-        setSuccess("Stripe status refreshed successfully.");
-      });
-      // Clean the URL without triggering a navigation
-      window.history.replaceState(
-        {},
-        "",
-        `/organizations/${orgId}/settings/billing`
-      );
-    }
-  }, [searchParams, orgId]);
-
-  async function handleConnectStripe() {
-    setStripeLoading(true);
-    setError("");
-
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        setError("Not authenticated.");
-        setStripeLoading(false);
-        return;
-      }
-
-      if (!stripeStatus?.connected) {
-        const createResult = await createStripeConnectAccount(
-          orgId,
-          session.user.id
-        );
-        if (createResult.error) {
-          setError(createResult.error);
-          setStripeLoading(false);
-          return;
-        }
-      }
-
-      const linkResult = await getStripeOnboardingLink(
-        orgId,
-        session.user.id
-      );
-      if (linkResult.error) {
-        setError(linkResult.error);
-        setStripeLoading(false);
-        return;
-      }
-
-      if (linkResult.url) {
-        window.location.href = linkResult.url;
-      }
-    } catch {
-      setError("Failed to start Stripe onboarding.");
-      setStripeLoading(false);
-    }
-  }
+  const [success] = useState("");
 
   return (
     <>
-      {!canManageBilling && (
-        <p className="mb-3 text-xs text-stone-500 dark:text-zinc-400">
-          You can view billing status, but only billing managers can make changes.
-        </p>
-      )}
-
       {error && (
         <motion.p
           initial={{ opacity: 0, y: 6 }}
@@ -268,127 +153,7 @@ export function BillingManager({
           </div>
         </div>
 
-        {/* Stripe Connect */}
-        <div className="rounded-xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="border-b border-stone-100 px-5 py-3 dark:border-zinc-800/60">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-              <h2 className="text-sm font-semibold text-stone-900 dark:text-white">Stripe Connect</h2>
-            </div>
-            <p className="text-xs text-stone-500 dark:text-zinc-500">Receive payouts for sales</p>
-          </div>
-          <div className="px-5 py-4">
-            {stripeStatus?.onboardingComplete ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2.5 dark:bg-emerald-900/20">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    <div>
-                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Connected</p>
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400">Payouts enabled</p>
-                    </div>
-                  </div>
-                  <a
-                    href="https://dashboard.stripe.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
-                  >
-                    Dashboard <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-                {canManageBilling && (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowDisconnectConfirm(true)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-500 transition-all hover:border-red-300 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-500 dark:hover:border-red-800 dark:hover:text-red-400"
-                    >
-                      <Unlink className="h-3.5 w-3.5" />
-                      Disconnect Stripe
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : stripeStatus?.connected ? (
-              <div className="space-y-3">
-                <div className="rounded-lg bg-stone-50 px-3 py-2.5 dark:bg-zinc-800/60">
-                  <p className="text-sm font-medium text-stone-700 dark:text-zinc-300">Onboarding incomplete</p>
-                  <p className="mt-0.5 text-xs text-stone-500 dark:text-zinc-400">
-                    Stripe needs more information before you can accept payouts.
-                  </p>
-                  {stripeStatus.requirements && stripeStatus.requirements.currentlyDue.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-[11px] font-medium text-stone-500 dark:text-zinc-500">Still needed:</p>
-                      <ul className="mt-1 list-inside list-disc text-[11px] text-stone-500 dark:text-zinc-400">
-                        {stripeStatus.requirements.currentlyDue.slice(0, 5).map((req) => (
-                          <li key={req}>{req.replace(/_/g, " ")}</li>
-                        ))}
-                        {stripeStatus.requirements.currentlyDue.length > 5 && (
-                          <li>and {stripeStatus.requirements.currentlyDue.length - 5} more…</li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                  {stripeStatus.requirements?.errors && stripeStatus.requirements.errors.length > 0 && (
-                    <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">
-                      {stripeStatus.requirements.errors.join(", ")}
-                    </p>
-                  )}
-                </div>
-                {canManageBilling && (
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={async () => {
-                      setStripeLoading(true);
-                      setError("");
-                      try {
-                        const { data: { session } } = await supabase.auth.getSession();
-                        if (!session) { setError("Not authenticated."); return; }
-                        const result = await retryStripeOnboarding(orgId, session.user.id);
-                        if (result.url) { window.location.href = result.url; }
-                        else { setError(result.error || "Failed to restart onboarding."); }
-                      } catch { setError("Failed to restart onboarding."); }
-                      finally { setStripeLoading(false); }
-                    }} disabled={stripeLoading}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
-                      {stripeLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
-                      Complete Stripe Setup
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowDisconnectConfirm(true)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-500 transition-all hover:border-red-300 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-500 dark:hover:border-red-800 dark:hover:text-red-400"
-                    >
-                      <Unlink className="h-3.5 w-3.5" />
-                      Disconnect
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-stone-600 dark:text-zinc-400">Connect Stripe to receive payouts when inventory sells.</p>
-                {canManageBilling && (
-                  <button type="button" onClick={handleConnectStripe} disabled={stripeLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
-                    {stripeLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />}
-                    Connect Stripe
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
       </motion.div>
-
-      <ConfirmDeleteModal
-        open={showDisconnectConfirm}
-        onClose={() => setShowDisconnectConfirm(false)}
-        onConfirm={handleDisconnect}
-        entityName="disconnect"
-        entityType="Stripe Connection"
-        description="This will disconnect your Stripe account and you will no longer be able to receive payouts for sales. You can reconnect later, but any pending payouts may be affected."
-      />
     </>
   );
 }

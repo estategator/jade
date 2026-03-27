@@ -99,10 +99,10 @@ export default function StripeReturnPage() {
         )}
         <button
           type="button"
-          onClick={() => router.push(`/organizations/${orgId}/settings/billing`)}
+          onClick={() => router.push(`/organizations/${orgId}/settings/connections/financials`)}
           className="mt-3 inline-flex items-center rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-medium text-stone-700 transition-all hover:border-stone-300 hover:bg-stone-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
         >
-          Go to Billing Settings
+          Go to Financial Connections
         </button>
       </div>
     </div>

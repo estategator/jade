@@ -286,7 +286,7 @@ export default function OrganizationDetailPage() {
                   )}
                 </div>
                 <Link
-                  href={`/organizations/${orgId}/settings/billing`}
+                  href={`/organizations/${orgId}/settings/connections/financials`}
                   className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
                 >
                   Manage Stripe

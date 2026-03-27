@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { processItemImage, analyzeUploadedSimpleImage, normalizeSourceImage } from '@/lib/image-processing';
 import type { AIAnalysisResult, InventoryProcessingStatus } from '@/lib/inventory';
+import { logProjectTransparencyEvent } from '@/lib/project-transparency';
 import { requirePermission } from '@/lib/rbac';
 import { enqueue, TOPICS } from '@/lib/queue';
 
@@ -412,6 +413,21 @@ export async function createInventoryItem(formData: FormData) {
       );
     }
 
+    await logProjectTransparencyEvent({
+      orgId: project.org_id,
+      projectId,
+      actorId: userId,
+      eventType: 'inventory_created',
+      title: `Added ${name} to inventory`,
+      body: `${name} is now part of the project inventory at $${price.toFixed(2)}.`,
+      payload: {
+        item_id: item.id,
+        category: category || 'Uncategorized',
+        condition: condition || 'Good',
+        price,
+      },
+    });
+
     revalidateInventoryRoutes();
 
     return { success: true };
@@ -442,6 +458,21 @@ export async function updateInventoryItem(id: string, userId: string, formData: 
   if (!projectId) return { error: 'Project is required.' };
 
   try {
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('org_id, name')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError || !project) {
+      return { error: 'Project not found.' };
+    }
+
+    const permissionCheck = await requirePermission(project.org_id, userId, 'inventory:update');
+    if (!permissionCheck.granted) {
+      return { error: permissionCheck.error };
+    }
+
     const { error } = await supabase
       .from('inventory_items')
       .update({
@@ -462,6 +493,22 @@ export async function updateInventoryItem(id: string, userId: string, formData: 
       console.error('Supabase error:', error);
       return { error: 'Failed to update item. Please try again.' };
     }
+
+    await logProjectTransparencyEvent({
+      orgId: project.org_id,
+      projectId,
+      actorId: userId,
+      eventType: 'inventory_updated',
+      title: `Updated ${name}`,
+      body: `${name} inventory details were updated.`,
+      payload: {
+        item_id: id,
+        category: category || 'Uncategorized',
+        condition: condition || 'Good',
+        status: status || 'available',
+        price,
+      },
+    });
 
     revalidateInventoryRoutes();
 

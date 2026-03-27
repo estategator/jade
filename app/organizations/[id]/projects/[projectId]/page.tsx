@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,27 +17,11 @@ import {
   type Project,
 } from "@/app/organizations/actions";
 import ConfirmDeleteModal from "@/app/components/confirm-delete-modal";
-
-const US_STATES = [
-  { value: "", label: "Select state" },
-  { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" }, { value: "AZ", label: "Arizona" },
-  { value: "AR", label: "Arkansas" }, { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
-  { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" }, { value: "FL", label: "Florida" },
-  { value: "GA", label: "Georgia" }, { value: "HI", label: "Hawaii" }, { value: "ID", label: "Idaho" },
-  { value: "IL", label: "Illinois" }, { value: "IN", label: "Indiana" }, { value: "IA", label: "Iowa" },
-  { value: "KS", label: "Kansas" }, { value: "KY", label: "Kentucky" }, { value: "LA", label: "Louisiana" },
-  { value: "ME", label: "Maine" }, { value: "MD", label: "Maryland" }, { value: "MA", label: "Massachusetts" },
-  { value: "MI", label: "Michigan" }, { value: "MN", label: "Minnesota" }, { value: "MS", label: "Mississippi" },
-  { value: "MO", label: "Missouri" }, { value: "MT", label: "Montana" }, { value: "NE", label: "Nebraska" },
-  { value: "NV", label: "Nevada" }, { value: "NH", label: "New Hampshire" }, { value: "NJ", label: "New Jersey" },
-  { value: "NM", label: "New Mexico" }, { value: "NY", label: "New York" }, { value: "NC", label: "North Carolina" },
-  { value: "ND", label: "North Dakota" }, { value: "OH", label: "Ohio" }, { value: "OK", label: "Oklahoma" },
-  { value: "OR", label: "Oregon" }, { value: "PA", label: "Pennsylvania" }, { value: "RI", label: "Rhode Island" },
-  { value: "SC", label: "South Carolina" }, { value: "SD", label: "South Dakota" }, { value: "TN", label: "Tennessee" },
-  { value: "TX", label: "Texas" }, { value: "UT", label: "Utah" }, { value: "VT", label: "Vermont" },
-  { value: "VA", label: "Virginia" }, { value: "WA", label: "Washington" }, { value: "WV", label: "West Virginia" },
-  { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" }, { value: "DC", label: "District of Columbia" },
-];
+import {
+  AddressAutocomplete,
+  US_STATES,
+  type AddressParts,
+} from "@/app/components/address-autocomplete";
 
 export default function ProjectEditPage() {
   const router = useRouter();
@@ -70,6 +54,14 @@ export default function ProjectEditPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
+
+  const handleProjectAddressSelect = useCallback((parts: AddressParts) => {
+    setAddressLine1(parts.address_line1);
+    setAddressLine2(parts.address_line2);
+    setCity(parts.city);
+    setProjectState(parts.state);
+    setZipCode(parts.zip_code);
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -333,13 +325,13 @@ export default function ProjectEditPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="proj-address1" className="settings-label">Street address</label>
-                  <input
+                  <AddressAutocomplete
                     id="proj-address1"
-                    type="text"
                     value={addressLine1}
-                    onChange={(e) => setAddressLine1(e.target.value)}
-                    placeholder="123 Main St"
-                    className="settings-input"
+                    onChange={setAddressLine1}
+                    onSelect={handleProjectAddressSelect}
+                    placeholder="Start typing an address…"
+                    className="mt-1"
                   />
                 </div>
                 <div>

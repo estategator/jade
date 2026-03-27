@@ -115,7 +115,7 @@ export function CartReview() {
           </p>
           <Link
             href="/inventory"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-indigo-700"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-primary)] px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-[var(--color-brand-primary-hover)]"
           >
             <PiArrowLeftDuotone className="h-4 w-4" />
             Back to Inventory
@@ -185,12 +185,13 @@ export function CartReview() {
                           <div className="min-w-0">
                             <Link
                               href={`/inventory/${item.id}`}
-                              className="truncate text-sm font-semibold text-stone-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
+                              title={item.name}
+                              className="line-clamp-2 block break-words text-sm font-semibold text-stone-900 hover:text-[var(--color-brand-primary)] dark:text-white dark:hover:text-[var(--color-brand-primary)]"
                             >
                               {item.name}
                             </Link>
-                            <p className="text-xs text-stone-500 dark:text-zinc-400">
-                              {item.category} &middot; {item.condition}
+                            <p className="truncate text-xs text-stone-500 dark:text-zinc-400">
+                              {[item.category, item.condition].filter(Boolean).join(" · ")}
                             </p>
                             {isUnavailable && (
                               <p className="mt-0.5 text-xs font-medium text-red-600 dark:text-red-400">
@@ -205,39 +206,41 @@ export function CartReview() {
 
                         {/* Quantity controls */}
                         {!isUnavailable && (
-                          <div className="mt-2 flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
+                          <div className="mt-2 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQty(ci.id, ci.quantity - 1)}
+                                  disabled={ci.quantity <= 1}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-300 text-stone-500 transition-colors hover:bg-stone-50 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                >
+                                  <PiMinusDuotone className="h-3.5 w-3.5" />
+                                </button>
+                                <span className="w-8 text-center text-sm font-bold text-stone-900 dark:text-white">
+                                  {ci.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQty(ci.id, ci.quantity + 1)}
+                                  disabled={ci.quantity >= maxQty}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-300 text-stone-500 transition-colors hover:bg-stone-50 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                >
+                                  <PiPlusDuotone className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                               <button
                                 type="button"
-                                onClick={() => handleUpdateQty(ci.id, ci.quantity - 1)}
-                                disabled={ci.quantity <= 1}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-300 text-stone-500 transition-colors hover:bg-stone-50 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                onClick={() => handleRemove(ci.id)}
+                                className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                                title="Remove"
                               >
-                                <PiMinusDuotone className="h-3.5 w-3.5" />
+                                <PiTrashDuotone className="h-4 w-4" />
                               </button>
-                              <span className="w-8 text-center text-sm font-bold text-stone-900 dark:text-white">
-                                {ci.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQty(ci.id, ci.quantity + 1)}
-                                disabled={ci.quantity >= maxQty}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-300 text-stone-500 transition-colors hover:bg-stone-50 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                              >
-                                <PiPlusDuotone className="h-3.5 w-3.5" />
-                              </button>
-                              <span className="ml-1 text-xs text-stone-400 dark:text-zinc-500">
-                                of {maxQty} &middot; ${item.price.toFixed(2)} each
-                              </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemove(ci.id)}
-                              className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-                              title="Remove"
-                            >
-                              <PiTrashDuotone className="h-4 w-4" />
-                            </button>
+                            <p className="text-xs text-stone-400 dark:text-zinc-500">
+                              {maxQty} available · ${item.price.toFixed(2)} each
+                            </p>
                           </div>
                         )}
 
@@ -247,9 +250,10 @@ export function CartReview() {
                             <button
                               type="button"
                               onClick={() => handleRemove(ci.id)}
-                              className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/40"
                             >
-                              Remove from cart
+                              <PiTrashDuotone className="h-3.5 w-3.5" />
+                              Remove
                             </button>
                           </div>
                         )}
@@ -281,7 +285,7 @@ export function CartReview() {
               type="button"
               onClick={handleCheckout}
               disabled={checking || !validItems.length}
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-indigo-600 px-5 py-3.5 text-base font-bold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[var(--color-brand-primary)] px-5 py-3.5 text-base font-bold text-white shadow-sm transition-all hover:bg-[var(--color-brand-primary-hover)] hover:shadow-md active:scale-[0.98] disabled:opacity-50"
             >
               {checking ? (
                 <PiSpinnerDuotone className="h-5 w-5 animate-spin" />
@@ -294,7 +298,7 @@ export function CartReview() {
             <div className="mt-3 flex items-center justify-between">
               <Link
                 href="/inventory"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-brand-primary)] transition-colors hover:text-[var(--color-brand-primary-hover)] dark:text-[var(--color-brand-primary)] dark:hover:text-[var(--color-brand-primary-hover)]"
               >
                 <PiArrowLeftDuotone className="h-3.5 w-3.5" />
                 Continue shopping

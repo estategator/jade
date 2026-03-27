@@ -1,6 +1,7 @@
 'use server';
 
 import { normalizeSourceImage, batchAnalyzePricingImages } from '@/lib/image-processing';
+import { logProjectTransparencyEvent } from '@/lib/project-transparency';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { revalidatePath } from 'next/cache';
 
@@ -173,6 +174,21 @@ export async function addPricingResultToInventory(
 
     revalidatePath('/inventory');
     revalidatePath('/pricing-optimization');
+
+    await logProjectTransparencyEvent({
+      orgId: project.org_id,
+      projectId,
+      actorId: userId,
+      eventType: 'pricing_updated',
+      title: `Pricing prepared for ${name}`,
+      body: `${name} was added with a ${conditionLabel.toLowerCase()} price of $${pricePerCondition[selectedCondition].toFixed(2)}.`,
+      payload: {
+        item_id: item.id,
+        condition: conditionLabel,
+        selected_price: pricePerCondition[selectedCondition],
+        price_per_condition: pricePerCondition,
+      },
+    });
 
     return { id: item.id };
   } catch (err) {

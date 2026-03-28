@@ -31,10 +31,23 @@ export async function POST(req: NextRequest) {
     const relatedObj = 'related_object' in notification && notification.related_object
       ? notification.related_object as { id: string; type: string; url: string }
       : undefined;
+
+    // Signature verified — extract data.object from the raw body since the SDK
+    // only returns a thin notification without the embedded snapshot.
+    let eventData: Record<string, unknown> = {};
+    try {
+      const rawEvent = JSON.parse(body);
+      if (rawEvent.data?.object && typeof rawEvent.data.object === 'object') {
+        eventData = rawEvent.data.object as Record<string, unknown>;
+      }
+    } catch {
+      // body wasn't JSON — leave eventData empty
+    }
+
     payload = {
       eventType: notification.type,
       eventId: notification.id,
-      data: {},
+      data: eventData,
       relatedObject: relatedObj
         ? { id: relatedObj.id, type: relatedObj.type, url: relatedObj.url }
         : undefined,
@@ -43,20 +56,8 @@ export async function POST(req: NextRequest) {
       type: notification.type,
       id: notification.id,
       hasRelatedObject: !!relatedObj,
+      hasDataObject: Object.keys(eventData).length > 0,
     });
-
-    // v2 thin events don't include the full object — hydrate from Stripe API
-    if (!notification.type.startsWith('v2.')) {
-      // v1-type events (e.g. checkout.session.completed) sent via v2 destination:
-      // retrieve the full event snapshot so the queue processor has all fields.
-      const fullEvent = await stripe.events.retrieve(notification.id);
-      payload.data = fullEvent.data.object as unknown as Record<string, unknown>;
-      console.log('[stripe-webhook] Hydrated v2 thin event with full v1 snapshot', {
-        type: notification.type,
-        id: notification.id,
-        dataObjectType: fullEvent.data.object?.object,
-      });
-    }
   } catch {
     // Not a v2 thin event — continue
   }

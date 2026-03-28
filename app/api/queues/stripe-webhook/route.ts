@@ -194,59 +194,94 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
 
       if (checkoutSessionId) {
         // ── Multi-item checkout via cart ──
-        const { data: sessionItems } = await supabaseAdmin
-          .from('checkout_session_items')
-          .select('inventory_item_id, quantity, unit_price, reserved_quantity')
-          .eq('checkout_session_id', checkoutSessionId);
+        // Parallel: fetch session items + checkout session user_id (saves a later round trip)
+        const [{ data: sessionItems }, { data: csRow }] = await Promise.all([
+          supabaseAdmin
+            .from('checkout_session_items')
+            .select('inventory_item_id, quantity, unit_price, reserved_quantity')
+            .eq('checkout_session_id', checkoutSessionId),
+          supabaseAdmin
+            .from('checkout_sessions')
+            .select('user_id')
+            .eq('id', checkoutSessionId)
+            .single(),
+        ]);
 
         if (sessionItems?.length) {
-          let totalNotified = 0;
+          // Batch-fetch all inventory items in one query (replaces N sequential fetches)
+          const itemIds = sessionItems.map(si => si.inventory_item_id);
+          const { data: allItems } = await supabaseAdmin
+            .from('inventory_items')
+            .select('id, quantity, status, project_id, price, name, category, description')
+            .in('id', itemIds);
+
+          const itemMap = new Map((allItems ?? []).map(i => [i.id, i]));
+
+          // Batch-fetch all projects in one query (replaces N sequential fetches)
+          const projectIds = [...new Set(
+            (allItems ?? []).filter(i => i.project_id).map(i => i.project_id as string)
+          )];
+          const { data: allProjects } = projectIds.length
+            ? await supabaseAdmin.from('projects').select('id, org_id').in('id', projectIds)
+            : { data: [] as { id: string; org_id: string }[] };
+          const projectMap = new Map((allProjects ?? []).map(p => [p.id, p.org_id]));
+
           let firstOrgId: string | null = null;
           let firstProjectId: string | null = null;
           const invoiceLines: InvoiceLineInput[] = [];
 
-          for (const si of sessionItems) {
-            // Update inventory status
-            const { data: currentItem } = await supabaseAdmin
-              .from('inventory_items')
-              .select('quantity, status, project_id, price, name, category, description')
-              .eq('id', si.inventory_item_id)
-              .single();
+          // Process each item: parallelize inventory update + sale insert per item
+          const results = await Promise.all(sessionItems.map(async (si) => {
+            const currentItem = itemMap.get(si.inventory_item_id);
+            if (!currentItem) return null;
 
-            if (!currentItem) continue;
-
-            if (currentItem.status === 'reserved' && currentItem.quantity === 0) {
-              await supabaseAdmin
-                .from('inventory_items')
-                .update({
-                  status: 'sold',
+            const updatePayload = currentItem.status === 'reserved' && currentItem.quantity === 0
+              ? {
+                  status: 'sold' as const,
                   stripe_payment_id: session.payment_intent as string,
                   sold_at: new Date().toISOString(),
                   updated_at: new Date().toISOString(),
-                })
-                .eq('id', si.inventory_item_id);
-            } else {
-              await supabaseAdmin
-                .from('inventory_items')
-                .update({
+                }
+              : {
                   stripe_payment_id: session.payment_intent as string,
                   updated_at: new Date().toISOString(),
-                })
-                .eq('id', si.inventory_item_id);
-            }
+                };
 
-            // Look up org
-            const { data: project } = await supabaseAdmin
-              .from('projects')
-              .select('org_id')
-              .eq('id', currentItem.project_id)
-              .single();
+            const orgId = projectMap.get(currentItem.project_id) ?? null;
 
-            const orgId = project?.org_id ?? null;
+            // Parallel: update inventory + insert sale (independent writes)
+            const [, { data: sale }] = await Promise.all([
+              supabaseAdmin
+                .from('inventory_items')
+                .update(updatePayload)
+                .eq('id', si.inventory_item_id),
+              supabaseAdmin.from('sales').insert({
+                inventory_item_id: si.inventory_item_id,
+                seller_org_id: orgId,
+                buyer_email: session.customer_details?.email ?? null,
+                amount: si.unit_price * si.quantity,
+                quantity: si.quantity,
+                unit_price: si.unit_price,
+                currency: session.currency ?? 'usd',
+                stripe_checkout_session_id: session.id,
+                stripe_payment_intent_id: session.payment_intent as string,
+                stripe_connected_account_id: connectedAccountId ?? null,
+                status: 'completed',
+              }).select('id').single(),
+            ]);
+
+            return { si, currentItem, orgId, sale };
+          }));
+
+          // Post-process: collect invoice lines, send notifications, track org/project
+          let totalNotified = 0;
+          for (const result of results) {
+            if (!result) continue;
+            const { si, currentItem, orgId, sale } = result;
+
             if (!firstOrgId && orgId) firstOrgId = orgId;
             if (!firstProjectId && currentItem.project_id) firstProjectId = currentItem.project_id;
 
-            // Collect line data for invoice generation
             invoiceLines.push({
               inventory_item_id: si.inventory_item_id,
               item_name: currentItem.name ?? 'Unknown item',
@@ -255,21 +290,6 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
               quantity: si.quantity,
               unit_price: si.unit_price,
             });
-
-            // Insert sale record (one per line item)
-            const { data: sale } = await supabaseAdmin.from('sales').insert({
-              inventory_item_id: si.inventory_item_id,
-              seller_org_id: orgId,
-              buyer_email: session.customer_details?.email ?? null,
-              amount: si.unit_price * si.quantity,
-              quantity: si.quantity,
-              unit_price: si.unit_price,
-              currency: session.currency ?? 'usd',
-              stripe_checkout_session_id: session.id,
-              stripe_payment_intent_id: session.payment_intent as string,
-              stripe_connected_account_id: connectedAccountId ?? null,
-              status: 'completed',
-            }).select('id').single();
 
             if (sale && orgId) {
               const itemLabel = si.quantity > 1
@@ -302,13 +322,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
 
           // Enqueue invoice generation for the completed checkout
           if (firstOrgId && invoiceLines.length > 0) {
-            // Resolve a valid user UUID for created_by
-            const { data: csRow } = await supabaseAdmin
-              .from('checkout_sessions')
-              .select('user_id')
-              .eq('id', checkoutSessionId)
-              .single();
-
+            // csRow was fetched in parallel above — no extra round trip
             let invoiceCreatedBy = csRow?.user_id;
             if (!invoiceCreatedBy) {
               const { data: orgRow } = await supabaseAdmin
@@ -343,49 +357,39 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
         // ── Legacy single-item checkout ──
         const purchaseQty = parseInt(session.metadata?.purchase_quantity ?? '1', 10) || 1;
 
-        // Fetch current item state
+        // Single query for all needed fields (replaces two sequential fetches)
         const { data: currentItem } = await supabaseAdmin
           .from('inventory_items')
-          .select('quantity, status')
+          .select('quantity, status, project_id, price, name, category, description')
           .eq('id', itemId)
           .single();
 
-        // Mark as sold only when last unit (reserved state), otherwise keep available
-        if (currentItem?.status === 'reserved' && currentItem.quantity === 0) {
-          await supabaseAdmin
-            .from('inventory_items')
-            .update({
-              status: 'sold',
-              stripe_payment_id: session.payment_intent as string,
-              sold_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', itemId);
-        } else {
-          // Multi-quantity item: unit was already decremented at checkout time,
-          // just record the payment reference on the item
-          await supabaseAdmin
-            .from('inventory_items')
-            .update({
-              stripe_payment_id: session.payment_intent as string,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', itemId);
-        }
+        if (currentItem) {
+          // Mark as sold only when last unit (reserved state), otherwise keep available
+          const updatePayload = currentItem.status === 'reserved' && currentItem.quantity === 0
+            ? {
+                status: 'sold' as const,
+                stripe_payment_id: session.payment_intent as string,
+                sold_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }
+            : {
+                stripe_payment_id: session.payment_intent as string,
+                updated_at: new Date().toISOString(),
+              };
 
-        // Look up the item to get the org
-        const { data: item } = await supabaseAdmin
-          .from('inventory_items')
-          .select('project_id, price, name, category, description')
-          .eq('id', itemId)
-          .single();
-
-        if (item) {
-          const { data: project } = await supabaseAdmin
-            .from('projects')
-            .select('org_id')
-            .eq('id', item.project_id)
-            .single();
+          // Parallel: update inventory + fetch project (independent operations)
+          const [, { data: project }] = await Promise.all([
+            supabaseAdmin
+              .from('inventory_items')
+              .update(updatePayload)
+              .eq('id', itemId),
+            supabaseAdmin
+              .from('projects')
+              .select('org_id')
+              .eq('id', currentItem.project_id)
+              .single(),
+          ]);
 
           // Insert sale record
           const { data: sale } = await supabaseAdmin.from('sales').insert({
@@ -394,7 +398,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             buyer_email: session.customer_details?.email ?? null,
             amount: (session.amount_total ?? 0) / 100,
             quantity: purchaseQty,
-            unit_price: Number(item.price),
+            unit_price: Number(currentItem.price),
             currency: session.currency ?? 'usd',
             stripe_checkout_session_id: session.id,
             stripe_payment_intent_id: session.payment_intent as string,
@@ -405,8 +409,8 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
           // Notify all org members about the sale
           if (sale && project?.org_id) {
             const itemLabel = purchaseQty > 1
-              ? `${item.name ?? 'Unknown item'} (x${purchaseQty})`
-              : (item.name ?? 'Unknown item');
+              ? `${currentItem.name ?? 'Unknown item'} (x${purchaseQty})`
+              : (currentItem.name ?? 'Unknown item');
             await createSaleNotifications({
               orgId: project.org_id,
               saleId: sale.id,
@@ -428,18 +432,18 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             if (orgRow?.created_by) {
               await enqueueInvoiceGeneration({
                 orgId: project.org_id,
-                projectId: item.project_id,
+                projectId: currentItem.project_id,
                 stripeCheckoutSessionId: session.id,
                 buyerEmail: session.customer_details?.email ?? null,
                 currency: session.currency ?? 'usd',
                 createdBy: orgRow.created_by,
                 lines: [{
                   inventory_item_id: itemId,
-                  item_name: item.name ?? 'Unknown item',
-                  item_category: (item as Record<string, unknown>).category as string ?? 'Uncategorized',
-                  item_description: (item as Record<string, unknown>).description as string ?? '',
+                  item_name: currentItem.name ?? 'Unknown item',
+                  item_category: (currentItem as Record<string, unknown>).category as string ?? 'Uncategorized',
+                  item_description: (currentItem as Record<string, unknown>).description as string ?? '',
                   quantity: purchaseQty,
-                  unit_price: Number(item.price),
+                  unit_price: Number(currentItem.price),
                 }],
               });
               console.log('[stripe-webhook-queue] Single-item invoice enqueued', {
@@ -500,18 +504,12 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       const subRef = invoice.parent?.subscription_details?.subscription;
       const subId = typeof subRef === 'string' ? subRef : subRef?.id;
       if (subId) {
-        const { data: subRow } = await supabaseAdmin
+        // Direct UPDATE by stripe_subscription_id (saves a SELECT round trip)
+        const { error } = await supabaseAdmin
           .from('subscriptions')
-          .select('org_id')
-          .eq('stripe_subscription_id', subId)
-          .single();
-        if (subRow) {
-          const { error } = await supabaseAdmin
-            .from('subscriptions')
-            .update({ status: 'active', updated_at: new Date().toISOString() })
-            .eq('org_id', subRow.org_id);
-          if (error) console.error('update_subscription_status (active) failed:', error);
-        }
+          .update({ status: 'active', updated_at: new Date().toISOString() })
+          .eq('stripe_subscription_id', subId);
+        if (error) console.error('update_subscription_status (active) failed:', error);
       }
       break;
     }
@@ -521,18 +519,12 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       const subRef2 = invoice.parent?.subscription_details?.subscription;
       const subId2 = typeof subRef2 === 'string' ? subRef2 : subRef2?.id;
       if (subId2) {
-        const { data: subRow2 } = await supabaseAdmin
+        // Direct UPDATE by stripe_subscription_id (saves a SELECT round trip)
+        const { error } = await supabaseAdmin
           .from('subscriptions')
-          .select('org_id')
-          .eq('stripe_subscription_id', subId2)
-          .single();
-        if (subRow2) {
-          const { error } = await supabaseAdmin
-            .from('subscriptions')
-            .update({ status: 'past_due', updated_at: new Date().toISOString() })
-            .eq('org_id', subRow2.org_id);
-          if (error) console.error('update_subscription_status (past_due) failed:', error);
-        }
+          .update({ status: 'past_due', updated_at: new Date().toISOString() })
+          .eq('stripe_subscription_id', subId2);
+        if (error) console.error('update_subscription_status (past_due) failed:', error);
       }
       break;
     }

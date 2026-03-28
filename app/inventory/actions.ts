@@ -5,7 +5,7 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { processItemImage, analyzeUploadedSimpleImage, normalizeSourceImage } from '@/lib/image-processing';
 import type { AIAnalysisResult, InventoryProcessingStatus } from '@/lib/inventory';
 import { logProjectTransparencyEvent } from '@/lib/project-transparency';
-import { requirePermission } from '@/lib/rbac';
+import { requirePermission, resolveActiveOrgId } from '@/lib/rbac';
 import { enqueue, TOPICS } from '@/lib/queue';
 
 export type { AIAnalysisResult } from '@/lib/inventory';
@@ -37,6 +37,7 @@ type InventoryAccessItem = Pick<
 >;
 
 const INVENTORY_STORAGE_DELETE_CHUNK_SIZE = 100;
+const INVENTORY_IMAGE_UPLOAD_CHUNK_SIZE = 8;
 
 // Helper: verify user has access to an item via org membership
 async function verifyItemOwnership(userId: string, itemId: string): Promise<{ valid: boolean; error?: string }> {
@@ -177,6 +178,15 @@ export type UserProject = {
   org_name: string;
 };
 
+function mapProjectsToUserProjects(projects: Record<string, unknown>[]): UserProject[] {
+  return projects.map((project) => ({
+    id: project.id as string,
+    name: project.name as string,
+    org_id: project.org_id as string,
+    org_name: ((project.organizations as Record<string, unknown> | null)?.name as string) ?? '',
+  }));
+}
+
 export type InventoryPagination = {
   page: number;
   pageSize: number;
@@ -215,8 +225,67 @@ function revalidateInventoryRoutes() {
   }
 }
 
+export async function getBulkAddPageProjects(userId: string) {
+  try {
+    const activeOrgId = await resolveActiveOrgId(userId);
+    if (!activeOrgId) {
+      return { activeOrgId: null, projects: [] as UserProject[] };
+    }
+
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select('id, name, org_id, organizations(name)')
+      .eq('org_id', activeOrgId)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { activeOrgId, error: 'Failed to load projects.' };
+    }
+
+    return {
+      activeOrgId,
+      projects: mapProjectsToUserProjects((projects ?? []) as Record<string, unknown>[]),
+    };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { activeOrgId: null, error: 'An unexpected error occurred.' };
+  }
+}
+
 export async function getUserProjects(userId: string, orgId?: string | null) {
   try {
+    if (orgId) {
+      const { data: membership, error: membershipError } = await supabase
+        .from('org_members')
+        .select('org_id')
+        .eq('user_id', userId)
+        .eq('org_id', orgId)
+        .maybeSingle();
+
+      if (membershipError) {
+        console.error('Supabase error:', membershipError);
+        return { error: 'Failed to load projects.' };
+      }
+
+      if (!membership) {
+        return { data: [] as UserProject[] };
+      }
+
+      const { data: projects, error: projectError } = await supabase
+        .from('projects')
+        .select('id, name, org_id, organizations(name)')
+        .eq('org_id', orgId)
+        .order('name', { ascending: true });
+
+      if (projectError) {
+        console.error('Supabase error:', projectError);
+        return { error: 'Failed to load projects.' };
+      }
+
+      return { data: mapProjectsToUserProjects((projects ?? []) as Record<string, unknown>[]) };
+    }
+
     const orgIdsResult = await getAccessibleOrgIds(userId);
     if (orgIdsResult.error) {
       return { error: 'Failed to load projects.' };
@@ -240,14 +309,54 @@ export async function getUserProjects(userId: string, orgId?: string | null) {
       return { error: 'Failed to load projects.' };
     }
 
-    const result: UserProject[] = (projects ?? []).map((p: Record<string, unknown>) => ({
-      id: p.id as string,
-      name: p.name as string,
-      org_id: p.org_id as string,
-      org_name: ((p.organizations as Record<string, unknown>)?.name as string) ?? '',
-    }));
+    return { data: mapProjectsToUserProjects((projects ?? []) as Record<string, unknown>[]) };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
 
-    return { data: result };
+async function getValidatedBulkProjectOrgMap(
+  userId: string,
+  projectIds: string[],
+): Promise<{ data?: Record<string, string>; error?: string }> {
+  const uniqueProjectIds = [...new Set(projectIds.filter(Boolean))];
+  if (!uniqueProjectIds.length) {
+    return { data: {} };
+  }
+
+  try {
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select('id, org_id')
+      .in('id', uniqueProjectIds);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to validate projects.' };
+    }
+
+    const resolvedProjects = projects ?? [];
+    if (resolvedProjects.length !== uniqueProjectIds.length) {
+      return { error: 'One or more selected projects were not found.' };
+    }
+
+    const orgIds = [...new Set(resolvedProjects.map((project) => project.org_id).filter(Boolean))];
+    const permissionChecks = await Promise.all(
+      orgIds.map(async (orgId) => ({
+        orgId,
+        result: await requirePermission(orgId, userId, 'inventory:create'),
+      })),
+    );
+
+    const denied = permissionChecks.find((check) => !check.result.granted);
+    if (denied && !denied.result.granted) {
+      return { error: denied.result.error };
+    }
+
+    return {
+      data: Object.fromEntries(resolvedProjects.map((project) => [project.id, project.org_id])),
+    };
   } catch (err) {
     console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };
@@ -740,18 +849,20 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
 
   if (!items.length) return { error: 'No items to add.' };
 
-  // Resolve org_id for each distinct project_id to prevent null org_id
-  const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
-  const projOrgMap: Record<string, string> = {};
-  if (projectIds.length) {
-    const { data: projects } = await supabase
-      .from('projects')
-      .select('id, org_id')
-      .in('id', projectIds);
-    for (const p of projects ?? []) {
-      if (p.org_id) projOrgMap[p.id] = p.org_id;
-    }
+  const userIds = [...new Set(items.map((item) => item.user_id).filter(Boolean))];
+  if (userIds.length !== 1) {
+    return { error: 'All items must belong to the same user.' };
   }
+
+  const actingUserId = userIds[0];
+
+  const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
+  const projectValidation = await getValidatedBulkProjectOrgMap(actingUserId, projectIds);
+  if (projectValidation.error || !projectValidation.data) {
+    return { error: projectValidation.error || 'Failed to validate projects.' };
+  }
+
+  const projOrgMap = projectValidation.data;
 
   try {
     // 1. Normalize uploaded source images in parallel before storage.
@@ -766,10 +877,18 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
       }),
     );
 
+    const itemIds = items.map(() => crypto.randomUUID());
+
     // 2. Build rows from the in-place analysis results collected in the UI.
     const rows = items.map((item, i) => {
       const hasImage = imageData.some((d) => d?.index === i);
+      const storagePath = `${itemIds[i]}/source.webp`;
+      const originalImageUrl = hasImage
+        ? supabase.storage.from('inventory-images').getPublicUrl(storagePath).data.publicUrl
+        : null;
+
       return {
+        id: itemIds[i],
         name: item.name || '',
         description: item.description || '',
         category: item.category || 'Other',
@@ -779,51 +898,60 @@ export async function createBulkInventoryItemsWithImages(formData: FormData) {
         user_id: item.user_id,
         project_id: item.project_id || null,
         org_id: item.project_id ? (projOrgMap[item.project_id] ?? null) : null,
+        original_image_url: originalImageUrl,
         ai_insights: item.ai_insights ?? null,
         processing_status: hasImage ? ('queued' as const) : ('none' as const),
       };
     });
 
-    const { data: insertedItems, error } = await supabase
+    const { error } = await supabase
       .from('inventory_items')
-      .insert(rows)
-      .select('id');
+      .insert(rows);
 
-    if (error || !insertedItems) {
+    if (error) {
       console.error('Supabase bulk insert error:', error);
       return { error: `Failed to add items: ${error?.message ?? 'Unknown error'}` };
     }
 
-    // 3. Upload source images and enqueue thumbnail generation in parallel.
-    await Promise.all(
-      imageData.map(async (data) => {
-        if (!data) return;
+    // 3. Upload source images in bounded chunks.
+    const failedUploadIds: string[] = [];
+    const imageEntries = imageData.filter((entry): entry is NonNullable<typeof entry> => !!entry);
 
-        const itemId = insertedItems[data.index].id;
-        const storagePath = `${itemId}/source.webp`;
+    for (const imageChunk of chunkArray(imageEntries, INVENTORY_IMAGE_UPLOAD_CHUNK_SIZE)) {
+      await Promise.all(
+        imageChunk.map(async (data) => {
+          const itemId = itemIds[data.index];
+          const storagePath = `${itemId}/source.webp`;
 
-        const { error: uploadErr } = await supabase.storage
-          .from('inventory-images')
-          .upload(storagePath, data.sourceBuffer, { contentType: 'image/webp' });
-
-        if (!uploadErr) {
-          const { data: { publicUrl } } = supabase.storage
+          const { error: uploadErr } = await supabase.storage
             .from('inventory-images')
-            .getPublicUrl(storagePath);
+            .upload(storagePath, data.sourceBuffer, { contentType: 'image/webp' });
 
-          await supabase
-            .from('inventory_items')
-            .update({ original_image_url: publicUrl })
-            .eq('id', itemId);
+          if (uploadErr) {
+            console.error('Bulk image upload error:', uploadErr);
+            failedUploadIds.push(itemId);
+            return null;
+          }
 
           await enqueue(
             TOPICS.PROCESS_IMAGE,
             { itemId, storagePath, skipAnalysis: !!items[data.index]?.ai_insights },
             async (d) => processItemImage(d.itemId, d.storagePath, { skipAnalysis: d.skipAnalysis }),
           );
-        }
-      }),
-    );
+        }),
+      );
+    }
+
+    if (failedUploadIds.length > 0) {
+      const { error: failedStatusError } = await supabase
+        .from('inventory_items')
+        .update({ processing_status: 'failed', original_image_url: null })
+        .in('id', failedUploadIds);
+
+      if (failedStatusError) {
+        console.error('Supabase bulk upload failure status update error:', failedStatusError);
+      }
+    }
 
     revalidateInventoryRoutes();
 
@@ -838,18 +966,20 @@ export async function createBulkInventoryItems(items: BulkItemInput[]) {
   if (!items.length) return { error: 'No items to add.' };
   if (items.some((it) => !it.project_id)) return { error: 'Project is required for all items.' };
 
-  // Resolve org_id for each distinct project_id
-  const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
-  const projOrgMap: Record<string, string> = {};
-  if (projectIds.length) {
-    const { data: projects } = await supabase
-      .from('projects')
-      .select('id, org_id')
-      .in('id', projectIds);
-    for (const p of projects ?? []) {
-      if (p.org_id) projOrgMap[p.id] = p.org_id;
-    }
+  const userIds = [...new Set(items.map((item) => item.user_id).filter(Boolean))];
+  if (userIds.length !== 1) {
+    return { error: 'All items must belong to the same user.' };
   }
+
+  const actingUserId = userIds[0];
+
+  const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
+  const projectValidation = await getValidatedBulkProjectOrgMap(actingUserId, projectIds);
+  if (projectValidation.error || !projectValidation.data) {
+    return { error: projectValidation.error || 'Failed to validate projects.' };
+  }
+
+  const projOrgMap = projectValidation.data;
 
   const rows = items.map((item) => ({
     name: item.name,

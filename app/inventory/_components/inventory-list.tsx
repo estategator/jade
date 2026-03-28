@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/cn";
 import {
   PiSpinnerDuotone,
   PiPlusDuotone,
@@ -398,6 +399,28 @@ export function InventoryList({ initialItems, pagination, userId }: InventoryLis
     params.set("page", String(nextPage));
     params.set("pageSize", String(pagination.pageSize));
     router.push(`/inventory?${params.toString()}`);
+  }
+
+  function handlePageSizeChange(newSize: number) {
+    const params = new URLSearchParams(window.location.search);
+    params.set("page", "1");
+    params.set("pageSize", String(newSize));
+    router.push(`/inventory?${params.toString()}`);
+  }
+
+  function getPageNumbers(): (number | null)[] {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages = new Set<number>([1, totalPages]);
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      pages.add(i);
+    }
+    const sorted = Array.from(pages).sort((a, b) => a - b);
+    const result: (number | null)[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push(null);
+      result.push(sorted[i]);
+    }
+    return result;
   }
 
   useEffect(() => {
@@ -940,28 +963,56 @@ export function InventoryList({ initialItems, pagination, userId }: InventoryLis
           </motion.div>
 
           <div className="mt-4 flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="text-sm text-stone-600 dark:text-zinc-400">
-              Showing {startItem}-{endItem} of {pagination.totalCount}
-            </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-stone-600 dark:text-zinc-400">
+                Showing {startItem}-{endItem} of {pagination.totalCount}
+              </p>
+              <select
+                value={pagination.pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700 transition-colors dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                {[20, 50, 100].map((size) => (
+                  <option key={size} value={size}>{size} / page</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="min-w-[2rem] rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
-                Previous
+                &lsaquo;
               </button>
-              <span className="text-sm font-medium text-stone-700 dark:text-zinc-300">
-                Page {currentPage} of {totalPages}
-              </span>
+              {getPageNumbers().map((page, i) =>
+                page === null ? (
+                  <span key={`ellipsis-${i}`} className="px-2 text-sm text-stone-400 dark:text-zinc-500">&hellip;</span>
+                ) : (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => handlePageChange(page)}
+                    disabled={page === currentPage}
+                    className={cn(
+                      "min-w-[2rem] rounded-lg border px-2 py-1.5 text-sm font-medium transition-colors",
+                      page === currentPage
+                        ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-500 dark:bg-indigo-500"
+                        : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    )}
+                  >
+                    {page}
+                  </button>
+                )
+              )}
               <button
                 type="button"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="min-w-[2rem] rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
-                Next
+                &rsaquo;
               </button>
             </div>
           </div>

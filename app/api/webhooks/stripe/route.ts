@@ -5,10 +5,18 @@ import { enqueue, TOPICS } from '@/lib/queue';
 import { processWebhookEvent, type WebhookPayload } from '@/app/api/queues/stripe-webhook/route';
 
 export async function POST(req: NextRequest) {
+  const receivedAt = Date.now();
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
 
+  console.log('[stripe-webhook] Incoming request', {
+    timestamp: new Date(receivedAt).toISOString(),
+    bodySize: body.length,
+    hasSignature: !!sig,
+  });
+
   if (!sig) {
+    console.warn('[stripe-webhook] Rejected: missing stripe-signature header');
     return NextResponse.json({ error: 'Missing signature.' }, { status: 400 });
   }
 
@@ -31,7 +39,11 @@ export async function POST(req: NextRequest) {
         ? { id: relatedObj.id, type: relatedObj.type, url: relatedObj.url }
         : undefined,
     };
-    console.log('[stripe-webhook] v2 thin event:', notification.type, 'id:', notification.id);
+    console.log('[stripe-webhook] Verified as v2 thin event', {
+      type: notification.type,
+      id: notification.id,
+      hasRelatedObject: !!relatedObj,
+    });
   } catch {
     // Not a v2 thin event — continue
   }
@@ -45,7 +57,10 @@ export async function POST(req: NextRequest) {
         eventId: event.id,
         data: event.data.object as unknown as Record<string, unknown>,
       };
-      console.log('[stripe-webhook] v1 connected event:', event.type, 'id:', event.id);
+      console.log('[stripe-webhook] Verified as v1 connected event', {
+        type: event.type,
+        id: event.id,
+      });
     } catch {
       // Not a v1 connected event — continue
     }
@@ -60,14 +75,32 @@ export async function POST(req: NextRequest) {
         eventId: event.id,
         data: event.data.object as unknown as Record<string, unknown>,
       };
-      console.log('[stripe-webhook] v1 platform event:', event.type, 'id:', event.id);
+      console.log('[stripe-webhook] Verified as v1 platform event', {
+        type: event.type,
+        id: event.id,
+      });
     } catch (err) {
-      console.error('Webhook signature verification failed for all secrets:', err);
+      console.error('[stripe-webhook] Signature verification failed for ALL secrets', {
+        error: err instanceof Error ? err.message : String(err),
+        elapsed: Date.now() - receivedAt,
+      });
       return NextResponse.json({ error: 'Invalid signature.' }, { status: 400 });
     }
   }
 
+  console.log('[stripe-webhook] Enqueuing event for processing', {
+    eventType: payload.eventType,
+    eventId: payload.eventId,
+    elapsed: Date.now() - receivedAt,
+  });
+
   await enqueue(TOPICS.STRIPE_WEBHOOK, payload, processWebhookEvent);
+
+  console.log('[stripe-webhook] Event enqueued successfully', {
+    eventType: payload.eventType,
+    eventId: payload.eventId,
+    totalElapsed: Date.now() - receivedAt,
+  });
 
   return NextResponse.json({ received: true });
 }

@@ -1,9 +1,12 @@
 ﻿import { redirect } from "next/navigation";
+import Link from "next/link";
+import { PiPlusDuotone, PiImagesDuotone } from "react-icons/pi";
 import { createClient } from "@/utils/supabase/server";
 import { resolveActiveOrgId } from "@/lib/rbac";
 import { getInventoryItems } from "@/app/inventory/actions";
 import { getCartItems } from "@/app/cart/actions";
 import { CartProvider } from "@/lib/cart-context";
+import { CartDrawer } from "@/app/components/cart-drawer";
 import { InventoryList } from "@/app/inventory/_components/inventory-list";
 import type { PaginatedInventoryResult } from "@/app/inventory/actions";
 
@@ -60,14 +63,43 @@ export default async function InventoryListPage({ searchParams }: InventoryListP
 
   return (
     <CartProvider userId={user.id} orgId={activeOrgId ?? ""} initialItems={cartItems}>
-      <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <main className="mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-stone-900 dark:text-white sm:text-4xl">
+              Inventory
+            </h1>
+            <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">
+              Manage and track all your estate sale items — {pagination.totalCount}{" "}
+              {pagination.totalCount === 1 ? "item" : "items"} across all projects.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <CartDrawer />
+            <Link
+              href="/inventory/bulk"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-2.5 text-sm font-medium text-stone-700 transition-all hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              <PiImagesDuotone className="h-4 w-4" />
+              Bulk add
+            </Link>
+            <Link
+              href="/inventory/add"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-transparent bg-[var(--color-brand-primary)] px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-[var(--color-brand-primary-hover)]"
+            >
+              <PiPlusDuotone className="h-4 w-4" />
+              Add item
+            </Link>
+          </div>
+        </div>
+
         <InventoryList
           key={`${activeOrgId ?? "all"}:${pagination.page}:${pagination.pageSize}`}
           initialItems={items}
           pagination={pagination}
           userId={user.id}
         />
-      </div>
+      </main>
     </CartProvider>
   );
 }

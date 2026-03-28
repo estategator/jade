@@ -1,126 +1,20 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import {
-  PiCheckCircleDuotone,
-  PiClockDuotone,
-  PiProhibitDuotone,
-  PiSpinnerDuotone,
-  PiSealCheckDuotone,
-  PiTrashDuotone,
-  PiPrinterDuotone,
-} from "react-icons/pi";
 import { PageHeader } from "@/app/components/page-header";
-import {
-  finalizeInvoice,
-  voidInvoice,
-  deleteInvoice,
-  type InvoiceWithLines,
-  type InvoiceAddress,
-} from "@/app/invoices/actions";
-
-const statusConfig = {
-  draft: {
-    label: "Draft",
-    icon: PiClockDuotone,
-    className: "bg-stone-100 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300",
-  },
-  finalized: {
-    label: "Finalized",
-    icon: PiCheckCircleDuotone,
-    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  },
-  void: {
-    label: "Void",
-    icon: PiProhibitDuotone,
-    className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  },
-} as const;
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatAddress(addr: InvoiceAddress | null | undefined): string | null {
-  if (!addr) return null;
-  const parts: string[] = [];
-  if (addr.address_line1) parts.push(addr.address_line1);
-  if (addr.address_line2) parts.push(addr.address_line2);
-  const cityLine = [addr.city, addr.state].filter(Boolean).join(", ");
-  if (cityLine) parts.push(addr.zip_code ? `${cityLine} ${addr.zip_code}` : cityLine);
-  else if (addr.zip_code) parts.push(addr.zip_code);
-  return parts.length > 0 ? parts.join("\n") : null;
-}
+import type { InvoiceWithLines } from "@/app/invoices/actions";
+import { InvoiceActions } from "@/app/invoices/_components/invoice-actions";
+import { statusConfig, formatCurrency, formatDate, formatAddress } from "@/app/invoices/_components/invoice-utils";
 
 type Props = {
   invoice: InvoiceWithLines;
   userId: string;
 };
 
-export function InvoiceDetailClient({ invoice: initialInvoice, userId }: Props) {
-  const router = useRouter();
-  const [invoice] = useState(initialInvoice);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  const sc = statusConfig[invoice.status];
-  const StatusIcon = sc.icon;
-
+export function InvoiceDetailClient({ invoice, userId }: Props) {
   const orgName = invoice.organization?.name ?? "Curator";
   const orgAddress = formatAddress(invoice.organization);
   const orgPhone = invoice.organization?.phone;
   const projectName = invoice.project?.name;
   const projectAddress = formatAddress(invoice.project);
   const projectPhone = invoice.project?.phone;
-
-  async function handleFinalize() {
-    setBusy(true);
-    setError(null);
-    const result = await finalizeInvoice(userId, invoice.id);
-    setBusy(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setSuccessMsg("Invoice finalized successfully.");
-      router.refresh();
-    }
-  }
-
-  async function handleVoid() {
-    setBusy(true);
-    setError(null);
-    const result = await voidInvoice(userId, invoice.id);
-    setBusy(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setSuccessMsg("Invoice voided.");
-      router.refresh();
-    }
-  }
-
-  async function handleDelete() {
-    setBusy(true);
-    setError(null);
-    const result = await deleteInvoice(userId, invoice.id);
-    setBusy(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.push("/invoices");
-    }
-  }
 
   return (
     <main className="invoice-printable px-4 py-12 sm:px-6 lg:px-8">
@@ -241,70 +135,11 @@ export function InvoiceDetailClient({ invoice: initialInvoice, userId }: Props) 
           backLink={{ href: "/invoices", label: "Back to Invoices" }}
         />
 
-        {/* Status + Actions bar */}
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${sc.className}`}>
-            <StatusIcon className="h-4 w-4" />
-            {sc.label}
-          </span>
-
-          <div className="ml-auto flex gap-2">
-            {invoice.status === "draft" && (
-              <>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleFinalize}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
-                >
-                  {busy ? <PiSpinnerDuotone className="h-4 w-4 animate-spin" /> : <PiSealCheckDuotone className="h-4 w-4" />}
-                  Finalize
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleDelete}
-                  className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                >
-                  <PiTrashDuotone className="h-4 w-4" />
-                  Delete
-                </button>
-              </>
-            )}
-            {invoice.status === "finalized" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  <PiPrinterDuotone className="h-4 w-4" />
-                  Print
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleVoid}
-                  className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                >
-                  {busy ? <PiSpinnerDuotone className="h-4 w-4 animate-spin" /> : <PiProhibitDuotone className="h-4 w-4" />}
-                  Void Invoice
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-400">
-            {error}
-          </div>
-        )}
-        {successMsg && (
-          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-400">
-            {successMsg}
-          </div>
-        )}
+        <InvoiceActions
+          userId={userId}
+          invoiceId={invoice.id}
+          status={invoice.status}
+        />
 
         {/* Summary cards */}
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -314,15 +149,13 @@ export function InvoiceDetailClient({ invoice: initialInvoice, userId }: Props) 
             { label: "Total", value: formatCurrency(Number(invoice.total)) },
             { label: "Line Items", value: String(invoice.line_count) },
           ].map((card) => (
-            <motion.div
+            <div
               key={card.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
               className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
             >
               <p className="text-sm text-stone-500 dark:text-zinc-400">{card.label}</p>
               <p className="mt-1 text-2xl font-bold text-stone-900 dark:text-white">{card.value}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   PiCalendarDuotone,
@@ -15,10 +16,10 @@ type Props = {
   orgId: string;
   initialProjects?: { id: string; name: string }[];
   initialCategories?: string[];
-  onGenerated?: () => void;
 };
 
-export function InvoiceGenerateForm({ userId, orgId, initialProjects, initialCategories, onGenerated }: Props) {
+export function InvoiceGenerateForm({ userId, orgId, initialProjects, initialCategories }: Props) {
+  const router = useRouter();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>(initialProjects ?? []);
   const [categories, setCategories] = useState<string[]>(initialCategories ?? []);
   const [loading, setLoading] = useState(false);
@@ -87,7 +88,7 @@ export function InvoiceGenerateForm({ userId, orgId, initialProjects, initialCat
       setMinPrice("");
       setMaxPrice("");
       setNotes("");
-      onGenerated?.();
+      router.refresh();
     }
   }
 

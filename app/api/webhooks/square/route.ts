@@ -19,20 +19,34 @@ function verifySquareSignature(body: string, signature: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const receivedAt = Date.now();
   const body = await req.text();
   const signature = req.headers.get('x-square-hmacsha256-signature');
 
+  console.log('[square-webhook] Incoming request', {
+    timestamp: new Date(receivedAt).toISOString(),
+    bodySize: body.length,
+    hasSignature: !!signature,
+  });
+
   if (!signature) {
+    console.warn('[square-webhook] Rejected: missing x-square-hmacsha256-signature header');
     return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
   }
 
   if (!verifySquareSignature(body, signature)) {
+    console.warn('[square-webhook] Rejected: signature verification failed');
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
   const event = JSON.parse(body);
 
-  console.log('[square-webhook] Received event:', event.type, 'id:', event.event_id);
+  console.log('[square-webhook] Event verified', {
+    type: event.type,
+    eventId: event.event_id,
+    merchantId: event.merchant_id,
+    elapsed: Date.now() - receivedAt,
+  });
 
   const payload: SquareWebhookPayload = {
     eventType: event.type,
@@ -42,6 +56,12 @@ export async function POST(req: NextRequest) {
   };
 
   await enqueue(TOPICS.SQUARE_WEBHOOK, payload, processWebhookEvent);
+
+  console.log('[square-webhook] Event enqueued successfully', {
+    type: event.type,
+    eventId: event.event_id,
+    totalElapsed: Date.now() - receivedAt,
+  });
 
   return NextResponse.json({ received: true });
 }

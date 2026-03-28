@@ -19,10 +19,19 @@ function verifyCloverSignature(body: string, signature: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const receivedAt = Date.now();
   const body = await req.text();
   const signature = req.headers.get('x-clover-hmac-sha256') ?? req.headers.get('x-clover-signature') ?? '';
 
+  console.log('[clover-webhook] Incoming request', {
+    timestamp: new Date(receivedAt).toISOString(),
+    bodySize: body.length,
+    hasSignature: !!signature,
+    signatureHeader: signature ? 'x-clover-hmac-sha256' : 'none',
+  });
+
   if (!signature || !verifyCloverSignature(body, signature)) {
+    console.warn('[clover-webhook] Rejected: invalid or missing signature');
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -30,7 +39,11 @@ export async function POST(req: NextRequest) {
   const eventType = event.type ?? event.eventType ?? '';
   const merchantId = event.merchant_id ?? event.merchantId ?? '';
 
-  console.log('[clover-webhook] Received event type:', eventType, 'merchant:', merchantId);
+  console.log('[clover-webhook] Event verified', {
+    eventType,
+    merchantId,
+    elapsed: Date.now() - receivedAt,
+  });
 
   const payload: CloverWebhookPayload = {
     eventType,
@@ -39,6 +52,12 @@ export async function POST(req: NextRequest) {
   };
 
   await enqueue(TOPICS.CLOVER_WEBHOOK, payload, processWebhookEvent);
+
+  console.log('[clover-webhook] Event enqueued successfully', {
+    eventType,
+    merchantId,
+    totalElapsed: Date.now() - receivedAt,
+  });
 
   return NextResponse.json({ received: true });
 }

@@ -23,8 +23,16 @@ export async function POST(req: NextRequest) {
 
   const adapter = getContractAdapter(provider);
 
+  const receivedAt = Date.now();
+
+  console.log(`[contract-webhook] Incoming request`, {
+    timestamp: new Date(receivedAt).toISOString(),
+    provider,
+    bodySize: body.length,
+  });
+
   if (!adapter.verifyWebhookSignature(body, headers)) {
-    console.error(`[contract-webhook] Invalid signature for provider: ${provider}`);
+    console.error(`[contract-webhook] Rejected: invalid signature`, { provider });
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 401 });
   }
 
@@ -32,14 +40,23 @@ export async function POST(req: NextRequest) {
   try {
     rawPayload = JSON.parse(body) as Record<string, unknown>;
   } catch {
+    console.warn(`[contract-webhook] Rejected: invalid JSON body`, { provider });
     return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 });
   }
 
   const payload: ContractWebhookPayload = { provider, rawPayload };
 
-  console.log(`[contract-webhook] Received ${provider} event, enqueuing.`);
+  console.log(`[contract-webhook] Event verified, enqueuing`, {
+    provider,
+    elapsed: Date.now() - receivedAt,
+  });
 
   await enqueue(TOPICS.CONTRACT_WEBHOOK, payload, processContractWebhook);
+
+  console.log(`[contract-webhook] Event enqueued successfully`, {
+    provider,
+    totalElapsed: Date.now() - receivedAt,
+  });
 
   return NextResponse.json({ received: true });
 }

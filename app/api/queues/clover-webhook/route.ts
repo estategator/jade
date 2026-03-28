@@ -31,8 +31,13 @@ async function enqueueInvoiceGeneration(payload: InvoiceGenerationPayload): Prom
 
 export async function processWebhookEvent(payload: CloverWebhookPayload): Promise<void> {
   const { eventType, merchantId, data } = payload;
+  const startedAt = Date.now();
 
-  console.log('[clover-webhook-queue] Processing event:', eventType);
+  console.log('[clover-webhook-queue] Processing event', {
+    eventType,
+    merchantId,
+    timestamp: new Date(startedAt).toISOString(),
+  });
 
   // Look up org by Clover merchant ID
   const { data: connection } = await supabaseAdmin
@@ -224,7 +229,7 @@ export async function processWebhookEvent(payload: CloverWebhookPayload): Promis
           });
         }
 
-        console.log('[clover-webhook-queue] Simple payment recorded for org:', orgId);
+        console.log('[clover-webhook-queue] Simple payment recorded', { orgId, amount, currency });
       }
       break;
     }
@@ -232,6 +237,12 @@ export async function processWebhookEvent(payload: CloverWebhookPayload): Promis
     default:
       console.log('[clover-webhook-queue] Unhandled event type:', eventType);
   }
+
+  console.log('[clover-webhook-queue] Event processing complete', {
+    eventType,
+    merchantId,
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 export const POST = handleCallback(async (payload: CloverWebhookPayload) => {

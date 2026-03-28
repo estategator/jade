@@ -21,8 +21,16 @@ export async function POST(req: NextRequest) {
 
   const adapter = getSchedulingAdapter(provider);
 
+  const receivedAt = Date.now();
+
+  console.log(`[walkthrough-webhook] Incoming request`, {
+    timestamp: new Date(receivedAt).toISOString(),
+    provider,
+    bodySize: body.length,
+  });
+
   if (!adapter.verifyWebhookSignature(body, headers)) {
-    console.error(`[walkthrough-webhook] Invalid signature for provider: ${provider}`);
+    console.error(`[walkthrough-webhook] Rejected: invalid signature`, { provider });
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 401 });
   }
 
@@ -30,14 +38,23 @@ export async function POST(req: NextRequest) {
   try {
     rawPayload = JSON.parse(body) as Record<string, unknown>;
   } catch {
+    console.warn(`[walkthrough-webhook] Rejected: invalid JSON body`, { provider });
     return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 });
   }
 
   const payload: WalkthroughWebhookPayload = { provider, rawPayload };
 
-  console.log(`[walkthrough-webhook] Received ${provider} event, enqueuing.`);
+  console.log(`[walkthrough-webhook] Event verified, enqueuing`, {
+    provider,
+    elapsed: Date.now() - receivedAt,
+  });
 
   await enqueue(TOPICS.WALKTHROUGH_WEBHOOK, payload, processWalkthroughWebhook);
+
+  console.log(`[walkthrough-webhook] Event enqueued successfully`, {
+    provider,
+    totalElapsed: Date.now() - receivedAt,
+  });
 
   return NextResponse.json({ received: true });
 }

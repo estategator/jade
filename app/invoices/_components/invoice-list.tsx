@@ -7,54 +7,23 @@ import {
   PiFileTextDuotone,
   PiSpinnerDuotone,
   PiMagnifyingGlassDuotone,
-  PiCheckCircleDuotone,
-  PiClockDuotone,
-  PiProhibitDuotone,
   PiTrashDuotone,
   PiWarningDuotone,
   PiPrinterDuotone,
 } from "react-icons/pi";
 import { getInvoices, deleteInvoice, type InvoiceListItem } from "@/app/invoices/actions";
+import { statusConfig, formatCurrency, formatDate } from "@/app/invoices/_components/invoice-utils";
 
 type Props = {
   userId: string;
   orgId: string;
   initialInvoices: InvoiceListItem[];
   initialHasMore: boolean;
-  refreshKey?: number;
 };
 
-const statusConfig = {
-  draft: {
-    label: "Draft",
-    icon: PiClockDuotone,
-    className: "bg-stone-100 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300",
-  },
-  finalized: {
-    label: "Finalized",
-    icon: PiCheckCircleDuotone,
-    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  },
-  void: {
-    label: "Void",
-    icon: PiProhibitDuotone,
-    className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  },
-} as const;
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
-}
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-export function InvoiceList({ userId, orgId, initialInvoices, initialHasMore, refreshKey }: Props) {
+export function InvoiceList({ userId, orgId, initialInvoices, initialHasMore }: Props) {
   const [invoices, setInvoices] = useState<InvoiceListItem[]>(initialInvoices);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -67,6 +36,12 @@ export function InvoiceList({ userId, orgId, initialInvoices, initialHasMore, re
   const [hasMore, setHasMore] = useState(initialHasMore);
   // Track whether user has triggered a filter change (skip initial mount fetch)
   const [hasUserFiltered, setHasUserFiltered] = useState(false);
+
+  // Sync with server-provided data when parent re-renders (e.g. after router.refresh())
+  useEffect(() => {
+    setInvoices(initialInvoices);
+    setHasMore(initialHasMore);
+  }, [initialInvoices, initialHasMore]);
 
   // Reset page when filter changes
   const loadInvoices = useCallback(async (pageNum: number, append: boolean) => {
@@ -88,13 +63,13 @@ export function InvoiceList({ userId, orgId, initialInvoices, initialHasMore, re
     setLoadingMore(false);
   }, [userId, orgId, statusFilter]);
 
-  // Only re-fetch when user changes filter or refreshKey triggers;
+  // Only re-fetch when user changes filter;
   // initial data is already provided server-side.
   useEffect(() => {
-    if (hasUserFiltered || (refreshKey !== undefined && refreshKey > 0)) {
+    if (hasUserFiltered) {
       loadInvoices(0, false);
     }
-  }, [loadInvoices, refreshKey, hasUserFiltered]);
+  }, [loadInvoices, hasUserFiltered]);
 
   const filtered = invoices.filter((inv) => {
     if (!search) return true;

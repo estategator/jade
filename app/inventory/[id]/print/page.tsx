@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { getInventoryItem } from "@/app/inventory/actions";
 import type { AIAnalysisResult } from "@/app/inventory/actions";
@@ -40,12 +41,17 @@ export default async function PrintLabelPage({
         item.condition.toLowerCase()
       ];
 
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const proto = headersList.get("x-forwarded-proto") ?? "https";
+  const publicUrl = `${proto}://${host}/items/${item.id}`;
+
   return (
     <ThermalLabel
       itemName={item.name}
       itemPrice={item.price}
       itemDescription={item.description}
-      itemId={item.id}
+      publicUrl={publicUrl}
       isGreatDeal={isGreatDeal}
     />
   );

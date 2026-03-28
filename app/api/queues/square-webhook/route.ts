@@ -32,8 +32,14 @@ async function enqueueInvoiceGeneration(payload: InvoiceGenerationPayload): Prom
 
 export async function processWebhookEvent(payload: SquareWebhookPayload): Promise<void> {
   const { eventType, eventId, merchantId, data } = payload;
+  const startedAt = Date.now();
 
-  console.log('[square-webhook-queue] Processing event:', eventType, 'id:', eventId);
+  console.log('[square-webhook-queue] Processing event', {
+    eventType,
+    eventId,
+    merchantId,
+    timestamp: new Date(startedAt).toISOString(),
+  });
 
   // Look up org by Square merchant ID
   const { data: connection } = await supabaseAdmin
@@ -246,6 +252,13 @@ export async function processWebhookEvent(payload: SquareWebhookPayload): Promis
     default:
       console.log('[square-webhook-queue] Unhandled event type:', eventType);
   }
+
+  console.log('[square-webhook-queue] Event processing complete', {
+    eventType,
+    eventId,
+    merchantId,
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 export const POST = handleCallback(async (payload: SquareWebhookPayload) => {

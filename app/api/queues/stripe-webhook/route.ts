@@ -138,12 +138,28 @@ async function enqueueInvoiceGeneration(payload: InvoiceGenerationPayload): Prom
 
 export async function processWebhookEvent(payload: WebhookPayload): Promise<void> {
   const { eventType, data } = payload;
+  const startedAt = Date.now();
 
-  console.log('[stripe-webhook-queue] Processing event:', eventType);
+  console.log('[stripe-webhook-queue] Processing event', {
+    eventType,
+    eventId: payload.eventId,
+    hasRelatedObject: !!payload.relatedObject,
+    timestamp: new Date(startedAt).toISOString(),
+  });
 
   switch (eventType) {
     case 'checkout.session.completed': {
       const session = data as unknown as Stripe.Checkout.Session;
+
+      console.log('[stripe-webhook-queue] checkout.session.completed', {
+        sessionId: session.id,
+        mode: session.mode,
+        paymentIntent: session.payment_intent,
+        customerEmail: session.customer_details?.email,
+        amountTotal: session.amount_total,
+        currency: session.currency,
+        metadata: session.metadata,
+      });
 
       // Handle subscription checkout
       if (session.mode === 'subscription') {
@@ -277,7 +293,12 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             .update({ status: 'completed', updated_at: new Date().toISOString() })
             .eq('id', checkoutSessionId);
 
-          console.log(`[stripe-webhook-queue] Multi-item checkout completed: ${sessionItems.length} items, ${totalNotified} notifications sent`);
+          console.log(`[stripe-webhook-queue] Multi-item checkout completed`, {
+            sessionId: session.id,
+            itemCount: sessionItems.length,
+            notificationsSent: totalNotified,
+            durationMs: Date.now() - startedAt,
+          });
 
           // Enqueue invoice generation for the completed checkout
           if (firstOrgId && invoiceLines.length > 0) {
@@ -308,7 +329,11 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
                 createdBy: invoiceCreatedBy,
                 lines: invoiceLines,
               });
-              console.log('[stripe-webhook-queue] Invoice generation enqueued for session:', session.id);
+              console.log('[stripe-webhook-queue] Invoice generation enqueued', {
+                sessionId: session.id,
+                orgId: firstOrgId,
+                lineCount: invoiceLines.length,
+              });
             } else {
               console.error('[stripe-webhook-queue] Skipping invoice: no valid user for created_by');
             }
@@ -417,7 +442,11 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
                   unit_price: Number(item.price),
                 }],
               });
-              console.log('[stripe-webhook-queue] Single-item invoice generation enqueued for session:', session.id);
+              console.log('[stripe-webhook-queue] Single-item invoice enqueued', {
+                sessionId: session.id,
+                itemId,
+                orgId: project.org_id,
+              });
             } else {
               console.error('[stripe-webhook-queue] Skipping single-item invoice: no valid user for created_by');
             }
@@ -431,6 +460,12 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       const session = data as unknown as Stripe.Checkout.Session;
       const expiredCheckoutSessionId = session.metadata?.checkout_session_id;
       const expiredItemId = session.metadata?.inventory_item_id;
+
+      console.log('[stripe-webhook-queue] checkout.session.expired', {
+        sessionId: session.id,
+        checkoutSessionId: expiredCheckoutSessionId,
+        itemId: expiredItemId,
+      });
 
       if (expiredCheckoutSessionId) {
         // Multi-item expiry: use shared idempotent restore
@@ -569,6 +604,12 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       break;
     }
   }
+
+  console.log('[stripe-webhook-queue] Event processing complete', {
+    eventType,
+    eventId: payload.eventId,
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 export const POST = handleCallback(async (payload: WebhookPayload) => {

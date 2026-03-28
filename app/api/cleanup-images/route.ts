@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
   }
 
   let deleted = 0;
+  const removedItemIds: string[] = [];
   const errors: string[] = [];
 
   for (const item of items ?? []) {
@@ -64,12 +65,20 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    await supabaseAdmin
+    removedItemIds.push(item.id);
+  }
+
+  if (removedItemIds.length > 0) {
+    const { error: updateError } = await supabaseAdmin
       .from('inventory_items')
       .update({ original_image_url: null })
-      .eq('id', item.id);
+      .in('id', removedItemIds);
 
-    deleted++;
+    if (updateError) {
+      errors.push(`database update failed: ${updateError.message}`);
+    } else {
+      deleted = removedItemIds.length;
+    }
   }
 
   return NextResponse.json({ deleted, errors, retentionDays: RETENTION_DAYS });

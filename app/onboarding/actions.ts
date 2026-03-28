@@ -647,6 +647,14 @@ export async function assignClientToProject(formData: FormData): Promise<ActionR
       return { error: 'Project not found for the active organization.' };
     }
 
+    // Clean up any archived rows for this org+project so re-linking works
+    await supabase
+      .from('client_project_assignments')
+      .delete()
+      .eq('org_id', context.orgId)
+      .eq('project_id', projectId)
+      .eq('status', 'archived');
+
     const { data: assignment, error: assignmentError } = await supabase
       .from('client_project_assignments')
       .insert({
@@ -715,6 +723,230 @@ export async function assignClientToProject(formData: FormData): Promise<ActionR
       targetType: 'client_project_assignment',
       targetId: assignment.id,
       metadata: { clientProfileId, projectId },
+    });
+
+    revalidatePath('/onboarding');
+    revalidatePath('/clients');
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+/**
+ * Archive (soft-remove) a client-project assignment.
+ * Preserves all workflow/contract/history data — the row is set to 'archived'.
+ */
+export async function removeClientAssignment(assignmentId: string): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:create');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  if (!assignmentId) {
+    return { error: 'Missing assignment.' };
+  }
+
+  try {
+    const { data: assignment, error: fetchError } = await supabase
+      .from('client_project_assignments')
+      .select('id, org_id, project_id, client_profile_id, status')
+      .eq('id', assignmentId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (fetchError || !assignment) {
+      return { error: 'Assignment not found.' };
+    }
+
+    if (assignment.status === 'archived') {
+      return { error: 'This assignment is already archived.' };
+    }
+
+    const { error: updateError } = await supabase
+      .from('client_project_assignments')
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
+      .eq('id', assignmentId)
+      .eq('org_id', context.orgId);
+
+    if (updateError) {
+      console.error('Supabase error:', updateError);
+      return { error: 'Failed to remove assignment.' };
+    }
+
+    await auditLog({
+      orgId: context.orgId,
+      actorId: context.userId,
+      action: 'onboarding.assignment_archived',
+      targetType: 'client_project_assignment',
+      targetId: assignmentId,
+      metadata: { projectId: assignment.project_id, clientProfileId: assignment.client_profile_id },
+    });
+
+    revalidatePath('/onboarding');
+    revalidatePath('/clients');
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+/**
+ * Change (reassign) a client from one project to another.
+ * Archives the current assignment, then creates a new active assignment
+ * with a fresh onboarding workflow.
+ */
+export async function changeClientAssignment(
+  assignmentId: string,
+  newProjectId: string,
+): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:create');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  if (!assignmentId || !newProjectId) {
+    return { error: 'Select an assignment and a new project.' };
+  }
+
+  try {
+    // Validate existing assignment
+    const { data: existingAssignment, error: existingError } = await supabase
+      .from('client_project_assignments')
+      .select('id, org_id, project_id, client_profile_id, status')
+      .eq('id', assignmentId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (existingError || !existingAssignment) {
+      return { error: 'Current assignment not found.' };
+    }
+
+    if (existingAssignment.status !== 'active') {
+      return { error: 'Only active assignments can be changed.' };
+    }
+
+    if (existingAssignment.project_id === newProjectId) {
+      return { error: 'The client is already assigned to that project.' };
+    }
+
+    // Validate new project
+    const { data: newProject, error: projectError } = await supabase
+      .from('projects')
+      .select('id, name')
+      .eq('id', newProjectId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (projectError || !newProject) {
+      return { error: 'New project not found for the active organization.' };
+    }
+
+    // Archive old assignment
+    const { error: archiveError } = await supabase
+      .from('client_project_assignments')
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
+      .eq('id', assignmentId)
+      .eq('org_id', context.orgId);
+
+    if (archiveError) {
+      console.error('Supabase error:', archiveError);
+      return { error: 'Failed to archive the current assignment.' };
+    }
+
+    // Clean up any prior archived rows for the new project so re-linking works
+    await supabase
+      .from('client_project_assignments')
+      .delete()
+      .eq('org_id', context.orgId)
+      .eq('project_id', newProjectId)
+      .eq('status', 'archived');
+
+    // Create new active assignment
+    const { data: newAssignment, error: newAssignError } = await supabase
+      .from('client_project_assignments')
+      .insert({
+        org_id: context.orgId,
+        client_profile_id: existingAssignment.client_profile_id,
+        project_id: newProjectId,
+        assigned_by: context.userId,
+      })
+      .select('id')
+      .single();
+
+    if (newAssignError || !newAssignment) {
+      console.error('Supabase error:', newAssignError);
+      // Attempt to roll back archive
+      await supabase
+        .from('client_project_assignments')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', assignmentId)
+        .eq('org_id', context.orgId);
+
+      if (newAssignError?.code === '23505') {
+        return { error: 'That project is already assigned to another client.' };
+      }
+      return { error: 'Failed to create new assignment.' };
+    }
+
+    // Create onboarding workflow + steps for the new assignment
+    const { data: workflow, error: workflowError } = await supabase
+      .from('onboarding_workflows')
+      .insert({ org_id: context.orgId, assignment_id: newAssignment.id })
+      .select('id')
+      .single();
+
+    if (workflowError || !workflow) {
+      console.error('Supabase error:', workflowError);
+      return { error: 'Assignment created but failed to initialize workflow.' };
+    }
+
+    const stepRows = ONBOARDING_STEP_BLUEPRINTS.map((step, index) => ({
+      org_id: context.orgId,
+      workflow_id: workflow.id,
+      step_key: step.key,
+      title: step.title,
+      description: step.description,
+      sort_order: index,
+    }));
+
+    const { error: stepsError } = await supabase.from('onboarding_steps').insert(stepRows);
+    if (stepsError) {
+      console.error('Supabase error:', stepsError);
+    }
+
+    // Fetch client name for transparency event
+    const { data: client } = await supabase
+      .from('client_profiles')
+      .select('full_name')
+      .eq('id', existingAssignment.client_profile_id)
+      .single();
+
+    await logProjectTransparencyEvent({
+      orgId: context.orgId,
+      projectId: newProjectId,
+      assignmentId: newAssignment.id,
+      actorId: context.userId,
+      eventType: 'client_assigned',
+      title: `Client reassigned to ${newProject.name}`,
+      body: `${client?.full_name ?? 'Client'} was reassigned from a previous project.`,
+      payload: { client_profile_id: existingAssignment.client_profile_id, previous_assignment_id: assignmentId },
+    });
+
+    await auditLog({
+      orgId: context.orgId,
+      actorId: context.userId,
+      action: 'onboarding.assignment_changed',
+      targetType: 'client_project_assignment',
+      targetId: newAssignment.id,
+      metadata: {
+        clientProfileId: existingAssignment.client_profile_id,
+        oldProjectId: existingAssignment.project_id,
+        newProjectId,
+        archivedAssignmentId: assignmentId,
+      },
     });
 
     revalidatePath('/onboarding');

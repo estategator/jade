@@ -31,45 +31,142 @@ export type InventoryItem = {
   project?: { id: string; name: string; org_id: string; organizations?: { name: string; stripe_onboarding_complete?: boolean } };
 };
 
+type InventoryAccessItem = Pick<
+  InventoryItem,
+  'id' | 'project_id' | 'original_image_url' | 'thumbnail_url' | 'medium_image_url'
+>;
+
+const INVENTORY_STORAGE_DELETE_CHUNK_SIZE = 100;
+
 // Helper: verify user has access to an item via org membership
 async function verifyItemOwnership(userId: string, itemId: string): Promise<{ valid: boolean; error?: string }> {
+  const result = await getAccessibleInventoryItems(userId, [itemId]);
+  if (result.error) {
+    return { valid: false, error: result.error };
+  }
+
+  return { valid: true };
+}
+
+function parseInventoryStoragePath(url: string | null): string | null {
+  if (!url) return null;
+
   try {
-    const { data: item, error: itemErr } = await supabase
-      .from('inventory_items')
-      .select('project_id')
-      .eq('id', itemId)
-      .single();
+    const parsedUrl = new URL(url);
+    const pathMatch = parsedUrl.pathname.match(/\/inventory-images\/(.+)$/);
+    return pathMatch ? decodeURIComponent(pathMatch[1]) : null;
+  } catch {
+    return null;
+  }
+}
 
-    if (itemErr || !item) {
-      return { valid: false, error: 'Item not found.' };
-    }
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+  if (items.length <= chunkSize) return [items];
 
-    const { data: project, error: projErr } = await supabase
-      .from('projects')
-      .select('org_id')
-      .eq('id', item.project_id)
-      .single();
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
 
-    if (projErr || !project) {
-      return { valid: false, error: 'Project not found.' };
-    }
+async function getAccessibleInventoryItems(
+  userId: string,
+  itemIds: string[],
+): Promise<{ data?: InventoryAccessItem[]; error?: string }> {
+  const uniqueIds = [...new Set(itemIds)];
+  if (!uniqueIds.length) {
+    return { data: [] };
+  }
 
-    const { data: membership, error: memErr } = await supabase
+  try {
+    const { data: memberships, error: membershipError } = await supabase
       .from('org_members')
       .select('org_id')
-      .eq('user_id', userId)
-      .eq('org_id', project.org_id)
-      .single();
+      .eq('user_id', userId);
 
-    if (memErr && memErr.code !== 'PGRST116') {
-      return { valid: false, error: 'Permission check failed.' };
+    if (membershipError) {
+      console.error('Supabase error:', membershipError);
+      return { error: 'Permission check failed.' };
     }
 
-    const isValid = !!membership;
-    return { valid: isValid, ...(isValid ? {} : { error: 'You do not have access to this item.' }) };
+    const accessibleOrgIds = new Set((memberships ?? []).map((membership) => membership.org_id));
+
+    const { data: items, error: itemError } = await supabase
+      .from('inventory_items')
+      .select('id, project_id, original_image_url, thumbnail_url, medium_image_url')
+      .in('id', uniqueIds);
+
+    if (itemError) {
+      console.error('Supabase error:', itemError);
+      return { error: uniqueIds.length === 1 ? 'Item not found.' : 'Failed to load selected items.' };
+    }
+
+    const resolvedItems = (items ?? []) as InventoryAccessItem[];
+    if (resolvedItems.length !== uniqueIds.length) {
+      return { error: uniqueIds.length === 1 ? 'Item not found.' : 'One or more items were not found.' };
+    }
+
+    const projectIds = [...new Set(resolvedItems.map((item) => item.project_id))];
+    const { data: projects, error: projectError } = await supabase
+      .from('projects')
+      .select('id, org_id')
+      .in('id', projectIds);
+
+    if (projectError) {
+      console.error('Supabase error:', projectError);
+      return { error: uniqueIds.length === 1 ? 'Project not found.' : 'Failed to load selected item projects.' };
+    }
+
+    const projectOrgIds = new Map((projects ?? []).map((project) => [project.id, project.org_id]));
+
+    for (const item of resolvedItems) {
+      const orgId = projectOrgIds.get(item.project_id);
+      if (!orgId) {
+        return { error: uniqueIds.length === 1 ? 'Project not found.' : 'One or more items are linked to missing projects.' };
+      }
+
+      if (!accessibleOrgIds.has(orgId)) {
+        return {
+          error: uniqueIds.length === 1 ? 'You do not have access to this item.' : 'Permission denied for one or more items.',
+        };
+      }
+    }
+
+    return { data: resolvedItems };
   } catch (err) {
     console.error('Unexpected error in ownership check:', err);
-    return { valid: false, error: 'Permission check failed.' };
+    return { error: 'Permission check failed.' };
+  }
+}
+
+async function removeInventoryStorageObjects(items: InventoryAccessItem[]): Promise<{ success?: true; error?: string }> {
+  const paths = [...new Set(items.flatMap((item) => [
+    parseInventoryStoragePath(item.original_image_url),
+    parseInventoryStoragePath(item.thumbnail_url),
+    parseInventoryStoragePath(item.medium_image_url),
+  ].filter((path): path is string => !!path)))];
+
+  if (!paths.length) {
+    return { success: true };
+  }
+
+  try {
+    for (const pathChunk of chunkArray(paths, INVENTORY_STORAGE_DELETE_CHUNK_SIZE)) {
+      const { error } = await supabase.storage
+        .from('inventory-images')
+        .remove(pathChunk);
+
+      if (error) {
+        console.error('Storage delete error:', error);
+        return { error: 'Failed to delete item images.' };
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Unexpected storage delete error:', err);
+    return { error: 'Failed to delete item images.' };
   }
 }
 
@@ -520,20 +617,15 @@ export async function updateInventoryItem(id: string, userId: string, formData: 
 }
 
 export async function deleteInventoryItem(id: string, userId: string) {
-  // Verify ownership first
-  const ownershipCheck = await verifyItemOwnership(userId, id);
-  if (!ownershipCheck.valid) {
-    return { error: ownershipCheck.error || 'Failed to delete item.' };
+  const accessResult = await getAccessibleInventoryItems(userId, [id]);
+  if (accessResult.error || !accessResult.data?.length) {
+    return { error: accessResult.error || 'Failed to delete item.' };
   }
 
   try {
-    // Remove all storage objects for this item before deleting the DB row
-    const { data: files } = await supabase.storage
-      .from('inventory-images')
-      .list(id);
-    if (files && files.length > 0) {
-      const paths = files.map((f) => `${id}/${f.name}`);
-      await supabase.storage.from('inventory-images').remove(paths);
+    const storageResult = await removeInventoryStorageObjects(accessResult.data);
+    if (storageResult.error) {
+      return { error: storageResult.error };
     }
 
     const { error } = await supabase
@@ -556,30 +648,24 @@ export async function deleteInventoryItem(id: string, userId: string) {
 }
 
 export async function bulkDeleteInventoryItems(ids: string[], userId: string) {
-  if (!ids.length) return { error: 'No items selected.' };
+  const uniqueIds = [...new Set(ids)];
+  if (!uniqueIds.length) return { error: 'No items selected.' };
 
   try {
-    // Verify ownership for each item
-    for (const id of ids) {
-      const check = await verifyItemOwnership(userId, id);
-      if (!check.valid) return { error: check.error || 'Permission denied for one or more items.' };
+    const accessResult = await getAccessibleInventoryItems(userId, uniqueIds);
+    if (accessResult.error || !accessResult.data) {
+      return { error: accessResult.error || 'Permission denied for one or more items.' };
     }
 
-    // Remove storage objects for each item
-    for (const id of ids) {
-      const { data: files } = await supabase.storage
-        .from('inventory-images')
-        .list(id);
-      if (files && files.length > 0) {
-        const paths = files.map((f) => `${id}/${f.name}`);
-        await supabase.storage.from('inventory-images').remove(paths);
-      }
+    const storageResult = await removeInventoryStorageObjects(accessResult.data);
+    if (storageResult.error) {
+      return { error: storageResult.error };
     }
 
     const { error } = await supabase
       .from('inventory_items')
       .delete()
-      .in('id', ids);
+      .in('id', uniqueIds);
 
     if (error) {
       console.error('Supabase error:', error);
@@ -599,12 +685,13 @@ export async function bulkUpdateInventoryStatus(
   userId: string,
   status: 'available' | 'sold' | 'reserved',
 ) {
-  if (!ids.length) return { error: 'No items selected.' };
+  const uniqueIds = [...new Set(ids)];
+  if (!uniqueIds.length) return { error: 'No items selected.' };
 
   try {
-    for (const id of ids) {
-      const check = await verifyItemOwnership(userId, id);
-      if (!check.valid) return { error: check.error || 'Permission denied for one or more items.' };
+    const accessResult = await getAccessibleInventoryItems(userId, uniqueIds);
+    if (accessResult.error) {
+      return { error: accessResult.error || 'Permission denied for one or more items.' };
     }
 
     const { error } = await supabase
@@ -614,7 +701,7 @@ export async function bulkUpdateInventoryStatus(
         ...(status === 'sold' ? { sold_at: new Date().toISOString() } : {}),
         updated_at: new Date().toISOString(),
       })
-      .in('id', ids);
+      .in('id', uniqueIds);
 
     if (error) {
       console.error('Supabase error:', error);

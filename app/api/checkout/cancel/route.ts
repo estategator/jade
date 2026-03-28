@@ -50,9 +50,42 @@ async function restoreCheckoutSession(checkoutSessionId: string, targetStatus: '
 
   if (!sessionItems?.length) return false;
 
-  for (const si of sessionItems) {
-    await restoreSingleItem(si.inventory_item_id, si.reserved_quantity);
+  const reservedByItemId = new Map<string, number>();
+  for (const sessionItem of sessionItems) {
+    reservedByItemId.set(
+      sessionItem.inventory_item_id,
+      (reservedByItemId.get(sessionItem.inventory_item_id) ?? 0) + sessionItem.reserved_quantity,
+    );
   }
+
+  const itemIds = [...reservedByItemId.keys()];
+  const { data: inventoryItems } = await supabaseAdmin
+    .from('inventory_items')
+    .select('id, status, quantity')
+    .in('id', itemIds);
+
+  if (!inventoryItems?.length) return true;
+
+  const updatedAt = new Date().toISOString();
+
+  await Promise.all(
+    inventoryItems
+      .filter((item) => item.status !== 'sold')
+      .map(async (item) => {
+        const { error } = await supabaseAdmin
+          .from('inventory_items')
+          .update({
+            status: 'available',
+            quantity: (item.quantity ?? 0) + (reservedByItemId.get(item.id) ?? 0),
+            updated_at: updatedAt,
+          })
+          .eq('id', item.id);
+
+        if (error) {
+          console.error('restoreCheckoutSession update error:', error);
+        }
+      }),
+  );
 
   return true;
 }

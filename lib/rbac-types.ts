@@ -48,6 +48,8 @@ export type AuditAction =
   | 'onboarding.contract_drafted'
   | 'onboarding.contract_deleted'
   | 'onboarding.project_assigned'
+  | 'onboarding.assignment_archived'
+  | 'onboarding.assignment_changed'
   | 'onboarding.share_link_created'
   | 'onboarding.step_updated'
   | 'member.invited'

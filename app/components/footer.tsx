@@ -41,10 +41,10 @@ export function Footer() {
             <Link href="/help" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Help Center
             </Link>
-            <Link href="/help?tab=docs" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+            <Link href="/help/docs" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Documentation
             </Link>
-            <Link href="/help?tab=tutorials" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+            <Link href="/help/tutorials" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Tutorials
             </Link>
             <Link href="/help?tab=contact" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">

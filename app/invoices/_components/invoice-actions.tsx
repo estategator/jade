@@ -15,6 +15,7 @@ import {
   deleteInvoice,
 } from "@/app/invoices/actions";
 import { statusConfig } from "@/app/invoices/_components/invoice-utils";
+import ConfirmDeleteModal from "@/app/components/confirm-delete-modal";
 
 type Props = {
   userId: string;
@@ -27,6 +28,7 @@ export function InvoiceActions({ userId, invoiceId, status }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [showVoidModal, setShowVoidModal] = useState(false);
 
   const sc = statusConfig[status];
   const StatusIcon = sc.icon;
@@ -45,6 +47,11 @@ export function InvoiceActions({ userId, invoiceId, status }: Props) {
   }
 
   async function handleVoid() {
+    setShowVoidModal(true);
+  }
+
+  async function confirmVoid() {
+    setShowVoidModal(false);
     setBusy(true);
     setError(null);
     const result = await voidInvoice(userId, invoiceId);
@@ -135,6 +142,16 @@ export function InvoiceActions({ userId, invoiceId, status }: Props) {
           {successMsg}
         </div>
       )}
+
+      <ConfirmDeleteModal
+        open={showVoidModal}
+        onClose={() => setShowVoidModal(false)}
+        onConfirm={confirmVoid}
+        entityName={invoiceId}
+        entityType="Invoice"
+        actionLabel="Void"
+        description="Voiding this invoice is irreversible. The invoice will be permanently marked as void and cannot be restored or edited."
+      />
     </>
   );
 }

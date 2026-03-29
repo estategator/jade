@@ -29,6 +29,34 @@ export type StatusBreakdown = {
   revenue: number;
 };
 
+export type InventoryHealthBucket = {
+  label: string;
+  count: number;
+  tone: 'fresh' | 'watch' | 'attention' | 'critical';
+};
+
+export type InventoryHealth = {
+  sellThroughRate: number;
+  reservedRate: number;
+  averageDaysToSell: number | null;
+  averageUnsoldAge: number | null;
+  staleItemCount: number;
+  buckets: InventoryHealthBucket[];
+};
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+function diffInDays(startDate: string, endDate: string) {
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return null;
+  }
+
+  return (end - start) / MS_PER_DAY;
+}
+
 export async function getDashboardStats(userId: string, orgId?: string | null) {
   try {
     if (!orgId) {
@@ -236,6 +264,97 @@ export async function getStatusBreakdown(userId: string, orgId?: string | null) 
     );
 
     return { data: breakdown };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function getInventoryHealth(userId: string, orgId?: string | null) {
+  try {
+    if (!orgId) {
+      return {
+        data: {
+          sellThroughRate: 0,
+          reservedRate: 0,
+          averageDaysToSell: null,
+          averageUnsoldAge: null,
+          staleItemCount: 0,
+          buckets: [
+            { label: '0-30d', count: 0, tone: 'fresh' },
+            { label: '31-60d', count: 0, tone: 'watch' },
+            { label: '61-90d', count: 0, tone: 'attention' },
+            { label: '90+d', count: 0, tone: 'critical' },
+          ],
+        } as InventoryHealth,
+      };
+    }
+
+    const membership = await requireOrgMembership(orgId, userId);
+    if ('error' in membership) return { error: membership.error };
+
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('status, created_at, sold_at')
+      .eq('org_id', orgId);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to load inventory health.' };
+    }
+
+    const items = data ?? [];
+    const totalItems = items.length;
+    const soldItems = items.filter((item) => item.status === 'sold');
+    const reservedItems = items.filter((item) => item.status === 'reserved');
+    const unsoldItems = items.filter((item) => item.status !== 'sold');
+    const nowIso = new Date().toISOString();
+
+    const daysToSell = soldItems
+      .map((item) => diffInDays(item.created_at, item.sold_at ?? nowIso))
+      .filter((value): value is number => value !== null);
+
+    const unsoldAges = unsoldItems
+      .map((item) => diffInDays(item.created_at, nowIso))
+      .filter((value): value is number => value !== null);
+
+    const buckets: InventoryHealthBucket[] = [
+      { label: '0-30d', count: 0, tone: 'fresh' },
+      { label: '31-60d', count: 0, tone: 'watch' },
+      { label: '61-90d', count: 0, tone: 'attention' },
+      { label: '90+d', count: 0, tone: 'critical' },
+    ];
+
+    for (const age of unsoldAges) {
+      if (age <= 30) {
+        buckets[0].count += 1;
+      } else if (age <= 60) {
+        buckets[1].count += 1;
+      } else if (age <= 90) {
+        buckets[2].count += 1;
+      } else {
+        buckets[3].count += 1;
+      }
+    }
+
+    const staleItemCount = buckets[2].count + buckets[3].count;
+    const averageDaysToSell = daysToSell.length
+      ? daysToSell.reduce((sum, value) => sum + value, 0) / daysToSell.length
+      : null;
+    const averageUnsoldAge = unsoldAges.length
+      ? unsoldAges.reduce((sum, value) => sum + value, 0) / unsoldAges.length
+      : null;
+
+    return {
+      data: {
+        sellThroughRate: totalItems ? soldItems.length / totalItems : 0,
+        reservedRate: totalItems ? reservedItems.length / totalItems : 0,
+        averageDaysToSell,
+        averageUnsoldAge,
+        staleItemCount,
+        buckets,
+      } as InventoryHealth,
+    };
   } catch (err) {
     console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };

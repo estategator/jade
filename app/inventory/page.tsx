@@ -9,6 +9,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { CartDrawer } from "@/app/components/cart-drawer";
 import { InventoryList } from "@/app/inventory/_components/inventory-list";
 import type { PaginatedInventoryResult } from "@/app/inventory/actions";
+import type { InventoryListInitialFilters } from "@/app/inventory/_components/inventory-list";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,11 @@ function parsePositiveInt(value: string | string[] | undefined, fallback: number
   return parsed;
 }
 
+function parseQueryValue(value: string | string[] | undefined): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw?.trim() ?? "";
+}
+
 export default async function InventoryListPage({ searchParams }: InventoryListPageProps) {
   const supabase = await createClient();
   const {
@@ -40,6 +46,18 @@ export default async function InventoryListPage({ searchParams }: InventoryListP
   const params = (await searchParams) ?? {};
   const page = parsePositiveInt(params.page, 1);
   const pageSize = parsePositiveInt(params.pageSize, DEFAULT_PAGE_SIZE);
+  const initialFilters: InventoryListInitialFilters = {
+    search: parseQueryValue(params.search),
+    project: parseQueryValue(params.project) || "all",
+    status: (["all", "available", "sold", "reserved"] as const).includes(parseQueryValue(params.status) as "all" | "available" | "sold" | "reserved")
+      ? (parseQueryValue(params.status) as "all" | "available" | "sold" | "reserved")
+      : "all",
+    category: parseQueryValue(params.category) || "all",
+    condition: parseQueryValue(params.condition) || "all",
+    age: (["all", "0-30", "31-60", "61-90", "90-plus"] as const).includes(parseQueryValue(params.age) as "all" | "0-30" | "31-60" | "61-90" | "90-plus")
+      ? (parseQueryValue(params.age) as "all" | "0-30" | "31-60" | "61-90" | "90-plus")
+      : "all",
+  };
 
   const [inventoryResult, cartResult] = await Promise.all([
     getInventoryItems(user.id, activeOrgId, page, pageSize),
@@ -94,10 +112,11 @@ export default async function InventoryListPage({ searchParams }: InventoryListP
         </div>
 
         <InventoryList
-          key={`${activeOrgId ?? "all"}:${pagination.page}:${pagination.pageSize}`}
+          key={`${activeOrgId ?? "all"}:${pagination.page}:${pagination.pageSize}:${initialFilters.search}:${initialFilters.project}:${initialFilters.status}:${initialFilters.category}:${initialFilters.condition}:${initialFilters.age}`}
           initialItems={items}
           pagination={pagination}
           userId={user.id}
+          initialFilters={initialFilters}
         />
       </main>
     </CartProvider>

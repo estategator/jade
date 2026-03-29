@@ -6,6 +6,8 @@ import { getOrgContracts } from "@/app/onboarding/actions";
 import { resolveActiveOrgId } from "@/lib/rbac";
 import { createClient } from "@/utils/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export default async function ContractsPage() {
   const supabase = await createClient();
   const {

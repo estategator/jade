@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,8 +14,46 @@ import {
 import { getPublicProject, getPublicProjectItems } from "@/app/sales/actions";
 import type { PublicProjectItem } from "@/app/sales/actions";
 import { createClient } from "@/utils/supabase/server";
+import { SITE_URL, SITE_NAME } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const result = await getPublicProject(id);
+  if (!result.data) return { title: 'Sale Not Found' };
+
+  const project = result.data;
+  const title = project.name;
+  const description = project.description
+    ? project.description.slice(0, 160)
+    : `Browse items for sale at ${project.name}`;
+  const url = `${SITE_URL}/sales/${id}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: SITE_NAME,
+      type: 'website',
+      ...(project.cover_image_url ? { images: [{ url: project.cover_image_url }] } : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      ...(project.cover_image_url ? { images: [project.cover_image_url] } : {}),
+    },
+  };
+}
 
 const statusConfig: Record<
   string,

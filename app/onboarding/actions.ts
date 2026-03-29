@@ -2973,27 +2973,49 @@ export async function getOrgContracts(
 
     const assignmentIds = [...new Set(contractRows.map((c) => c.assignment_id as string))];
 
-    const { data: assignments } = await supabase
+    const { data: assignments, error: assignError } = await supabase
       .from('client_project_assignments')
       .select('id, client_profile_id, project_id')
       .in('id', assignmentIds);
 
+    if (assignError) {
+      console.error('Supabase error (assignments):', assignError);
+      return { error: 'Failed to load contracts.' };
+    }
+
     const clientIds = [...new Set((assignments ?? []).map((a: { client_profile_id: string }) => a.client_profile_id))];
     const projectIds = [...new Set((assignments ?? []).map((a: { project_id: string }) => a.project_id))];
 
-    const [{ data: clients }, { data: projects }] = await Promise.all([
-      supabase.from('client_profiles').select('id, full_name').in('id', clientIds),
-      supabase.from('projects').select('id, name').in('id', projectIds),
-    ]);
+    let clients: { id: string; full_name: string }[] = [];
+    let projects: { id: string; name: string }[] = [];
+
+    if (clientIds.length > 0 || projectIds.length > 0) {
+      const [clientRes, projectRes] = await Promise.all([
+        clientIds.length > 0
+          ? supabase.from('client_profiles').select('id, full_name').in('id', clientIds)
+          : Promise.resolve({ data: [] as { id: string; full_name: string }[], error: null }),
+        projectIds.length > 0
+          ? supabase.from('projects').select('id, name').in('id', projectIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[], error: null }),
+      ]);
+
+      if (clientRes.error || projectRes.error) {
+        console.error('Supabase error (clients/projects):', clientRes.error, projectRes.error);
+        return { error: 'Failed to load contracts.' };
+      }
+
+      clients = (clientRes.data ?? []) as { id: string; full_name: string }[];
+      projects = (projectRes.data ?? []) as { id: string; name: string }[];
+    }
 
     const assignmentMap = new Map(
       (assignments ?? []).map((a: { id: string; client_profile_id: string; project_id: string }) => [a.id, a]),
     );
     const clientMap = new Map(
-      (clients ?? []).map((c: { id: string; full_name: string }) => [c.id, c.full_name]),
+      clients.map((c: { id: string; full_name: string }) => [c.id, c.full_name]),
     );
     const projectMap = new Map(
-      (projects ?? []).map((p: { id: string; name: string }) => [p.id, p.name]),
+      projects.map((p: { id: string; name: string }) => [p.id, p.name]),
     );
 
     const rows: OrgContractRow[] = contractRows.map((c) => {

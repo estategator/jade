@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,8 +18,47 @@ import {
 import { getPublicInventoryItem } from "@/app/inventory/actions";
 import type { AIAnalysisResult } from "@/app/inventory/actions";
 import { ItemBuyButton } from "@/app/items/[id]/buy-button";
+import { SITE_URL, SITE_NAME, productJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const result = await getPublicInventoryItem(id);
+  if (!result.data) return { title: 'Item Not Found' };
+
+  const item = result.data;
+  const title = item.name;
+  const description = item.description
+    ? item.description.slice(0, 160)
+    : `${item.name} — ${item.category} for $${item.price.toFixed(2)}`;
+  const url = `${SITE_URL}/items/${id}`;
+  const image = item.medium_image_url || item.thumbnail_url;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: SITE_NAME,
+      type: 'website',
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
+  };
+}
 
 const statusConfig: Record<
   string,
@@ -132,8 +172,28 @@ export default async function PublicItemPage({
       : null;
   const isBelowMarket = marketPrice != null && item.price <= marketPrice;
 
+  const itemUrl = `${SITE_URL}/items/${id}`;
+  const sellerName = project?.organizations?.name ?? undefined;
+
   return (
     <main className="min-h-screen bg-white dark:bg-zinc-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            productJsonLd({
+              name: item.name,
+              description: item.description || `${item.name} — ${item.category}`,
+              image: displayImage ?? undefined,
+              price: item.price,
+              url: itemUrl,
+              condition: item.condition,
+              availability: item.status === 'available' ? 'InStock' : 'SoldOut',
+              seller: sellerName,
+            }),
+          ),
+        }}
+      />
       {/* ── Top bar ── */}
       <div className="border-b border-stone-100 bg-white/80 backdrop-blur-sm dark:border-zinc-800/50 dark:bg-zinc-950/80">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">

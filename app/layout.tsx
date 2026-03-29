@@ -6,6 +6,7 @@ import "./globals.css";
 import { SettingsProvider } from "@/app/components/settings-provider";
 import { DashboardLayoutWrapper } from "@/app/components/dashboard-layout-wrapper";
 import { createClient } from "@/utils/supabase/server";
+import { SITE_URL, SITE_NAME, DEFAULT_DESCRIPTION, organizationJsonLd } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,8 +19,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Curator AI",
-  description: "AI-powered estate sales management",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: DEFAULT_DESCRIPTION,
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/apple-touch-icon.png',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default async function RootLayout({
@@ -89,13 +110,15 @@ export default async function RootLayout({
             `,
           }}
         />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/manifest.json" />
+
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
+        />
         <SettingsProvider userId={user?.id ?? null}>
           {isAuthenticated ? (
             <DashboardLayoutWrapper>{children}</DashboardLayoutWrapper>

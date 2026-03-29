@@ -9,6 +9,7 @@ import {
   PiChartBarDuotone,
   PiBuildingsDuotone,
   PiReceiptDuotone,
+  PiHourglassDuotone,
   PiUploadDuotone,
 } from "react-icons/pi";
 
@@ -23,10 +24,54 @@ import {
   getRevenueByRange,
   getRecentSales,
   getSalesRevenue,
+  getInventoryHealth,
 } from "./actions";
 import { DashboardCategoryChart } from "./_components/dashboard-charts";
 import { RevenueChartWithPeriod } from "./_components/revenue-chart-with-period";
 import { DashboardErrorToast } from "./_components/dashboard-error-toast";
+
+function formatPercent(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatDays(value: number | null, emptyLabel: string) {
+  if (value === null) return emptyLabel;
+  const rounded = Math.round(value);
+  return `${rounded}d`;
+}
+
+function healthBucketInventoryHref(bucketLabel: string) {
+  if (bucketLabel === "0-30d") return "/inventory?age=0-30";
+  if (bucketLabel === "31-60d") return "/inventory?age=31-60";
+  if (bucketLabel === "61-90d") return "/inventory?age=61-90";
+  return "/inventory?age=90-plus";
+}
+
+function bucketToneClasses(tone: "fresh" | "watch" | "attention" | "critical") {
+  switch (tone) {
+    case "fresh":
+      return {
+        bar: "bg-emerald-500 dark:bg-emerald-400",
+        badge: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+      };
+    case "watch":
+      return {
+        bar: "bg-[var(--color-brand-primary)]",
+        badge: "bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]",
+      };
+    case "attention":
+      return {
+        bar: "bg-red-400 dark:bg-red-400",
+        badge: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+      };
+    case "critical":
+    default:
+      return {
+        bar: "bg-red-600 dark:bg-red-500",
+        badge: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200",
+      };
+  }
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -74,12 +119,13 @@ export default async function DashboardPage({
 
   const activeOrgId = await resolveActiveOrgId(user.id);
 
-  const [statsRes, catRes, revRes, salesRes, salesRevRes] = await Promise.all([
+  const [statsRes, catRes, revRes, salesRes, salesRevRes, healthRes] = await Promise.all([
     getDashboardStats(user.id, activeOrgId),
     getCategoryBreakdown(user.id, activeOrgId),
     getRevenueByRange(user.id, activeOrgId),
     getRecentSales(user.id, activeOrgId),
     getSalesRevenue(user.id, activeOrgId),
+    getInventoryHealth(user.id, activeOrgId),
   ]);
 
   // ── Aggregate errors ────────────────────────────────────
@@ -89,6 +135,7 @@ export default async function DashboardPage({
     revRes.error,
     salesRes.error,
     salesRevRes.error,
+    healthRes.error,
   ].filter((e): e is string => !!e);
 
   const statsLoaded = !statsRes.error;
@@ -97,6 +144,20 @@ export default async function DashboardPage({
   const revenueData = revRes.data || [];
   const recentSales = salesRes.data || [];
   const salesRevenue = salesRevRes.data || { total: 0, count: 0 };
+  const inventoryHealth = healthRes.data || {
+    sellThroughRate: 0,
+    reservedRate: 0,
+    averageDaysToSell: null,
+    averageUnsoldAge: null,
+    staleItemCount: 0,
+    buckets: [
+      { label: "0-30d", count: 0, tone: "fresh" as const },
+      { label: "31-60d", count: 0, tone: "watch" as const },
+      { label: "61-90d", count: 0, tone: "attention" as const },
+      { label: "90+d", count: 0, tone: "critical" as const },
+    ],
+  };
+  const unsoldTotal = inventoryHealth.buckets.reduce((sum, bucket) => sum + bucket.count, 0);
 
   const displayName =
     user?.user_metadata?.full_name ||
@@ -255,7 +316,7 @@ export default async function DashboardPage({
 
       {/* Charts */}
       {hasData && (
-        <div className="mb-8 grid gap-4 lg:grid-cols-2 animate-fade-in-up [animation-delay:300ms] fill-mode-both">
+        <div className="mb-4 grid gap-4 lg:grid-cols-2 animate-fade-in-up [animation-delay:300ms] fill-mode-both">
           {/* Revenue over time */}
           <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-4 flex items-center gap-2">
@@ -280,6 +341,167 @@ export default async function DashboardPage({
               </h3>
             </div>
             <DashboardCategoryChart data={categories} />
+          </div>
+        </div>
+      )}
+
+      {hasData && (
+        <div className="mb-8 animate-fade-in-up [animation-delay:340ms] fill-mode-both">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <PiHourglassDuotone className="h-4 w-4 text-[var(--color-brand-primary)]" />
+                  <h3 className="text-sm font-semibold text-stone-900 dark:text-white">
+                    Inventory health
+                  </h3>
+                </div>
+                <p className="text-sm text-stone-600 dark:text-zinc-400">
+                  Track sell-through, stalled inventory, and how long items sit before they move.
+                </p>
+              </div>
+              <Link
+                href="/inventory?age=61-90"
+                className="inline-flex items-center gap-2 self-start rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                <span className="h-2 w-2 rounded-full bg-red-500" />
+                {inventoryHealth.staleItemCount} items need attention
+              </Link>
+            </div>
+
+            <div className="mb-5 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500 dark:text-zinc-500">
+                  Sell-through
+                </p>
+                <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">
+                  {formatPercent(inventoryHealth.sellThroughRate)}
+                </p>
+                <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">
+                  Portion of inventory already sold.
+                </p>
+              </div>
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500 dark:text-zinc-500">
+                  Avg time to sell
+                </p>
+                <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">
+                  {formatDays(inventoryHealth.averageDaysToSell, "No sales")}
+                </p>
+                <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">
+                  Measured from item creation to recorded sale date.
+                </p>
+              </div>
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500 dark:text-zinc-500">
+                  Unsold inventory age
+                </p>
+                <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">
+                  {formatDays(inventoryHealth.averageUnsoldAge, "No unsold items")}
+                </p>
+                <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">
+                  Reserved share: {formatPercent(inventoryHealth.reservedRate)} of all items.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)] lg:items-start">
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-stone-900 dark:text-white">
+                    Aging mix for unsold inventory
+                  </p>
+                  <p className="text-xs text-stone-500 dark:text-zinc-500">
+                    {unsoldTotal} active {unsoldTotal === 1 ? "item" : "items"}
+                  </p>
+                </div>
+                <div className="flex h-3 overflow-hidden rounded-full bg-stone-100 dark:bg-zinc-800">
+                  {inventoryHealth.buckets.map((bucket) => {
+                    const width = unsoldTotal > 0 ? `${(bucket.count / unsoldTotal) * 100}%` : "0%";
+                    const tone = bucketToneClasses(bucket.tone);
+                    return (
+                      <div
+                        key={bucket.label}
+                        className={`${tone.bar} transition-all`}
+                        style={{ width }}
+                        aria-label={`${bucket.label}: ${bucket.count} items`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {inventoryHealth.buckets.map((bucket) => {
+                    const tone = bucketToneClasses(bucket.tone);
+                    const percentage = unsoldTotal > 0 ? Math.round((bucket.count / unsoldTotal) * 100) : 0;
+                    return (
+                      <div
+                        key={bucket.label}
+                        className="rounded-xl border border-stone-200 p-3 dark:border-zinc-800"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${tone.badge}`}>
+                            {bucket.label}
+                          </span>
+                          <span className="text-xs text-stone-500 dark:text-zinc-500">
+                            {percentage}%
+                          </span>
+                        </div>
+                        <p className="text-2xl font-bold text-stone-900 dark:text-white">
+                          {bucket.count}
+                        </p>
+                        <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">
+                          {bucket.label === "90+d" ? "Long-stalled items." : bucket.label === "61-90d" ? "Starting to age out." : bucket.label === "31-60d" ? "Worth reviewing soon." : "Freshly listed inventory."}
+                        </p>
+                        <Link
+                          href={healthBucketInventoryHref(bucket.label)}
+                          className="mt-2 inline-flex text-xs font-medium text-[var(--color-brand-primary)] hover:opacity-80"
+                        >
+                          View items
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+                <p className="text-sm font-semibold text-stone-900 dark:text-white">
+                  What to watch
+                </p>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500 dark:text-zinc-500">
+                      Aging pressure
+                    </p>
+                    <p className="mt-1 text-sm text-stone-700 dark:text-zinc-300">
+                      {inventoryHealth.staleItemCount > 0
+                        ? `${inventoryHealth.staleItemCount} items have been unsold for more than 60 days.`
+                        : "No inventory has crossed the 60-day threshold yet."}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500 dark:text-zinc-500">
+                      Inventory flow
+                    </p>
+                    <p className="mt-1 text-sm text-stone-700 dark:text-zinc-300">
+                      {inventoryHealth.sellThroughRate >= 0.4
+                        ? "Sell-through is healthy relative to your current inventory mix."
+                        : "Sell-through is still low, so repricing or promoting older items may help."}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500 dark:text-zinc-500">
+                      Reserved backlog
+                    </p>
+                    <p className="mt-1 text-sm text-stone-700 dark:text-zinc-300">
+                      {inventoryHealth.reservedRate >= 0.2
+                        ? "A noticeable share of items are reserved. Follow-through and checkout completion are worth checking."
+                        : "Reserved inventory is under control and not dominating the active catalog."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

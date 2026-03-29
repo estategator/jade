@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +38,17 @@ import { useCart } from "@/lib/cart-context";
 type BulkAction =
   | { kind: "delete" }
   | { kind: "status"; status: "available" | "sold" | "reserved" };
+
+type AgeFilter = "all" | "0-30" | "31-60" | "61-90" | "90-plus";
+
+export type InventoryListInitialFilters = {
+  search?: string;
+  project?: string;
+  status?: "all" | "available" | "sold" | "reserved";
+  category?: string;
+  condition?: string;
+  age?: AgeFilter;
+};
 
 const bulkActionLabels: Record<string, string> = {
   delete: "delete",
@@ -368,18 +379,29 @@ type InventoryListProps = Readonly<{
   initialItems: InventoryItem[];
   pagination: InventoryPagination;
   userId: string;
+  initialFilters?: InventoryListInitialFilters;
 }>;
 
-export function InventoryList({ initialItems, pagination, userId }: InventoryListProps) {
+function matchesAgeBucket(ageDays: number, ageFilter: AgeFilter) {
+  if (ageFilter === "all") return true;
+  if (ageFilter === "0-30") return ageDays >= 0 && ageDays <= 30;
+  if (ageFilter === "31-60") return ageDays > 30 && ageDays <= 60;
+  if (ageFilter === "61-90") return ageDays > 60 && ageDays <= 90;
+  return ageDays > 90;
+}
+
+export function InventoryList({ initialItems, pagination, userId, initialFilters }: InventoryListProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const cart = useCart();
   const [items, setItems] = useState(initialItems);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialFilters?.search ?? "");
   const [error, setError] = useState("");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [conditionFilter, setConditionFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>(initialFilters?.project ?? "all");
+  const [statusFilter, setStatusFilter] = useState<string>(initialFilters?.status ?? "all");
+  const [categoryFilter, setCategoryFilter] = useState<string>(initialFilters?.category ?? "all");
+  const [conditionFilter, setConditionFilter] = useState<string>(initialFilters?.condition ?? "all");
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>(initialFilters?.age ?? "all");
   const [sortField, setSortField] = useState<string>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [showFilters, setShowFilters] = useState(false);
@@ -427,10 +449,36 @@ export function InventoryList({ initialItems, pagination, userId }: InventoryLis
     setItems(initialItems);
   }, [initialItems]);
 
+  // Keep filter state reflected in query params so deep links remain shareable.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (search.trim()) params.set("search", search.trim());
+    else params.delete("search");
+
+    if (projectFilter !== "all") params.set("project", projectFilter);
+    else params.delete("project");
+
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    else params.delete("status");
+
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    else params.delete("category");
+
+    if (conditionFilter !== "all") params.set("condition", conditionFilter);
+    else params.delete("condition");
+
+    if (ageFilter !== "all") params.set("age", ageFilter);
+    else params.delete("age");
+
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }, [search, projectFilter, statusFilter, categoryFilter, conditionFilter, ageFilter, pathname, router]);
+
   // Clear selection when filter/search changes
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [search, projectFilter, statusFilter, categoryFilter, conditionFilter]);
+  }, [search, projectFilter, statusFilter, categoryFilter, conditionFilter, ageFilter]);
 
   async function handleDelete(id: string) {
     const result = await deleteInventoryItem(id, userId);
@@ -463,7 +511,7 @@ export function InventoryList({ initialItems, pagination, userId }: InventoryLis
   
   const projects = Array.from(projectsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-  const activeFilterCount = [projectFilter, statusFilter, categoryFilter, conditionFilter].filter((f) => f !== "all").length;
+  const activeFilterCount = [projectFilter, statusFilter, categoryFilter, conditionFilter, ageFilter].filter((f) => f !== "all").length;
 
   function toggleSort(field: string) {
     if (sortField === field) {
@@ -479,6 +527,7 @@ export function InventoryList({ initialItems, pagination, userId }: InventoryLis
     setStatusFilter("all");
     setCategoryFilter("all");
     setConditionFilter("all");
+    setAgeFilter("all");
     setSearch("");
   }
 
@@ -552,7 +601,15 @@ export function InventoryList({ initialItems, pagination, userId }: InventoryLis
       const matchesStatus = statusFilter === "all" || item.status === statusFilter;
       const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
       const matchesCondition = conditionFilter === "all" || item.condition === conditionFilter;
-      return matchesSearch && matchesProject && matchesStatus && matchesCategory && matchesCondition;
+      const createdAt = new Date(item.created_at).getTime();
+      const ageDays = Number.isFinite(createdAt)
+        ? (Date.now() - createdAt) / (1000 * 60 * 60 * 24)
+        : null;
+      const matchesAge = ageFilter === "all"
+        ? true
+        : item.status !== "sold" && ageDays !== null && matchesAgeBucket(ageDays, ageFilter);
+
+      return matchesSearch && matchesProject && matchesStatus && matchesCategory && matchesCondition && matchesAge;
     })
     .sort((a, b) => {
       const dir = sortDirection === "asc" ? 1 : -1;
@@ -697,6 +754,22 @@ export function InventoryList({ initialItems, pagination, userId }: InventoryLis
                     {cond}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div className="min-w-[150px]">
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500 dark:text-zinc-500">
+                Aging
+              </label>
+              <select
+                value={ageFilter}
+                onChange={(e) => setAgeFilter(e.target.value as AgeFilter)}
+                className="block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              >
+                <option value="all">All ages</option>
+                <option value="0-30">0-30 days (unsold)</option>
+                <option value="31-60">31-60 days (unsold)</option>
+                <option value="61-90">61-90 days (unsold)</option>
+                <option value="90-plus">90+ days (unsold)</option>
               </select>
             </div>
             <div className="min-w-[180px]">

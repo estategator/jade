@@ -11,6 +11,7 @@ type ConfirmDeleteModalProps = Readonly<{
   entityName: string;
   entityType: string;
   description?: string;
+  actionLabel?: string;
 }>;
 
 export default function ConfirmDeleteModal({
@@ -20,6 +21,7 @@ export default function ConfirmDeleteModal({
   entityName,
   entityType,
   description,
+  actionLabel = "Delete",
 }: ConfirmDeleteModalProps) {
   const [inputValue, setInputValue] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -67,7 +69,7 @@ export default function ConfirmDeleteModal({
           onClick={() => { if (!deleting) onClose(); }}
           role="dialog"
           aria-modal="true"
-          aria-label={`Delete ${entityType}`}
+          aria-label={`${actionLabel} ${entityType}`}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -84,7 +86,7 @@ export default function ConfirmDeleteModal({
                   <AlertTriangle className="h-5 w-5" />
                 </div>
                 <h2 className="text-lg font-bold text-stone-900 dark:text-white">
-                  Delete {entityType}
+                  {actionLabel} {entityType}
                 </h2>
               </div>
               <button
@@ -101,7 +103,7 @@ export default function ConfirmDeleteModal({
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/30">
               <p className="text-sm text-red-700 dark:text-red-300">
                 This action <strong>cannot be undone</strong>.
-                {description ? ` ${description}` : ` This will permanently delete the ${entityType} and all associated data.`}
+                {description ? ` ${description}` : ` This will permanently ${actionLabel.toLowerCase()} the ${entityType} and all associated data.`}
               </p>
             </div>
 
@@ -140,7 +142,7 @@ export default function ConfirmDeleteModal({
                 className="inline-flex items-center gap-2 rounded-xl border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-zinc-900"
               >
                 {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Delete {entityType}
+                {actionLabel} {entityType}
               </button>
             </div>
           </motion.div>

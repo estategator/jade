@@ -205,7 +205,6 @@ export function OnboardingConsole({
     const formData = new FormData();
     formData.set("assignment_id", assignmentId);
     formData.set("subject", "Welcome to your estate sale project");
-    formData.set("body", "");
 
     startTransition(async () => {
       const result = await sendWelcomeEmail(formData);

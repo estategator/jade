@@ -11,6 +11,13 @@ import 'server-only';
 
 export type EmailProvider = 'resend' | 'sendgrid' | 'manual';
 
+export type ContractSnapshot = {
+  status: string;
+  templateName: string;
+  provider: string;
+  signedAt: string | null;
+};
+
 export type WelcomeEmailRequest = {
   /** Internal welcome_messages row ID — used for status callbacks. */
   welcomeMessageId: string;
@@ -25,6 +32,8 @@ export type WelcomeEmailRequest = {
   orgName: string;
   projectName: string;
   shareUrl?: string;
+  /** Contract context (optional — included when a contract exists). */
+  contract?: ContractSnapshot;
 };
 
 export type EmailSendResult = {
@@ -149,6 +158,94 @@ export function createManualEmailAdapter(): EmailProviderAdapter {
       console.log(`[email-manual] Would send welcome to ${request.to}: "${request.subject}"`);
       return { externalMessageId: `manual_${request.welcomeMessageId}`, status: 'sent' };
     },
+  };
+}
+
+// ── Email content builder ─────────────────────────────────────
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+const CONTRACT_STATUS_LABELS: Record<string, string> = {
+  draft: 'Contract drafted — awaiting review',
+  sent: 'Contract sent — awaiting your signature',
+  viewed: 'Contract viewed — awaiting your signature',
+  signed: 'Contract signed — complete',
+  declined: 'Contract declined',
+  voided: 'Contract voided',
+  expired: 'Contract expired',
+};
+
+export function buildWelcomeEmailContent(request: WelcomeEmailRequest): {
+  textBody: string;
+  htmlBody: string;
+} {
+  const lines: string[] = [];
+  const htmlParts: string[] = [];
+
+  // Greeting
+  lines.push(`Hi ${request.recipientName},`);
+  lines.push('');
+  htmlParts.push(`<p>Hi ${escapeHtml(request.recipientName)},</p>`);
+
+  // Intro
+  const intro = `Welcome to your project "${request.projectName}" with ${request.orgName}.`;
+  lines.push(intro);
+  lines.push('');
+  htmlParts.push(`<p>${escapeHtml(intro)}</p>`);
+
+  // User-supplied body (if provided)
+  if (request.textBody) {
+    lines.push(request.textBody);
+    lines.push('');
+    htmlParts.push(`<p>${escapeHtml(request.textBody).replace(/\n/g, '<br>')}</p>`);
+  }
+
+  // Public project link
+  if (request.shareUrl) {
+    lines.push('You can view your project details and progress at any time:');
+    lines.push(request.shareUrl);
+    lines.push('');
+    htmlParts.push(
+      `<p>You can view your project details and progress at any time:</p>` +
+      `<p><a href="${escapeHtml(request.shareUrl)}" style="color:#4f46e5;text-decoration:underline;">${escapeHtml(request.shareUrl)}</a></p>`,
+    );
+  }
+
+  // Contract section
+  if (request.contract) {
+    const statusLabel =
+      CONTRACT_STATUS_LABELS[request.contract.status] ?? `Status: ${request.contract.status}`;
+    lines.push(`Agreement: ${request.contract.templateName}`);
+    lines.push(statusLabel);
+    if (request.contract.signedAt) {
+      lines.push(`Signed on: ${new Date(request.contract.signedAt).toLocaleDateString()}`);
+    }
+    lines.push('');
+    htmlParts.push(
+      `<table cellpadding="8" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;margin:12px 0;width:100%;max-width:480px;">` +
+      `<tr><td style="font-weight:600;color:#111827;">Agreement</td><td>${escapeHtml(request.contract.templateName)}</td></tr>` +
+      `<tr><td style="font-weight:600;color:#111827;">Status</td><td>${escapeHtml(statusLabel)}</td></tr>` +
+      (request.contract.signedAt
+        ? `<tr><td style="font-weight:600;color:#111827;">Signed</td><td>${new Date(request.contract.signedAt).toLocaleDateString()}</td></tr>`
+        : '') +
+      `</table>`,
+    );
+  }
+
+  // Sign-off
+  lines.push(`Thank you,`);
+  lines.push(`The ${request.orgName} team`);
+  htmlParts.push(`<p>Thank you,<br>The ${escapeHtml(request.orgName)} team</p>`);
+
+  return {
+    textBody: lines.join('\n'),
+    htmlBody: htmlParts.join(''),
   };
 }
 

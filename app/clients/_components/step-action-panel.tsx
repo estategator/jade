@@ -191,7 +191,6 @@ export function StepActionPanel({
                   const fd = new FormData();
                   fd.set("assignment_id", assignmentId);
                   fd.set("subject", "Welcome to your estate sale project");
-                  fd.set("body", "");
                   startTransition(async () => {
                     const res = await sendWelcomeEmail(fd);
                     if (res.error) {
@@ -671,7 +670,6 @@ function WorkflowStep({
                     const fd = new FormData();
                     fd.set("assignment_id", assignmentId);
                     fd.set("subject", "Welcome to your estate sale project");
-                    fd.set("body", "");
                     startTransition(async () => {
                       const res = await sendWelcomeEmail(fd);
                       if (res.error) { setError(res.error); return; }

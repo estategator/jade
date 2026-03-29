@@ -26,9 +26,13 @@ export default async function ClientProjectSharePage({
     notFound();
   }
 
-  const { client, project, workflow, items, events } = result.data;
+  const { client, project, workflow, items } = result.data;
   const availableItems = items.filter((item) => item.status === "available").length;
   const soldItems = items.filter((item) => item.status === "sold").length;
+
+  const totalValue = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
+  const availableValue = items.filter((i) => i.status === "available").reduce((sum, i) => sum + (i.price ?? 0), 0);
+  const soldValue = items.filter((i) => i.status === "sold").reduce((sum, i) => sum + (i.price ?? 0), 0);
 
   return (
     <main className="min-h-screen bg-stone-50 dark:bg-zinc-950">
@@ -36,10 +40,7 @@ export default async function ClientProjectSharePage({
         <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.16),_transparent_45%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.16),_transparent_45%)]" />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--color-brand-primary)]">
-              Curator client transparency
-            </p>
-            <h1 className="mt-3 text-4xl font-bold tracking-tight text-stone-900 dark:text-white">
+            <h1 className="text-4xl font-bold tracking-tight text-stone-900 dark:text-white">
               {project.name}
             </h1>
             <p className="mt-3 text-base text-stone-600 dark:text-zinc-400">
@@ -61,8 +62,7 @@ export default async function ClientProjectSharePage({
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
-        <div className="space-y-6">
+      <section className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
               <p className="text-sm text-stone-500 dark:text-zinc-500">Total items</p>
@@ -132,6 +132,21 @@ export default async function ClientProjectSharePage({
               </div>
             </div>
 
+            <div className="mb-5 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <p className="text-xs font-medium text-stone-500 dark:text-zinc-500">Total estimated value</p>
+                <p className="mt-1 text-lg font-bold text-stone-900 dark:text-white">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <p className="text-xs font-medium text-stone-500 dark:text-zinc-500">For sale</p>
+                <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">${availableValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <p className="text-xs font-medium text-stone-500 dark:text-zinc-500">Sold</p>
+                <p className="mt-1 text-lg font-bold text-stone-900 dark:text-white">${soldValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {items.length === 0 ? (
                 <div className="sm:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500 dark:border-zinc-700 dark:text-zinc-500">
@@ -145,9 +160,9 @@ export default async function ClientProjectSharePage({
                   return (
                     <article
                       key={item.id}
-                      className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 dark:border-zinc-800 dark:bg-zinc-950"
+                      className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950"
                     >
-                      <div className="relative aspect-square bg-stone-100 dark:bg-zinc-900">
+                      <div className="relative aspect-[4/3] bg-stone-100 dark:bg-zinc-900">
                         {imageUrl ? (
                           <Image
                             src={imageUrl}
@@ -159,10 +174,10 @@ export default async function ClientProjectSharePage({
                           />
                         ) : null}
                       </div>
-                      <div className="space-y-3 p-4">
+                      <div className="space-y-3 p-5">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-semibold text-stone-900 dark:text-white">{item.name}</p>
+                            <p className="text-base font-semibold text-stone-900 dark:text-white">{item.name}</p>
                             <p className="text-xs text-stone-500 dark:text-zinc-500">{item.category}</p>
                           </div>
                           <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusClass}`}>
@@ -175,14 +190,10 @@ export default async function ClientProjectSharePage({
                             <Tag className="h-3.5 w-3.5" />
                             {item.condition}
                           </span>
-                          <span className="font-semibold text-stone-900 dark:text-white">
+                          <span className="text-base font-bold text-stone-900 dark:text-white">
                             ${item.price.toFixed(2)}
                           </span>
                         </div>
-
-                        <p className="text-xs leading-5 text-stone-500 dark:text-zinc-500">
-                          {item.description || "Description coming soon."}
-                        </p>
                       </div>
                     </article>
                   );
@@ -190,39 +201,6 @@ export default async function ClientProjectSharePage({
               )}
             </div>
           </div>
-        </div>
-
-        <aside className="rounded-3xl border border-stone-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="text-xl font-semibold text-stone-900 dark:text-white">
-            Recent updates
-          </h2>
-          <p className="mt-1 text-sm text-stone-500 dark:text-zinc-500">
-            Timeline of changes to the project, inventory, and readiness.
-          </p>
-
-          <div className="mt-6 space-y-4">
-            {events.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500 dark:border-zinc-700 dark:text-zinc-500">
-                Updates will appear here as the project advances.
-              </div>
-            ) : (
-              events.map((event) => (
-                <div
-                  key={event.id}
-                  className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950"
-                >
-                  <p className="text-sm font-semibold text-stone-900 dark:text-white">{event.title}</p>
-                  {event.body ? (
-                    <p className="mt-1 text-sm text-stone-600 dark:text-zinc-400">{event.body}</p>
-                  ) : null}
-                  <p className="mt-2 text-xs uppercase tracking-wide text-stone-400 dark:text-zinc-500">
-                    {new Date(event.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
       </section>
     </main>
   );

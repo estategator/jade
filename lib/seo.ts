@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://estategator.com';
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://inventorytools.app';
 export const SITE_NAME = 'Curator AI';
 export const DEFAULT_DESCRIPTION =
   'AI-powered estate sales management. Price items instantly with AI, manage inventory, accept payments, and close sales faster.';

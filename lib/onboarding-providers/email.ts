@@ -44,7 +44,7 @@ export interface EmailProviderAdapter {
 
 export function createResendAdapter(): EmailProviderAdapter {
   const apiKey = process.env.RESEND_API_KEY ?? '';
-  const fromAddress = process.env.RESEND_FROM_ADDRESS ?? 'noreply@estategator.com';
+  const fromAddress = process.env.RESEND_FROM_ADDRESS ?? 'noreply@inventorytools.app';
 
   return {
     async send(request) {
@@ -90,7 +90,7 @@ export function createResendAdapter(): EmailProviderAdapter {
 
 export function createSendGridAdapter(): EmailProviderAdapter {
   const apiKey = process.env.SENDGRID_API_KEY ?? '';
-  const fromAddress = process.env.SENDGRID_FROM_ADDRESS ?? 'noreply@estategator.com';
+  const fromAddress = process.env.SENDGRID_FROM_ADDRESS ?? 'noreply@inventorytools.app';
 
   return {
     async send(request) {

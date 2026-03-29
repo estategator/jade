@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://estategator.com';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://inventorytools.app';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static pages

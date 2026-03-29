@@ -26,7 +26,7 @@ export function UpgradeCta({ orgId, userId, currentTier }: UpgradeCtaProps) {
     if (isCurrent(tier)) return;
     if (tier === "enterprise") {
       // Enterprise is sales-led — open contact form / mailto
-      window.location.href = "mailto:sales@estategator.com?subject=Enterprise%20Plan%20Inquiry";
+      window.location.href = "mailto:sales@inventorytools.app?subject=Enterprise%20Plan%20Inquiry";
       return;
     }
     setLoadingTier(tier);

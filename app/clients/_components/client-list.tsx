@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   MapPin,
-  RefreshCw,
   Search,
   ShieldCheck,
   UserPlus,
@@ -18,10 +17,7 @@ import {
 } from "lucide-react";
 
 import type { OnboardingDashboardData } from "@/app/onboarding/actions";
-import {
-  backfillLegacyProjects,
-  createClientProfile,
-} from "@/app/onboarding/actions";
+import { createClientProfile } from "@/app/onboarding/actions";
 import {
   AddressAutocomplete,
   US_STATES,
@@ -37,7 +33,6 @@ export function ClientList({
   const [isPending, startTransition] = useTransition();
   const [createError, setCreateError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [actionError, setActionError] = useState<string | null>(null);
   const [showAddress, setShowAddress] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
@@ -127,18 +122,6 @@ export function ClientList({
       setTimeout(() => setCreateSuccess(false), 3000);
       router.refresh();
       closeAddModal();
-    });
-  };
-
-  const handleBackfill = () => {
-    setActionError(null);
-    startTransition(async () => {
-      const result = await backfillLegacyProjects();
-      if (result.error) {
-        setActionError(result.error);
-        return;
-      }
-      router.refresh();
     });
   };
 
@@ -277,26 +260,6 @@ export function ClientList({
             </div>
           )}
 
-          {actionError && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-              {actionError}
-            </div>
-          )}
-
-          <div className="border-t border-stone-200 pt-4 dark:border-zinc-800">
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={handleBackfill}
-              className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-400"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Backfill legacy projects
-            </button>
-            <p className="mt-1 text-xs text-stone-400 dark:text-zinc-600">
-              Creates onboarding records for existing projects that do not have one yet.
-            </p>
-          </div>
         </div>
 
       {/* Add client modal */}

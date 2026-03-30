@@ -23,6 +23,7 @@ import {
   getContractAdapter,
   type ContractProvider,
 } from '@/lib/onboarding-providers/contracts';
+import { buildContractHtmlDocument } from '@/lib/onboarding-providers/contract-document';
 import {
   getEmailAdapter,
   buildWelcomeEmailContent,
@@ -1824,9 +1825,17 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
     }
 
     const assignmentId = row.assignment_id as string;
-    const provider = row.provider as ContractProvider;
+    const providerRaw = row.provider as string;
+    if (!['docusign', 'dropbox_sign', 'manual'].includes(providerRaw)) {
+      return { error: 'Invalid contract provider.' };
+    }
+
+    const provider = providerRaw as ContractProvider;
     const agreementTypeRaw = (row.agreement_type as string) ?? 'estate_sale';
-    const templateName = (row.template_name as string) || AGREEMENT_TYPE_DEFAULTS[agreementTypeRaw as AgreementType] || 'Estate Sale Agreement';
+    const agreementType = VALID_AGREEMENT_TYPES.has(agreementTypeRaw)
+      ? agreementTypeRaw as AgreementType
+      : 'estate_sale';
+    const templateName = (row.template_name as string) || AGREEMENT_TYPE_DEFAULTS[agreementType] || 'Estate Sale Agreement';
 
     const { data: assignment, error: assignmentError } = await supabase
       .from('client_project_assignments')
@@ -1839,15 +1848,79 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
       return { error: 'Client assignment not found.' };
     }
 
-    const { data: client } = await supabase
-      .from('client_profiles')
-      .select('full_name, email')
-      .eq('id', assignment.client_profile_id)
-      .single();
+    const [{ data: client }, { data: project }, { data: org }] = await Promise.all([
+      supabase
+        .from('client_profiles')
+        .select('full_name, email, phone, address_line1, address_line2, city, state, zip_code')
+        .eq('id', assignment.client_profile_id)
+        .single(),
+      supabase.from('projects').select('name').eq('id', assignment.project_id).single(),
+      supabase.from('organizations').select('name').eq('id', context.orgId).single(),
+    ]);
 
     if (!client) {
       return { error: 'Client profile not found.' };
     }
+    if (!client.full_name?.trim()) {
+      return { error: 'Client name is required before sending a contract.' };
+    }
+    if (!client.email?.trim()) {
+      return { error: 'Client email is required before sending a contract.' };
+    }
+
+    const additionalCharges = Array.isArray(row.additional_charges)
+      ? (row.additional_charges as Array<Record<string, unknown>>)
+        .map((charge) => ({
+          label: typeof charge.label === 'string' ? charge.label : '',
+          amount: typeof charge.amount === 'number' ? charge.amount : Number(charge.amount ?? NaN),
+        }))
+        .filter((charge) => charge.label && Number.isFinite(charge.amount))
+      : [];
+
+    const discountSchedule = Array.isArray(row.discount_schedule)
+      ? (row.discount_schedule as Array<Record<string, unknown>>)
+        .map((discount) => ({
+          day: typeof discount.day === 'number' ? discount.day : Number(discount.day ?? NaN),
+          percent: typeof discount.percent === 'number' ? discount.percent : Number(discount.percent ?? NaN),
+        }))
+        .filter((discount) => Number.isFinite(discount.day) && Number.isFinite(discount.percent))
+      : [];
+
+    const unsoldItemsHandlingRaw = (row.unsold_items_handling as string | undefined) ?? 'client_keeps';
+    const unsoldItemsHandling = ['client_keeps', 'donate', 'haul_away', 'negotiate'].includes(unsoldItemsHandlingRaw)
+      ? unsoldItemsHandlingRaw as UnsoldItemsHandling
+      : 'client_keeps';
+
+    const generatedDocument = provider === 'docusign'
+      ? buildContractHtmlDocument({
+        agreementType,
+        documentTitle: templateName,
+        orgName: org?.name ?? 'Curator',
+        projectName: project?.name ?? 'Client Project',
+        signerName: client.full_name,
+        signerEmail: client.email,
+        signerPhone: client.phone,
+        signerAddress: {
+          addressLine1: client.address_line1,
+          addressLine2: client.address_line2,
+          city: client.city,
+          state: client.state,
+          zipCode: client.zip_code,
+        },
+        terms: {
+          commissionRate: row.commission_rate != null ? Number(row.commission_rate) : null,
+          minimumCommission: row.minimum_commission != null ? Number(row.minimum_commission) : null,
+          flatFee: row.flat_fee != null ? Number(row.flat_fee) : null,
+          additionalCharges,
+          saleDurationDays: row.sale_duration_days != null ? Number(row.sale_duration_days) : null,
+          discountSchedule,
+          unsoldItemsHandling,
+          paymentTermsDays: row.payment_terms_days != null ? Number(row.payment_terms_days) : null,
+          cancellationFee: row.cancellation_fee != null ? Number(row.cancellation_fee) : null,
+          specialTerms: typeof row.special_terms === 'string' ? row.special_terms : '',
+        },
+      })
+      : undefined;
 
     // Send via provider adapter
     const adapter = getContractAdapter(provider);
@@ -1856,18 +1929,26 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
       signerName: client.full_name,
       signerEmail: client.email,
       documentTitle: templateName,
-      metadata: { org_id: context.orgId, assignment_id: assignmentId },
+      document: generatedDocument,
+      metadata: { org_id: context.orgId, assignment_id: assignmentId, agreement_type: agreementType },
     });
 
     // Update contract with external ID and status
-    await supabase
+    const { error: updateError } = await supabase
       .from('contracts')
       .update({
         external_contract_id: sendResult.externalContractId,
+        signer_name: client.full_name,
+        signer_email: client.email,
         status: sendResult.status === 'sent' ? 'sent' : sendResult.status,
         updated_at: new Date().toISOString(),
       })
       .eq('id', contractId);
+
+    if (updateError) {
+      console.error('Supabase error:', updateError);
+      return { error: 'Contract was sent, but Curator could not save the provider reference.' };
+    }
 
     // Record contract event
     await supabase.from('contract_events').insert({
@@ -1899,11 +1980,6 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
     }
 
     // Log transparency event
-    const [{ data: project }, { data: org }] = await Promise.all([
-      supabase.from('projects').select('name').eq('id', assignment.project_id).single(),
-      supabase.from('organizations').select('name').eq('id', context.orgId).single(),
-    ]);
-
     await logProjectTransparencyEvent({
       orgId: context.orgId,
       projectId: assignment.project_id,
@@ -3023,148 +3099,6 @@ export async function processWalkthroughWebhook(payload: WalkthroughWebhookPaylo
         payload: { walkthrough_id: session.id },
       });
     }
-  }
-}
-
-// ── Legacy project backfill ──────────────────────────────────
-
-const SENTINEL_EMAIL_PREFIX = '__internal:';
-
-export async function backfillLegacyProjects(): Promise<ActionResult> {
-  const context = await getActionContext('onboarding:create');
-  if ('error' in context) {
-    return { error: context.error };
-  }
-
-  try {
-    const orgId = context.orgId;
-
-    // Find or create sentinel client profile for this org
-    const sentinelEmail = `${SENTINEL_EMAIL_PREFIX}${orgId}`;
-    let sentinelId: string;
-
-    const { data: existingSentinel } = await supabase
-      .from('client_profiles')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('email', sentinelEmail)
-      .single();
-
-    if (existingSentinel) {
-      sentinelId = existingSentinel.id;
-    } else {
-      const { data: newSentinel, error: sentinelError } = await supabase
-        .from('client_profiles')
-        .insert({
-          org_id: orgId,
-          full_name: 'Legacy Projects',
-          email: sentinelEmail,
-          notes: 'Auto-created sentinel profile for legacy project backfill.',
-          created_by: context.userId,
-        })
-        .select('id')
-        .single();
-
-      if (sentinelError || !newSentinel) {
-        console.error('Supabase error:', sentinelError);
-        return { error: 'Failed to create sentinel client profile.' };
-      }
-      sentinelId = newSentinel.id;
-    }
-
-    // Find all projects in this org that don't have any onboarding assignment
-    const { data: allProjects } = await supabase
-      .from('projects')
-      .select('id, name')
-      .eq('org_id', orgId);
-
-    const { data: existingAssignments } = await supabase
-      .from('client_project_assignments')
-      .select('project_id')
-      .eq('org_id', orgId);
-
-    const assignedProjectIds = new Set(
-      (existingAssignments ?? []).map((a: { project_id: string }) => a.project_id),
-    );
-
-    const unassignedProjects = (allProjects ?? []).filter(
-      (p: { id: string }) => !assignedProjectIds.has(p.id),
-    );
-
-    if (unassignedProjects.length === 0) {
-      return { success: true };
-    }
-
-    let backfilledCount = 0;
-
-    for (const project of unassignedProjects as Array<{ id: string; name: string }>) {
-      // Create assignment
-      const { data: assignment, error: assignError } = await supabase
-        .from('client_project_assignments')
-        .insert({
-          org_id: orgId,
-          client_profile_id: sentinelId,
-          project_id: project.id,
-          assigned_by: context.userId,
-        })
-        .select('id')
-        .single();
-
-      if (assignError || !assignment) {
-        // Skip duplicates (idempotent)
-        if (assignError?.code === '23505') continue;
-        console.error('Backfill assignment error:', assignError);
-        continue;
-      }
-
-      // Create workflow
-      const { data: workflow, error: workflowError } = await supabase
-        .from('onboarding_workflows')
-        .insert({
-          org_id: orgId,
-          assignment_id: assignment.id,
-        })
-        .select('id')
-        .single();
-
-      if (workflowError || !workflow) {
-        console.error('Backfill workflow error:', workflowError);
-        continue;
-      }
-
-      // Create default steps
-      const stepRows = ONBOARDING_STEP_BLUEPRINTS.map((step, index) => ({
-        org_id: orgId,
-        workflow_id: workflow.id,
-        step_key: step.key,
-        title: step.title,
-        description: step.description,
-        sort_order: index,
-      }));
-
-      const { error: stepsError } = await supabase.from('onboarding_steps').insert(stepRows);
-      if (stepsError) {
-        console.error('Backfill steps error:', stepsError);
-        continue;
-      }
-
-      backfilledCount++;
-    }
-
-    await auditLog({
-      orgId,
-      actorId: context.userId,
-      action: 'onboarding.step_updated',
-      targetType: 'backfill',
-      metadata: { backfilledCount, totalUnassigned: unassignedProjects.length },
-    });
-
-    revalidatePath('/onboarding');
-    revalidatePath('/clients');
-    return { success: true };
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return { error: 'An unexpected error occurred.' };
   }
 }
 

@@ -2,6 +2,12 @@ import 'server-only';
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+import {
+  CONTRACT_SIGN_DATE_ANCHOR,
+  CONTRACT_SIGN_HERE_ANCHOR,
+  type ContractSendDocument,
+} from './contract-document';
+
 /**
  * Contract provider abstraction.
  *
@@ -19,6 +25,8 @@ export type ContractSendRequest = {
   contractId: string;
   /** Template identifier on the provider side, if applicable. */
   templateId?: string;
+  /** Generated document content for providers that accept direct file uploads. */
+  document?: ContractSendDocument;
   /** Signer details. */
   signerName: string;
   signerEmail: string;
@@ -113,18 +121,45 @@ export function createDocuSignAdapter(): ContractProviderAdapter {
     async send(request) {
       const token = await getAccessToken();
 
+      const hasTemplate = Boolean(request.templateId);
+      const hasDocument = Boolean(request.document);
+      if (hasTemplate === hasDocument) {
+        throw new Error('DocuSign send requires either a provider template or a generated document.');
+      }
+
+      const signer: Record<string, unknown> = {
+        email: request.signerEmail,
+        name: request.signerName,
+        recipientId: '1',
+        routingOrder: '1',
+      };
+
+      if (request.document) {
+        signer.tabs = {
+          signHereTabs: [
+            {
+              anchorString: CONTRACT_SIGN_HERE_ANCHOR,
+              anchorUnits: 'pixels',
+              anchorXOffset: '0',
+              anchorYOffset: '0',
+            },
+          ],
+          dateSignedTabs: [
+            {
+              anchorString: CONTRACT_SIGN_DATE_ANCHOR,
+              anchorUnits: 'pixels',
+              anchorXOffset: '0',
+              anchorYOffset: '0',
+            },
+          ],
+        };
+      }
+
       const envelopeBody: Record<string, unknown> = {
         emailSubject: request.documentTitle,
         status: 'sent',
         recipients: {
-          signers: [
-            {
-              email: request.signerEmail,
-              name: request.signerName,
-              recipientId: '1',
-              routingOrder: '1',
-            },
-          ],
+          signers: [signer],
         },
         customFields: {
           textCustomFields: [
@@ -133,19 +168,35 @@ export function createDocuSignAdapter(): ContractProviderAdapter {
         },
       };
 
+      if (request.document) {
+        envelopeBody.documents = [
+          {
+            documentBase64: request.document.contentBase64,
+            name: request.document.name,
+            fileExtension: request.document.fileExtension,
+            documentId: '1',
+          },
+        ];
+      }
+
       if (request.templateId) {
         (envelopeBody as Record<string, unknown>).templateId = request.templateId;
       }
 
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      if (integrationKey) {
+        headers['X-DocuSign-Authentication'] = JSON.stringify({
+          IntegratorKey: integrationKey,
+        });
+      }
+
       const res = await fetch(`${baseUrl}/v2.1/accounts/${accountId}/envelopes`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'X-DocuSign-Authentication': JSON.stringify({
-            IntegratorKey: integrationKey,
-          }),
-        },
+        headers,
         body: JSON.stringify(envelopeBody),
       });
 

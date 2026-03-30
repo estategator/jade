@@ -740,60 +740,82 @@ export function ClientWizard({
         )}
       </section>
 
-      {/* Attach project */}
+      {/* Attach project / Project attached info */}
       <section className="rounded-3xl border border-stone-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
-            <LinkIcon className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Attach project</h2>
-            <p className="text-sm text-stone-500 dark:text-zinc-500">
-              Link this client to a project to start the onboarding workflow.
+        {activeAssignments.length > 0 ? (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
+                <LinkIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Project attached</h2>
+                <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-stone-700 dark:text-zinc-300">
+                  <span className="truncate font-medium">{activeAssignments[0].project.name}</span>
+                  <StageBadge stage={activeAssignments[0].stage} />
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-stone-400 dark:text-zinc-600">
+              To change or remove the project, use the controls below.
             </p>
-          </div>
-        </div>
-
-        {assignSuccess && (
-          <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-400">
-            Project attached successfully.
-          </div>
-        )}
-
-        {projects.every((p) => p.isAttachedToClient) ? (
-          <p className="text-sm text-stone-500 dark:text-zinc-500">
-            All projects are already attached to this client.
-          </p>
+          </>
         ) : (
-          <form className="flex flex-wrap items-end gap-3" onSubmit={handleAssignProject}>
-            <label className="flex-1 text-sm font-medium text-stone-700 dark:text-zinc-300">
-              Project
-              <select
-                required
-                name="project_id"
-                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-900 outline-none transition focus:border-[var(--color-brand-primary)] dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                defaultValue=""
-              >
-                <option value="" disabled>Select a project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id} disabled={p.isAttachedToClient}>
-                    {p.name}{p.published ? " \u2022 published" : ""}{p.isAttachedToClient ? " (Already attached)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--color-brand-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <LinkIcon className="h-4 w-4" />
-              Attach
-            </button>
-            {assignError && (
-              <p className="w-full text-sm text-red-600 dark:text-red-400">{assignError}</p>
+          <>
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
+                <LinkIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Attach project</h2>
+                <p className="text-sm text-stone-500 dark:text-zinc-500">
+                  Link this client to a project to start the onboarding workflow.
+                </p>
+              </div>
+            </div>
+
+            {assignSuccess && (
+              <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-600 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-400">
+                Project attached successfully.
+              </div>
             )}
-          </form>
+
+            {projects.every((p) => p.isAttachedToClient) ? (
+              <p className="text-sm text-stone-500 dark:text-zinc-500">
+                All projects are already attached to this client.
+              </p>
+            ) : (
+              <form className="flex flex-wrap items-end gap-3" onSubmit={handleAssignProject}>
+                <label className="flex-1 text-sm font-medium text-stone-700 dark:text-zinc-300">
+                  Project
+                  <select
+                    required
+                    name="project_id"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-900 outline-none transition focus:border-[var(--color-brand-primary)] dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select a project</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id} disabled={p.isAttachedToClient}>
+                        {p.name}{p.published ? " \u2022 published" : ""}{p.isAttachedToClient ? " (Already attached)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--color-brand-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <LinkIcon className="h-4 w-4" />
+                  Attach
+                </button>
+                {assignError && (
+                  <p className="w-full text-sm text-red-600 dark:text-red-400">{assignError}</p>
+                )}
+              </form>
+            )}
+          </>
         )}
       </section>
 

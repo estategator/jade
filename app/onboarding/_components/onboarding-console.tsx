@@ -13,7 +13,6 @@ import {
   Link2,
   Mail,
   MapPin,
-  RefreshCw,
   Send,
   ShieldCheck,
   UserPlus,
@@ -24,7 +23,6 @@ import type { OnboardingDashboardData } from "@/app/onboarding/actions";
 import type { AgreementType } from "@/lib/agreement-types";
 import {
   assignClientToProject,
-  backfillLegacyProjects,
   createClientProfile,
   createProjectShareLink,
   scheduleWalkthrough,
@@ -270,19 +268,6 @@ export function OnboardingConsole({
             expiresAt: null,
           },
         }));
-      }
-      router.refresh();
-    });
-  };
-
-  const handleBackfill = () => {
-    setActionError(null);
-
-    startTransition(async () => {
-      const result = await backfillLegacyProjects();
-      if (result.error) {
-        setActionError(result.error);
-        return;
       }
       router.refresh();
     });
@@ -811,21 +796,6 @@ export function OnboardingConsole({
                 );
               })
             )}
-          </div>
-
-          <div className="mt-4 border-t border-stone-200 pt-4 dark:border-zinc-800">
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={handleBackfill}
-              className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-400"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Backfill legacy projects
-            </button>
-            <p className="mt-1 text-xs text-stone-400 dark:text-zinc-600">
-              Creates onboarding records for existing projects that do not have one yet.
-            </p>
           </div>
         </section>
       </div>

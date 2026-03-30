@@ -26,8 +26,10 @@ import {
 import {
   getEmailAdapter,
   buildWelcomeEmailContent,
+  buildClientPortalEmailContent,
+  buildContractSentEmailContent,
   type ContractSnapshot,
-} from '@/lib/onboarding-providers/email';
+} from '@/lib/email';
 import {
   getSchedulingAdapter,
   type SchedulingProvider,
@@ -51,6 +53,7 @@ export type OnboardingProjectOption = {
   id: string;
   name: string;
   published: boolean;
+  isAttachedToClient?: boolean;
 };
 
 export type OnboardingStepSummary = {
@@ -1373,6 +1376,14 @@ export type ContractDiscountDay = {
 
 export type UnsoldItemsHandling = 'client_keeps' | 'donate' | 'haul_away' | 'negotiate';
 
+import {
+  type AgreementType,
+  AGREEMENT_TYPE_DEFAULTS,
+  VALID_AGREEMENT_TYPES,
+} from '@/lib/agreement-types';
+
+export type { AgreementType } from '@/lib/agreement-types';
+
 export type ContractTerms = {
   commission_rate: number | null;
   minimum_commission: number | null;
@@ -1389,6 +1400,7 @@ export type ContractTerms = {
 export type ContractDetail = ContractTerms & {
   id: string;
   assignment_id: string;
+  agreement_type: AgreementType;
   provider: string;
   status: string;
   template_name: string | null;
@@ -1425,6 +1437,19 @@ function parseContractTerms(formData: FormData): ContractTerms {
     try { discountSchedule = JSON.parse(scheduleJson); } catch { /* keep empty */ }
   }
 
+  // Server-side discount schedule sanitisation: keep only valid, unique entries
+  const saleDurationParsed = saleDays ? parseInt(saleDays, 10) : null;
+  const seenDays = new Set<number>();
+  discountSchedule = discountSchedule.filter((d) => {
+    if (typeof d.day !== 'number' || typeof d.percent !== 'number') return false;
+    if (d.day < 1 || d.percent <= 0 || d.percent > 100) return false;
+    if (saleDurationParsed && !isNaN(saleDurationParsed) && d.day > saleDurationParsed) return false;
+    if (seenDays.has(d.day)) return false;
+    seenDays.add(d.day);
+    return true;
+  });
+  discountSchedule.sort((a, b) => a.day - b.day);
+
   return {
     commission_rate: commRate ? parseFloat(commRate) : null,
     minimum_commission: minComm ? parseFloat(minComm) : null,
@@ -1453,9 +1478,13 @@ export async function createContractDraft(formData: FormData): Promise<ActionRes
   const assignmentId = (formData.get('assignment_id') as string | null)?.trim() ?? '';
   const provider = ((formData.get('provider') as string | null)?.trim() ?? 'manual') as ContractProvider;
   const templateName = (formData.get('template_name') as string | null)?.trim() ?? '';
+  const agreementType = (formData.get('agreement_type') as string | null)?.trim() ?? '';
 
   if (!assignmentId) {
     return { error: 'Missing client assignment.' };
+  }
+  if (!VALID_AGREEMENT_TYPES.has(agreementType)) {
+    return { error: 'Agreement type is required.' };
   }
   if (!['docusign', 'dropbox_sign', 'manual'].includes(provider)) {
     return { error: 'Invalid contract provider.' };
@@ -1488,9 +1517,10 @@ export async function createContractDraft(formData: FormData): Promise<ActionRes
     const insertPayload: Record<string, unknown> = {
       org_id: context.orgId,
       assignment_id: assignmentId,
+      agreement_type: agreementType,
       provider,
       status: 'draft',
-      template_name: templateName || 'Estate Sale Agreement',
+      template_name: templateName || AGREEMENT_TYPE_DEFAULTS[agreementType as AgreementType],
       signer_name: client.full_name,
       signer_email: client.email,
       created_by: context.userId,
@@ -1523,7 +1553,7 @@ export async function createContractDraft(formData: FormData): Promise<ActionRes
       org_id: context.orgId,
       contract_id: contract.id,
       event_type: 'draft_created',
-      payload: { provider, template_name: templateName },
+      payload: { provider, agreement_type: agreementType, template_name: templateName },
     });
 
     await auditLog({
@@ -1532,7 +1562,7 @@ export async function createContractDraft(formData: FormData): Promise<ActionRes
       action: 'onboarding.contract_drafted',
       targetType: 'contract',
       targetId: contract.id,
-      metadata: { provider, assignmentId },
+      metadata: { provider, agreementType, assignmentId },
     });
 
     revalidatePath('/onboarding');
@@ -1736,6 +1766,7 @@ export async function getContractDetail(
     data: {
       id: row.id as string,
       assignment_id: row.assignment_id as string,
+      agreement_type: (row.agreement_type as AgreementType) ?? 'estate_sale',
       provider: row.provider as string,
       status: row.status as string,
       template_name: (row.template_name as string | null) ?? null,
@@ -1794,7 +1825,8 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
 
     const assignmentId = row.assignment_id as string;
     const provider = row.provider as ContractProvider;
-    const templateName = (row.template_name as string) || 'Estate Sale Agreement';
+    const agreementTypeRaw = (row.agreement_type as string) ?? 'estate_sale';
+    const templateName = (row.template_name as string) || AGREEMENT_TYPE_DEFAULTS[agreementTypeRaw as AgreementType] || 'Estate Sale Agreement';
 
     const { data: assignment, error: assignmentError } = await supabase
       .from('client_project_assignments')
@@ -1867,11 +1899,10 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
     }
 
     // Log transparency event
-    const { data: project } = await supabase
-      .from('projects')
-      .select('name')
-      .eq('id', assignment.project_id)
-      .single();
+    const [{ data: project }, { data: org }] = await Promise.all([
+      supabase.from('projects').select('name').eq('id', assignment.project_id).single(),
+      supabase.from('organizations').select('name').eq('id', context.orgId).single(),
+    ]);
 
     await logProjectTransparencyEvent({
       orgId: context.orgId,
@@ -1891,6 +1922,166 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
       targetType: 'contract',
       targetId: contractId,
       metadata: { provider, assignmentId, status: sendResult.status },
+    });
+
+    // Queue client notification email (best-effort — failure does not block contract send)
+    if (sendResult.status === 'sent') {
+      try {
+        const emailPayload: ContractSentEmailQueuePayload = {
+          contractId,
+          to: client.email,
+          recipientName: client.full_name,
+          subject: `Your agreement for ${project?.name ?? 'your project'} has been sent`,
+          orgName: org?.name ?? '',
+          projectName: project?.name ?? '',
+          contractName: templateName,
+          provider,
+          assignmentId,
+          orgId: context.orgId,
+        };
+
+        await enqueue(TOPICS.CONTRACT_SENT_EMAIL, emailPayload, processContractSentEmailDelivery);
+      } catch (emailError) {
+        console.error(`Contract-sent email enqueue failed for contract ${contractId}:`, emailError);
+      }
+    }
+
+    revalidatePath('/onboarding');
+    revalidatePath('/clients');
+    revalidatePath('/contracts');
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function recordClientProvidedContract(formData: FormData): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:update');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  const assignmentId = (formData.get('assignment_id') as string | null)?.trim() ?? '';
+  const agreementType = ((formData.get('agreement_type') as string | null)?.trim() ?? 'estate_sale') as AgreementType;
+  const externalContractUrl = (formData.get('external_contract_url') as string | null)?.trim() ?? '';
+  const notes = (formData.get('notes') as string | null)?.trim() ?? '';
+
+  if (!assignmentId) {
+    return { error: 'Missing client assignment.' };
+  }
+  if (!VALID_AGREEMENT_TYPES.has(agreementType)) {
+    return { error: 'Invalid agreement type.' };
+  }
+
+  try {
+    const { data: assignment, error: assignmentError } = await supabase
+      .from('client_project_assignments')
+      .select('id, org_id, project_id, client_profile_id')
+      .eq('id', assignmentId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (assignmentError || !assignment) {
+      return { error: 'Client assignment not found.' };
+    }
+
+    const { data: client } = await supabase
+      .from('client_profiles')
+      .select('full_name, email')
+      .eq('id', assignment.client_profile_id)
+      .single();
+
+    if (!client) {
+      return { error: 'Client profile not found.' };
+    }
+
+    const now = new Date().toISOString();
+    const { data: contract, error: contractError } = await supabase
+      .from('contracts')
+      .insert({
+        org_id: context.orgId,
+        assignment_id: assignmentId,
+        agreement_type: agreementType,
+        provider: 'manual',
+        status: 'signed',
+        template_name: 'Client-provided agreement',
+        external_contract_id: externalContractUrl || null,
+        signer_name: client.full_name,
+        signer_email: client.email,
+        signed_at: now,
+        metadata: {
+          source: 'client_provided',
+          notes: notes || null,
+          external_contract_url: externalContractUrl || null,
+        },
+        created_by: context.userId,
+      })
+      .select('id')
+      .single();
+
+    if (contractError || !contract) {
+      console.error('Supabase error:', contractError);
+      return { error: 'Failed to record client-provided contract.' };
+    }
+
+    await supabase.from('contract_events').insert({
+      org_id: context.orgId,
+      contract_id: contract.id,
+      event_type: 'client_provided',
+      payload: {
+        agreement_type: agreementType,
+        external_contract_url: externalContractUrl || null,
+      },
+    });
+
+    const { data: workflow } = await supabase
+      .from('onboarding_workflows')
+      .select('id')
+      .eq('assignment_id', assignmentId)
+      .single();
+
+    if (workflow?.id) {
+      await supabase
+        .from('onboarding_steps')
+        .update({ status: 'completed', completed_at: now, updated_at: now })
+        .eq('workflow_id', workflow.id)
+        .eq('step_key', 'contract_sent');
+
+      await supabase
+        .from('onboarding_steps')
+        .update({ status: 'completed', completed_at: now, updated_at: now })
+        .eq('workflow_id', workflow.id)
+        .eq('step_key', 'contract_signed');
+
+      await refreshWorkflowState(workflow.id, { contractStatus: 'signed' });
+    }
+
+    await logProjectTransparencyEvent({
+      orgId: context.orgId,
+      projectId: assignment.project_id,
+      assignmentId,
+      actorId: context.userId,
+      eventType: 'contract_signed',
+      title: 'Client-provided contract recorded',
+      body: 'A signed client-provided contract has been recorded in Curator.',
+      payload: {
+        contract_id: contract.id,
+        external_contract_url: externalContractUrl || null,
+      },
+    });
+
+    await auditLog({
+      orgId: context.orgId,
+      actorId: context.userId,
+      action: 'onboarding.step_updated',
+      targetType: 'contract',
+      targetId: contract.id,
+      metadata: {
+        assignmentId,
+        provider: 'manual',
+        source: 'client_provided',
+      },
     });
 
     revalidatePath('/onboarding');
@@ -2071,7 +2262,7 @@ export async function sendWelcomeEmail(formData: FormData): Promise<ActionResult
     const contractSnapshot: ContractSnapshot | undefined = latestContract
       ? {
           status: latestContract.status as string,
-          templateName: (latestContract.template_name as string) ?? 'Estate Sale Agreement',
+          templateName: (latestContract.template_name as string) ?? (AGREEMENT_TYPE_DEFAULTS[(latestContract as Record<string, unknown>).agreement_type as AgreementType] || 'Estate Sale Agreement'),
           provider: latestContract.provider as string,
           signedAt: (latestContract.signed_at as string) ?? null,
         }
@@ -2287,6 +2478,298 @@ export async function processWelcomeEmailDelivery(payload: WelcomeEmailQueuePayl
       .eq('id', payload.welcomeMessageId);
 
     throw new Error(`Welcome email delivery failed: ${result.error}`);
+  }
+}
+
+// ── Client portal email delivery ─────────────────────────────
+
+export type ClientPortalEmailQueuePayload = {
+  welcomeMessageId: string;
+  to: string;
+  recipientName: string;
+  subject: string;
+  orgName: string;
+  projectName: string;
+  assignmentId: string;
+  orgId: string;
+  shareUrl: string;
+};
+
+/**
+ * Generate (or rotate) a share link and email the client portal URL.
+ * Completes the `project_shared` onboarding step.
+ */
+export async function sendClientPortalEmail(formData: FormData): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:share');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  const assignmentId = (formData.get('assignment_id') as string | null)?.trim() ?? '';
+  if (!assignmentId) {
+    return { error: 'Missing client assignment.' };
+  }
+
+  try {
+    const { data: assignment, error: assignmentError } = await supabase
+      .from('client_project_assignments')
+      .select('id, org_id, project_id, client_profile_id')
+      .eq('id', assignmentId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (assignmentError || !assignment) {
+      return { error: 'Client assignment not found.' };
+    }
+
+    const [{ data: client }, { data: org }, { data: project }] = await Promise.all([
+      supabase.from('client_profiles').select('full_name, email').eq('id', assignment.client_profile_id).single(),
+      supabase.from('organizations').select('name').eq('id', context.orgId).single(),
+      supabase.from('projects').select('name').eq('id', assignment.project_id).single(),
+    ]);
+
+    if (!client) {
+      return { error: 'Client profile not found.' };
+    }
+
+    // Generate or rotate a share link
+    const now = new Date().toISOString();
+    await supabase
+      .from('project_share_links')
+      .update({ status: 'revoked', updated_at: now })
+      .eq('assignment_id', assignmentId)
+      .eq('status', 'active');
+
+    const token = randomBytes(24).toString('base64url');
+    const tokenHash = hashShareToken(token);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: shareLink, error: shareLinkError } = await supabase
+      .from('project_share_links')
+      .insert({
+        org_id: context.orgId,
+        assignment_id: assignmentId,
+        project_id: assignment.project_id,
+        token_hash: tokenHash,
+        status: 'active',
+        expires_at: expiresAt,
+        created_by: context.userId,
+      })
+      .select('id')
+      .single();
+
+    if (shareLinkError || !shareLink) {
+      console.error('Supabase error:', shareLinkError);
+      return { error: 'Failed to create project share link.' };
+    }
+
+    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/client/${token}`;
+    const subject = `Your client portal for ${project?.name ?? 'your project'}`;
+
+    // Create welcome_messages row (reuse table for portal emails)
+    const { data: message, error: messageError } = await supabase
+      .from('welcome_messages')
+      .insert({
+        org_id: context.orgId,
+        assignment_id: assignmentId,
+        provider: (process.env.EMAIL_PROVIDER as string) ?? 'manual',
+        status: 'queued',
+        subject,
+        body: `Client portal link: ${shareUrl}`,
+        created_by: context.userId,
+      })
+      .select('id')
+      .single();
+
+    if (messageError || !message) {
+      console.error('Supabase error:', messageError);
+      return { error: 'Failed to create portal email message.' };
+    }
+
+    const emailPayload: ClientPortalEmailQueuePayload = {
+      welcomeMessageId: message.id,
+      to: client.email,
+      recipientName: client.full_name,
+      subject,
+      orgName: org?.name ?? '',
+      projectName: project?.name ?? '',
+      assignmentId,
+      orgId: context.orgId,
+      shareUrl,
+    };
+
+    await enqueue(TOPICS.CLIENT_PORTAL_EMAIL, emailPayload, processClientPortalEmailDelivery);
+
+    // Update onboarding step
+    const { data: workflow } = await supabase
+      .from('onboarding_workflows')
+      .select('id')
+      .eq('assignment_id', assignmentId)
+      .single();
+
+    if (workflow?.id) {
+      await supabase
+        .from('onboarding_steps')
+        .update({
+          status: 'completed',
+          completed_at: now,
+          updated_at: now,
+        })
+        .eq('workflow_id', workflow.id)
+        .eq('step_key', 'project_shared');
+
+      await refreshWorkflowState(workflow.id, { projectShareStatus: 'active' });
+    }
+
+    // Transparency + audit
+    await logProjectTransparencyEvent({
+      orgId: context.orgId,
+      projectId: assignment.project_id,
+      assignmentId,
+      actorId: context.userId,
+      eventType: 'client_portal_emailed',
+      title: 'Client portal link emailed',
+      body: `Portal link sent to ${client.full_name} at ${client.email}.`,
+      payload: { share_link_id: shareLink.id, expires_at: expiresAt },
+    });
+
+    await auditLog({
+      orgId: context.orgId,
+      actorId: context.userId,
+      action: 'onboarding.portal_email_sent',
+      targetType: 'project_share_link',
+      targetId: shareLink.id,
+      metadata: { assignmentId, expiresAt },
+    });
+
+    revalidatePath('/onboarding');
+    revalidatePath('/clients');
+    return {
+      success: true,
+      data: { shareUrl, expiresAt },
+    };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function processClientPortalEmailDelivery(payload: ClientPortalEmailQueuePayload): Promise<void> {
+  const adapter = getEmailAdapter();
+
+  const composed = buildClientPortalEmailContent({
+    recipientName: payload.recipientName,
+    orgName: payload.orgName,
+    projectName: payload.projectName,
+    shareUrl: payload.shareUrl,
+  });
+
+  const result = await adapter.send({
+    welcomeMessageId: payload.welcomeMessageId,
+    to: payload.to,
+    recipientName: payload.recipientName,
+    subject: payload.subject,
+    textBody: composed.textBody,
+    htmlBody: composed.htmlBody,
+    orgName: payload.orgName,
+    projectName: payload.projectName,
+    shareUrl: payload.shareUrl,
+  });
+
+  const now = new Date().toISOString();
+
+  if (result.status === 'sent') {
+    await supabase
+      .from('welcome_messages')
+      .update({
+        status: 'sent',
+        sent_at: now,
+        metadata: {
+          external_message_id: result.externalMessageId,
+          email_type: 'client_portal',
+          share_url: payload.shareUrl,
+        },
+        updated_at: now,
+      })
+      .eq('id', payload.welcomeMessageId);
+  } else {
+    await supabase
+      .from('welcome_messages')
+      .update({
+        status: 'failed',
+        metadata: { error: result.error, email_type: 'client_portal' },
+        updated_at: now,
+      })
+      .eq('id', payload.welcomeMessageId);
+
+    throw new Error(`Client portal email delivery failed: ${result.error}`);
+  }
+}
+
+// ── Contract-sent email delivery ─────────────────────────────
+
+export type ContractSentEmailQueuePayload = {
+  contractId: string;
+  to: string;
+  recipientName: string;
+  subject: string;
+  orgName: string;
+  projectName: string;
+  contractName: string;
+  provider: string;
+  assignmentId: string;
+  orgId: string;
+  signingUrl?: string;
+};
+
+/**
+ * Queue processor: deliver the "contract sent" notification email and
+ * record a contract_event for delivery audit.
+ */
+export async function processContractSentEmailDelivery(
+  payload: ContractSentEmailQueuePayload,
+): Promise<void> {
+  const adapter = getEmailAdapter();
+
+  const composed = buildContractSentEmailContent({
+    recipientName: payload.recipientName,
+    orgName: payload.orgName,
+    projectName: payload.projectName,
+    contractName: payload.contractName,
+    provider: payload.provider,
+    signingUrl: payload.signingUrl,
+  });
+
+  const result = await adapter.send({
+    welcomeMessageId: payload.contractId,
+    to: payload.to,
+    recipientName: payload.recipientName,
+    subject: payload.subject,
+    textBody: composed.textBody,
+    htmlBody: composed.htmlBody,
+    orgName: payload.orgName,
+    projectName: payload.projectName,
+  });
+
+  if (result.status === 'sent') {
+    await supabase.from('contract_events').insert({
+      org_id: payload.orgId,
+      contract_id: payload.contractId,
+      event_type: 'notification_email_sent',
+      payload: {
+        external_message_id: result.externalMessageId,
+        to: payload.to,
+      },
+    });
+  } else {
+    await supabase.from('contract_events').insert({
+      org_id: payload.orgId,
+      contract_id: payload.contractId,
+      event_type: 'notification_email_failed',
+      payload: { error: result.error, to: payload.to },
+    });
+
+    throw new Error(`Contract-sent email delivery failed: ${result.error}`);
   }
 }
 
@@ -2689,6 +3172,7 @@ export async function backfillLegacyProjects(): Promise<ActionResult> {
 
 export type ClientContractSummary = {
   id: string;
+  agreement_type: AgreementType;
   provider: string;
   status: string;
   template_name: string | null;
@@ -2794,12 +3278,20 @@ export async function getClientDetail(
     const projectList = (projects ?? []) as OnboardingProjectOption[];
     const projectsById = new Map(projectList.map((p) => [p.id, p]));
 
+    const activeProjectIds = new Set(
+      assignmentRows.filter((a) => a.status === 'active').map((a) => a.project_id),
+    );
+    const taggedProjects = projectList.map((p) => ({
+      ...p,
+      isAttachedToClient: activeProjectIds.has(p.id),
+    }));
+
     if (assignmentRows.length === 0) {
       return {
         data: {
           orgId,
           client: client as OnboardingClientProfile,
-          projects: projectList,
+          projects: taggedProjects,
           assignments: [],
         },
       };
@@ -2883,6 +3375,7 @@ export async function getClientDetail(
       const arr = contractsByAssignment.get(c.assignment_id) ?? [];
       arr.push({
         id: c.id as string,
+        agreement_type: (c.agreement_type as AgreementType) ?? 'estate_sale',
         provider: c.provider as string,
         status: c.status as string,
         template_name: (c.template_name as string | null) ?? null,
@@ -2965,7 +3458,7 @@ export async function getClientDetail(
       data: {
         orgId,
         client: client as OnboardingClientProfile,
-        projects: projectList,
+        projects: taggedProjects,
         assignments: detailAssignments,
       },
     };
@@ -2979,6 +3472,7 @@ export async function getClientDetail(
 
 export type OrgContractRow = {
   id: string;
+  agreement_type: AgreementType;
   provider: string;
   status: string;
   template_name: string | null;
@@ -3079,6 +3573,7 @@ export async function getOrgContracts(
       const assignment = assignmentMap.get(c.assignment_id as string) as { client_profile_id: string; project_id: string } | undefined;
       return {
         id: c.id as string,
+        agreement_type: (c.agreement_type as AgreementType) ?? 'estate_sale',
         provider: c.provider as string,
         status: c.status as string,
         template_name: (c.template_name as string | null) ?? null,

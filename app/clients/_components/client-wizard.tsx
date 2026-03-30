@@ -760,35 +760,41 @@ export function ClientWizard({
           </div>
         )}
 
-        <form className="flex flex-wrap items-end gap-3" onSubmit={handleAssignProject}>
-          <label className="flex-1 text-sm font-medium text-stone-700 dark:text-zinc-300">
-            Project
-            <select
-              required
-              name="project_id"
-              className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-900 outline-none transition focus:border-[var(--color-brand-primary)] dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-              defaultValue=""
+        {projects.every((p) => p.isAttachedToClient) ? (
+          <p className="text-sm text-stone-500 dark:text-zinc-500">
+            All projects are already attached to this client.
+          </p>
+        ) : (
+          <form className="flex flex-wrap items-end gap-3" onSubmit={handleAssignProject}>
+            <label className="flex-1 text-sm font-medium text-stone-700 dark:text-zinc-300">
+              Project
+              <select
+                required
+                name="project_id"
+                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-900 outline-none transition focus:border-[var(--color-brand-primary)] dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                defaultValue=""
+              >
+                <option value="" disabled>Select a project</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id} disabled={p.isAttachedToClient}>
+                    {p.name}{p.published ? " \u2022 published" : ""}{p.isAttachedToClient ? " (Already attached)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--color-brand-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <option value="" disabled>Select a project</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.published ? " \u2022 published" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--color-brand-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <LinkIcon className="h-4 w-4" />
-            Attach
-          </button>
-          {assignError && (
-            <p className="w-full text-sm text-red-600 dark:text-red-400">{assignError}</p>
-          )}
-        </form>
+              <LinkIcon className="h-4 w-4" />
+              Attach
+            </button>
+            {assignError && (
+              <p className="w-full text-sm text-red-600 dark:text-red-400">{assignError}</p>
+            )}
+          </form>
+        )}
       </section>
 
       {/* Action-level error */}

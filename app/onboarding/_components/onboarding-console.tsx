@@ -14,12 +14,14 @@ import {
   Mail,
   MapPin,
   RefreshCw,
+  Send,
   ShieldCheck,
   UserPlus,
   Users,
 } from "lucide-react";
 
 import type { OnboardingDashboardData } from "@/app/onboarding/actions";
+import type { AgreementType } from "@/lib/agreement-types";
 import {
   assignClientToProject,
   backfillLegacyProjects,
@@ -27,6 +29,7 @@ import {
   createProjectShareLink,
   scheduleWalkthrough,
   createContractDraft,
+  sendClientPortalEmail,
   sendWelcomeEmail,
   updateOnboardingStepStatus,
 } from "@/app/onboarding/actions";
@@ -35,6 +38,7 @@ import {
   US_STATES,
   type AddressParts,
 } from "@/app/components/address-autocomplete";
+import { AgreementTypeSelector } from "@/app/components/agreement-type-selector";
 
 type ShareResultState = Record<
   string,
@@ -55,6 +59,7 @@ export function OnboardingConsole({
   const [assignError, setAssignError] = useState<string | null>(null);
   const [shareResults, setShareResults] = useState<ShareResultState>({});
   const [actionError, setActionError] = useState<string | null>(null);
+  const [contractSelectorFor, setContractSelectorFor] = useState<string | null>(null);
   const [showAddress, setShowAddress] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
@@ -174,6 +179,33 @@ export function OnboardingConsole({
     });
   };
 
+  const handleSendPortalEmail = (assignmentId: string) => {
+    setActionError(null);
+
+    const formData = new FormData();
+    formData.set("assignment_id", assignmentId);
+
+    startTransition(async () => {
+      const result = await sendClientPortalEmail(formData);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+
+      const shareUrl = result.data?.shareUrl;
+      if (shareUrl) {
+        setShareResults((current) => ({
+          ...current,
+          [assignmentId]: {
+            url: shareUrl,
+            expiresAt: result.data?.expiresAt ?? null,
+          },
+        }));
+      }
+      router.refresh();
+    });
+  };
+
   const handleCopy = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -182,12 +214,13 @@ export function OnboardingConsole({
     }
   };
 
-  const handleCreateContract = (assignmentId: string) => {
+  const handleCreateContract = (assignmentId: string, agreementType: AgreementType) => {
     setActionError(null);
 
     const formData = new FormData();
     formData.set("assignment_id", assignmentId);
     formData.set("provider", "manual");
+    formData.set("agreement_type", agreementType);
 
     startTransition(async () => {
       const result = await createContractDraft(formData);
@@ -645,12 +678,21 @@ export function OnboardingConsole({
                         <button
                           type="button"
                           disabled={isPending}
-                          onClick={() => handleCreateContract(assignment.id)}
+                          onClick={() => setContractSelectorFor(assignment.id)}
                           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
                         >
                           <FileSignature className="h-3.5 w-3.5" />
                           Create contract
                         </button>
+                        {contractSelectorFor === assignment.id && (
+                          <AgreementTypeSelector
+                            onSelect={(type) => {
+                              setContractSelectorFor(null);
+                              handleCreateContract(assignment.id, type);
+                            }}
+                            onCancel={() => setContractSelectorFor(null)}
+                          />
+                        )}
                         <button
                           type="button"
                           disabled={isPending}
@@ -720,6 +762,15 @@ export function OnboardingConsole({
                         >
                           <Link2 className="h-4 w-4" />
                           Generate link
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleSendPortalEmail(assignment.id)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
+                        >
+                          <Send className="h-4 w-4" />
+                          Email portal link
                         </button>
                       </div>
 

@@ -249,6 +249,46 @@ export function buildWelcomeEmailContent(request: WelcomeEmailRequest): {
   };
 }
 
+/** Build email content specifically for the client portal link delivery. */
+export function buildClientPortalEmailContent(request: {
+  recipientName: string;
+  orgName: string;
+  projectName: string;
+  shareUrl: string;
+}): {
+  textBody: string;
+  htmlBody: string;
+} {
+  const textLines = [
+    `Hi ${request.recipientName},`,
+    '',
+    `Your client portal for "${request.projectName}" with ${request.orgName} is ready.`,
+    '',
+    'You can view your project details, progress updates, and key documents at any time:',
+    request.shareUrl,
+    '',
+    'This link is private — please do not share it with others.',
+    '',
+    `Thank you,`,
+    `The ${request.orgName} team`,
+  ];
+
+  const htmlParts = [
+    `<p>Hi ${escapeHtml(request.recipientName)},</p>`,
+    `<p>Your client portal for &ldquo;${escapeHtml(request.projectName)}&rdquo; with ${escapeHtml(request.orgName)} is ready.</p>`,
+    `<p>You can view your project details, progress updates, and key documents at any time:</p>`,
+    `<p style="margin:16px 0;"><a href="${escapeHtml(request.shareUrl)}" style="display:inline-block;padding:12px 24px;background-color:#4f46e5;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Open Client Portal</a></p>`,
+    `<p style="font-size:13px;color:#6b7280;">Or copy this link: <a href="${escapeHtml(request.shareUrl)}" style="color:#4f46e5;text-decoration:underline;">${escapeHtml(request.shareUrl)}</a></p>`,
+    `<p style="font-size:13px;color:#6b7280;">This link is private — please do not share it with others.</p>`,
+    `<p>Thank you,<br>The ${escapeHtml(request.orgName)} team</p>`,
+  ];
+
+  return {
+    textBody: textLines.join('\n'),
+    htmlBody: htmlParts.join(''),
+  };
+}
+
 // ── Factory ──────────────────────────────────────────────────
 
 export function getEmailAdapter(provider?: EmailProvider): EmailProviderAdapter {

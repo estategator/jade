@@ -27,6 +27,8 @@ import {
   updateContractDraft,
   sendContract,
 } from "@/app/onboarding/actions";
+import type { AgreementType } from "@/lib/agreement-types";
+import { AGREEMENT_TYPE_DEFAULTS } from "@/lib/agreement-types";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -54,6 +56,8 @@ const labelClass =
 type ContractEditorProps = Readonly<{
   /** Assignment ID — required when creating a new contract */
   assignmentId: string;
+  /** Agreement type — required for new contracts */
+  agreementType: AgreementType;
   /** Existing contract to edit (null = new draft) */
   contract: ContractDetail | null;
   /** Client display name (for header) */
@@ -66,6 +70,7 @@ type ContractEditorProps = Readonly<{
 
 export function ContractEditor({
   assignmentId,
+  agreementType,
   contract,
   clientName,
   projectName,
@@ -79,7 +84,7 @@ export function ContractEditor({
   // ── Form state ─────────────────────────────────────────────
   const [provider, setProvider] = useState(contract?.provider ?? "manual");
   const [templateName, setTemplateName] = useState(
-    contract?.template_name ?? "Estate Sale Agreement",
+    contract?.template_name ?? AGREEMENT_TYPE_DEFAULTS[contract?.agreement_type ?? agreementType],
   );
 
   // Commission
@@ -109,6 +114,7 @@ export function ContractEditor({
   >(contract?.discount_schedule ?? []);
   const [newDiscountDay, setNewDiscountDay] = useState("");
   const [newDiscountPercent, setNewDiscountPercent] = useState("");
+  const [discountError, setDiscountError] = useState<string | null>(null);
   const [unsoldHandling, setUnsoldHandling] = useState<UnsoldItemsHandling>(
     contract?.unsold_items_handling ?? "client_keeps",
   );
@@ -147,16 +153,32 @@ export function ContractEditor({
   // ── Discount schedule management ───────────────────────────
 
   const addDiscount = useCallback(() => {
+    setDiscountError(null);
     const day = parseInt(newDiscountDay, 10);
     const percent = parseFloat(newDiscountPercent);
-    if (isNaN(day) || day < 1 || isNaN(percent) || percent <= 0 || percent > 100)
+    if (isNaN(day) || day < 1) {
+      setDiscountError("Enter a valid day (1 or higher).");
       return;
-    setDiscountSchedule((prev) =>
-      [...prev, { day, percent }].sort((a, b) => a.day - b.day),
-    );
+    }
+    if (isNaN(percent) || percent <= 0 || percent > 100) {
+      setDiscountError("Enter a valid discount percent (1–100).");
+      return;
+    }
+    const maxDay = saleDurationDays ? parseInt(saleDurationDays, 10) : null;
+    if (maxDay && !isNaN(maxDay) && day > maxDay) {
+      setDiscountError(`Day cannot exceed sale duration (${maxDay} days).`);
+      return;
+    }
+    setDiscountSchedule((prev) => {
+      if (prev.some((d) => d.day === day)) {
+        setDiscountError(`Day ${day} already has a discount. Remove it first.`);
+        return prev;
+      }
+      return [...prev, { day, percent }].sort((a, b) => a.day - b.day);
+    });
     setNewDiscountDay("");
     setNewDiscountPercent("");
-  }, [newDiscountDay, newDiscountPercent]);
+  }, [newDiscountDay, newDiscountPercent, saleDurationDays]);
 
   const removeDiscount = useCallback((index: number) => {
     setDiscountSchedule((prev) => prev.filter((_, i) => i !== index));
@@ -171,6 +193,7 @@ export function ContractEditor({
     } else {
       fd.set("assignment_id", assignmentId);
     }
+    fd.set("agreement_type", contract?.agreement_type ?? agreementType);
     fd.set("provider", provider);
     fd.set("template_name", templateName);
     if (commissionRate) fd.set("commission_rate", commissionRate);
@@ -489,7 +512,7 @@ export function ContractEditor({
                 id="ce-duration"
                 type="number"
                 min="1"
-                max="14"
+                max="90"
                 value={saleDurationDays}
                 onChange={(e) => setSaleDurationDays(e.target.value)}
                 placeholder="e.g. 3"
@@ -547,14 +570,18 @@ export function ContractEditor({
               </div>
             )}
             {isDraft && (
-              <div className="flex items-end gap-2">
+              <div className="flex flex-col gap-2">
+                {discountError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{discountError}</p>
+                )}
+                <div className="flex items-end gap-2">
                 <div className="w-24">
                   <input
                     type="number"
                     min="1"
-                    max="14"
+                    max="90"
                     value={newDiscountDay}
-                    onChange={(e) => setNewDiscountDay(e.target.value)}
+                    onChange={(e) => { setNewDiscountDay(e.target.value); setDiscountError(null); }}
                     placeholder="Day"
                     className={inputClass}
                   />
@@ -565,7 +592,7 @@ export function ContractEditor({
                     min="1"
                     max="100"
                     value={newDiscountPercent}
-                    onChange={(e) => setNewDiscountPercent(e.target.value)}
+                    onChange={(e) => { setNewDiscountPercent(e.target.value); setDiscountError(null); }}
                     placeholder="% off"
                     className={inputClass}
                   />
@@ -579,6 +606,7 @@ export function ContractEditor({
                   <Plus className="h-3.5 w-3.5" />
                   Add
                 </button>
+                </div>
               </div>
             )}
           </div>

@@ -11,6 +11,8 @@ export const TOPICS = {
   INVOICE_GENERATION: 'invoice-generation',
   CONTRACT_WEBHOOK: 'contract-webhook',
   WELCOME_EMAIL: 'welcome-email',
+  CLIENT_PORTAL_EMAIL: 'client-portal-email',
+  CONTRACT_SENT_EMAIL: 'contract-sent-email',
   WALKTHROUGH_WEBHOOK: 'walkthrough-webhook',
 } as const;
 

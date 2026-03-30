@@ -51,6 +51,7 @@ export type AuditAction =
   | 'onboarding.assignment_archived'
   | 'onboarding.assignment_changed'
   | 'onboarding.share_link_created'
+  | 'onboarding.portal_email_sent'
   | 'onboarding.step_updated'
   | 'member.invited'
   | 'member.removed'

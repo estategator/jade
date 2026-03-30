@@ -85,7 +85,8 @@ export type ProjectTransparencyEventType =
   | "contract_signed"
   | "welcome_email_sent"
   | "walkthrough_scheduled"
-  | "walkthrough_completed";
+  | "walkthrough_completed"
+  | "client_portal_emailed";
 
 export type OnboardingStepRecord = {
   step_key: OnboardingStepKey;

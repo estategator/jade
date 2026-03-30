@@ -4,7 +4,7 @@ import { enqueue, TOPICS } from '@/lib/queue';
 import {
   processContractWebhook,
   type ContractWebhookPayload,
-} from '@/app/onboarding/actions';
+} from '@/lib/onboarding-webhook-processors';
 
 const SUPPORTED_PROVIDERS: ContractProvider[] = ['docusign', 'dropbox_sign'];
 

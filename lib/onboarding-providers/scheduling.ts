@@ -89,6 +89,75 @@ function calendlyStatusMap(status: string): WalkthroughStatusResult['status'] {
   }
 }
 
+function isCalendlyOneOnOneKeyword(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === 'one_on_one' ||
+    normalized === 'one-on-one' ||
+    normalized === 'one on one' ||
+    normalized === '1:1' ||
+    normalized === '1-1'
+  );
+}
+
+async function resolveCalendlyEventTypeUri(
+  apiToken: string,
+  baseUrl: string,
+  configuredEventTypeUri?: string,
+): Promise<string> {
+  const configured = configuredEventTypeUri?.trim();
+  if (configured && !isCalendlyOneOnOneKeyword(configured)) {
+    return configured;
+  }
+
+  const eventTypesResponse = await fetch(`${baseUrl}/event_types?count=100`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+
+  if (!eventTypesResponse.ok) {
+    const text = await eventTypesResponse.text();
+    throw new Error(`Calendly event_types failed (${eventTypesResponse.status}): ${text}`);
+  }
+
+  const eventTypesData = (await eventTypesResponse.json()) as {
+    collection?: Array<{
+      uri?: string;
+      name?: string;
+      active?: boolean;
+      kind?: string;
+      type?: string;
+    }>;
+  };
+
+  const allCandidates = (eventTypesData.collection ?? []).filter(
+    (item): item is { uri: string; name?: string; active?: boolean; kind?: string; type?: string } =>
+      Boolean(item.uri) && item.active !== false,
+  );
+
+  if (allCandidates.length === 0) {
+    throw new Error('Calendly event type URI not configured and no active event types were found.');
+  }
+
+  const oneOnOneCandidate = allCandidates.find((item) => {
+    const haystack = `${item.kind ?? ''} ${item.type ?? ''} ${item.name ?? ''}`.toLowerCase();
+    return (
+      haystack.includes('one_on_one') ||
+      haystack.includes('one-on-one') ||
+      haystack.includes('one on one') ||
+      haystack.includes('1:1')
+    );
+  });
+
+  if (configured && isCalendlyOneOnOneKeyword(configured)) {
+    if (!oneOnOneCandidate) {
+      throw new Error('Calendly one-on-one event type not found among active event types.');
+    }
+    return oneOnOneCandidate.uri;
+  }
+
+  return configured ? allCandidates[0].uri : (oneOnOneCandidate?.uri ?? allCandidates[0].uri);
+}
+
 export function createCalendlyAdapter(): SchedulingProviderAdapter {
   const apiToken = process.env.CALENDLY_API_TOKEN ?? '';
   const webhookSigningKey = process.env.CALENDLY_WEBHOOK_SIGNING_KEY ?? '';
@@ -103,10 +172,8 @@ export function createCalendlyAdapter(): SchedulingProviderAdapter {
       // Calendly doesn't have a direct "create invite" API — the standard flow
       // is to generate a scheduling link with prefilled invitee info.
       // We use the single-use scheduling link API.
-      const eventTypeUri = request.eventTypeUri ?? process.env.CALENDLY_DEFAULT_EVENT_TYPE;
-      if (!eventTypeUri) {
-        throw new Error('Calendly event type URI not configured.');
-      }
+      const configuredEventTypeUri = request.eventTypeUri ?? process.env.CALENDLY_DEFAULT_EVENT_TYPE;
+      const eventTypeUri = await resolveCalendlyEventTypeUri(apiToken, baseUrl, configuredEventTypeUri);
 
       const res = await fetch(`${baseUrl}/scheduling_links`, {
         method: 'POST',

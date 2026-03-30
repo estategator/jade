@@ -4,7 +4,7 @@ import { enqueue, TOPICS } from '@/lib/queue';
 import {
   processWalkthroughWebhook,
   type WalkthroughWebhookPayload,
-} from '@/app/onboarding/actions';
+} from '@/lib/onboarding-webhook-processors';
 
 export async function POST(req: NextRequest) {
   const provider = req.nextUrl.searchParams.get('provider') as SchedulingProvider | null;

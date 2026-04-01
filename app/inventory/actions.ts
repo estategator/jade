@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { processItemImage, analyzeUploadedSimpleImage, normalizeSourceImage } from '@/lib/image-processing';
+import { processItemImage, normalizeSourceImage } from '@/lib/image-processing';
 import type { AIAnalysisResult, InventoryProcessingStatus } from '@/lib/inventory';
 import { logProjectTransparencyEvent } from '@/lib/project-transparency';
 import { requirePermission, resolveActiveOrgId } from '@/lib/rbac';
@@ -1052,66 +1052,281 @@ export async function retryImageProcessing(itemId: string) {
   }
 }
 
-export async function analyzeItemAction(formData: FormData) {
-  try {
-    const imageFile = formData.get('image') as File | null;
-    if (!imageFile || imageFile.size === 0) {
-      console.warn('[analyzeItemAction] No image in FormData');
-      return { error: 'No image provided.' };
-    }
+// ── Direct-upload flow: prepare → client uploads → finalize ──────────
 
-    console.log('[analyzeItemAction] image received:', imageFile.name, imageFile.size, 'bytes');
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
-    const result = await analyzeUploadedSimpleImage(buffer);
-
-    if (!result) {
-      console.warn('[analyzeItemAction] analyzeUploadedSimpleImage returned null');
-      return { error: 'Could not analyze image.' };
-    }
-
-    console.log('[analyzeItemAction] returning:', JSON.stringify(result).slice(0, 300));
-    return { success: true, data: result };
-  } catch (err) {
-    console.error('[analyzeItemAction] error:', err);
-    return { error: 'An unexpected error occurred during analysis.' };
-  }
-}
-
-export type BatchAnalysisItem = {
-  index: number;
-  result: AIAnalysisResult | null;
-  error?: string;
+export type PrepareUploadDescriptor = {
+  itemId: string;
+  storagePath: string;
+  signedUrl: string;
+  token: string;
 };
 
-/** Analyze multiple images in a single request, all in parallel server-side. */
-export async function batchAnalyzeItemsAction(formData: FormData): Promise<{ data?: BatchAnalysisItem[]; error?: string }> {
+/**
+ * Prepare a single inventory item: insert the DB row (processing_status=queued)
+ * and return a signed upload URL so the browser can push image bytes directly
+ * to Supabase Storage — no server-action proxy.
+ */
+export async function prepareInventoryItem(input: {
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  condition: string;
+  quantity: number;
+  userId: string;
+  projectId: string;
+  hasImage: boolean;
+  aiInsights?: AIAnalysisResult | null;
+}): Promise<{ data?: { itemId: string; upload?: PrepareUploadDescriptor }; error?: string }> {
+  const { name, description, category, price, condition, quantity, userId, projectId, hasImage, aiInsights } = input;
+
+  if (!name) return { error: 'Name is required.' };
+  if (isNaN(price) || price < 0) return { error: 'Valid price is required.' };
+  if (!projectId) return { error: 'Project is required.' };
+
+  const { data: project, error: projLookupErr } = await supabase
+    .from('projects')
+    .select('org_id')
+    .eq('id', projectId)
+    .single();
+
+  if (projLookupErr || !project) return { error: 'Project not found.' };
+
+  const permCheck = await requirePermission(project.org_id, userId, 'inventory:create');
+  if (!permCheck.granted) return { error: permCheck.error };
+
   try {
-    const countStr = formData.get('count') as string;
-    const count = parseInt(countStr, 10);
-    if (!count || count < 1) return { error: 'No images provided.' };
+    const { data: item, error } = await supabase
+      .from('inventory_items')
+      .insert({
+        name,
+        description: description || '',
+        category: category || 'Uncategorized',
+        price,
+        condition: condition || 'Good',
+        status: 'available',
+        quantity: isNaN(quantity) || quantity < 1 ? 1 : quantity,
+        user_id: userId,
+        org_id: project.org_id,
+        project_id: projectId,
+        ai_insights: aiInsights ?? null,
+        processing_status: hasImage ? 'queued' : 'none',
+      })
+      .select('id')
+      .single();
 
-    const results = await Promise.all(
-      Array.from({ length: count }, async (_, i) => {
-        const imageFile = formData.get(`image-${i}`) as File | null;
-        if (!imageFile || imageFile.size === 0) {
-          return { index: i, result: null, error: 'No image' };
-        }
+    if (error || !item) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to add item. Please try again.' };
+    }
 
-        try {
-          const buffer = Buffer.from(await imageFile.arrayBuffer());
-          const result = await analyzeUploadedSimpleImage(buffer);
-          return { index: i, result, error: result ? undefined : 'Analysis failed' };
-        } catch (err) {
-          console.error(`[batchAnalyzeItemsAction] image-${i} error:`, err);
-          return { index: i, result: null, error: 'Analysis error' };
-        }
-      }),
-    );
+    let upload: PrepareUploadDescriptor | undefined;
 
-    return { data: results };
+    if (hasImage) {
+      const storagePath = `${item.id}/source.webp`;
+      const { data: signedData, error: signedErr } = await supabase.storage
+        .from('inventory-images')
+        .createSignedUploadUrl(storagePath);
+
+      if (signedErr || !signedData) {
+        console.error('Signed URL error:', signedErr);
+        await supabase.from('inventory_items').update({ processing_status: 'failed' }).eq('id', item.id);
+        return { error: 'Failed to prepare image upload.' };
+      }
+
+      upload = {
+        itemId: item.id,
+        storagePath,
+        signedUrl: signedData.signedUrl,
+        token: signedData.token,
+      };
+    }
+
+    await logProjectTransparencyEvent({
+      orgId: project.org_id,
+      projectId,
+      actorId: userId,
+      eventType: 'inventory_created',
+      title: `Added ${name} to inventory`,
+      body: `${name} is now part of the project inventory at $${price.toFixed(2)}.`,
+      payload: { item_id: item.id, category: category || 'Uncategorized', condition: condition || 'Good', price },
+    });
+
+    revalidateInventoryRoutes();
+    return { data: { itemId: item.id, upload } };
   } catch (err) {
-    console.error('[batchAnalyzeItemsAction] error:', err);
+    console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };
   }
 }
+
+/**
+ * Called by the client after a successful direct upload to Supabase Storage.
+ * Sets original_image_url and enqueues the image processing pipeline.
+ */
+export async function finalizeInventoryUpload(input: {
+  itemId: string;
+  storagePath: string;
+  skipAnalysis: boolean;
+}): Promise<{ success?: true; error?: string }> {
+  const { itemId, storagePath, skipAnalysis } = input;
+
+  try {
+    const { data: { publicUrl } } = supabase.storage
+      .from('inventory-images')
+      .getPublicUrl(storagePath);
+
+    await supabase
+      .from('inventory_items')
+      .update({ original_image_url: publicUrl })
+      .eq('id', itemId);
+
+    await enqueue(
+      TOPICS.PROCESS_IMAGE,
+      { itemId, storagePath, skipAnalysis },
+      async (data) => processItemImage(data.itemId, data.storagePath, { skipAnalysis: data.skipAnalysis }),
+    );
+
+    return { success: true };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    await supabase.from('inventory_items').update({ processing_status: 'failed' }).eq('id', itemId);
+    return { error: 'Failed to finalize upload.' };
+  }
+}
+
+/**
+ * Bulk prepare: insert all rows, generate signed upload URLs for items with images.
+ * Returns descriptors the client uses for direct-to-storage uploads.
+ */
+export async function prepareBulkInventoryItems(input: {
+  items: BulkItemInput[];
+  imageIndexes: number[];
+}): Promise<{ data?: { itemIds: string[]; uploads: PrepareUploadDescriptor[] }; error?: string }> {
+  const { items, imageIndexes } = input;
+  if (!items.length) return { error: 'No items provided.' };
+
+  const userIds = [...new Set(items.map((item) => item.user_id).filter(Boolean))];
+  if (userIds.length !== 1) return { error: 'All items must belong to the same user.' };
+
+  const actingUserId = userIds[0];
+  const projectIds = [...new Set(items.map((i) => i.project_id).filter(Boolean))] as string[];
+  const projectValidation = await getValidatedBulkProjectOrgMap(actingUserId, projectIds);
+  if (projectValidation.error || !projectValidation.data) {
+    return { error: projectValidation.error || 'Failed to validate projects.' };
+  }
+
+  const projOrgMap = projectValidation.data;
+  const imageIndexSet = new Set(imageIndexes);
+
+  try {
+    const itemIds = items.map(() => crypto.randomUUID());
+
+    const rows = items.map((item, i) => {
+      const hasImage = imageIndexSet.has(i);
+      const storagePath = `${itemIds[i]}/source.webp`;
+      const originalImageUrl = hasImage
+        ? supabase.storage.from('inventory-images').getPublicUrl(storagePath).data.publicUrl
+        : null;
+
+      return {
+        id: itemIds[i],
+        name: item.name || '',
+        description: item.description || '',
+        category: item.category || 'Other',
+        price: item.price || 0,
+        condition: item.condition || 'Good',
+        status: 'available' as const,
+        user_id: item.user_id,
+        project_id: item.project_id || null,
+        org_id: item.project_id ? (projOrgMap[item.project_id] ?? null) : null,
+        original_image_url: originalImageUrl,
+        ai_insights: item.ai_insights ?? null,
+        processing_status: hasImage ? ('queued' as const) : ('none' as const),
+      };
+    });
+
+    const { error } = await supabase.from('inventory_items').insert(rows);
+
+    if (error) {
+      console.error('Supabase bulk insert error:', error);
+      return { error: `Failed to add items: ${error.message}` };
+    }
+
+    // Generate signed upload URLs for items that have images.
+    const uploads: PrepareUploadDescriptor[] = [];
+
+    for (const idx of imageIndexes) {
+      const itemId = itemIds[idx];
+      const storagePath = `${itemId}/source.webp`;
+      const { data: signedData, error: signedErr } = await supabase.storage
+        .from('inventory-images')
+        .createSignedUploadUrl(storagePath);
+
+      if (signedErr || !signedData) {
+        console.error('Signed URL error for bulk item:', signedErr);
+        // Mark as failed but don't abort the whole batch
+        await supabase.from('inventory_items').update({ processing_status: 'failed', original_image_url: null }).eq('id', itemId);
+        continue;
+      }
+
+      uploads.push({
+        itemId,
+        storagePath,
+        signedUrl: signedData.signedUrl,
+        token: signedData.token,
+      });
+    }
+
+    revalidateInventoryRoutes();
+    return { data: { itemIds, uploads } };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+/**
+ * Bulk finalize: called after the client finishes all direct uploads.
+ * Enqueues the image processing pipeline for each successfully uploaded item.
+ */
+export async function finalizeBulkUploads(input: {
+  succeeded: { itemId: string; storagePath: string; skipAnalysis: boolean }[];
+  failedItemIds: string[];
+}): Promise<{ success?: true; error?: string }> {
+  try {
+    // Mark failed uploads
+    if (input.failedItemIds.length > 0) {
+      await supabase
+        .from('inventory_items')
+        .update({ processing_status: 'failed', original_image_url: null })
+        .in('id', input.failedItemIds);
+    }
+
+    // Enqueue processing for successful uploads
+    for (const item of input.succeeded) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('inventory-images')
+        .getPublicUrl(item.storagePath);
+
+      await supabase
+        .from('inventory_items')
+        .update({ original_image_url: publicUrl })
+        .eq('id', item.itemId);
+
+      await enqueue(
+        TOPICS.PROCESS_IMAGE,
+        { itemId: item.itemId, storagePath: item.storagePath, skipAnalysis: item.skipAnalysis },
+        async (data) => processItemImage(data.itemId, data.storagePath, { skipAnalysis: data.skipAnalysis }),
+      );
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'Failed to finalize uploads.' };
+  }
+}
+
+
 

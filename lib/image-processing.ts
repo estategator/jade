@@ -15,7 +15,7 @@ import { z } from 'zod';
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1000;
 
-/** Retry an OpenAI call with exponential backoff on 429 (rate-limit) errors. */
+/** Retry an OpenAI call with exponential backoff + jitter on 429 (rate-limit) errors. */
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -23,7 +23,10 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
     } catch (err) {
       const status = (err as { status?: number })?.status;
       if (status !== 429 || attempt === MAX_RETRIES) throw err;
-      const delay = INITIAL_BACKOFF_MS * 2 ** attempt;
+      // Exponential backoff with ±25% jitter to prevent synchronized retry spikes
+      const base = INITIAL_BACKOFF_MS * 2 ** attempt;
+      const jitter = base * (0.75 + Math.random() * 0.5);
+      const delay = Math.round(jitter);
       console.warn(`[withRetry] 429 rate-limited, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
       await new Promise((r) => setTimeout(r, delay));
     }

@@ -16,10 +16,11 @@ import {
 } from "@/lib/inventory";
 import { PageHeader } from "@/app/components/page-header";
 import {
-  createInventoryItem,
-  analyzeItemAction,
+  prepareInventoryItem,
+  finalizeInventoryUpload,
   type UserProject,
 } from "@/app/inventory/actions";
+import { compressImage } from "@/lib/client-image-compress";
 
 const FIELD_DEFAULTS = {
   name: "",
@@ -130,9 +131,13 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
     setAnalyzing(true);
     const fd = new FormData();
     fd.append("image", file);
-    analyzeItemAction(fd)
-      .then((result) => {
-        console.log("[AddItemForm] analyzeItemAction result:", JSON.stringify(result).slice(0, 300));
+    fetch("/api/inventory/analyze", {
+      method: "POST",
+      body: fd,
+    })
+      .then(async (res) => {
+        const result = await res.json() as { success?: boolean; data?: AIAnalysisResult; error?: string };
+        console.log("[AddItemForm] analyze result:", JSON.stringify(result).slice(0, 300));
 
         // Guard: discard if a newer upload has started
         if (token !== analysisTokenRef.current) {
@@ -140,7 +145,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
           return;
         }
 
-        if (result.success && result.data) {
+        if (res.ok && result.success && result.data) {
           const data = result.data as AIAnalysisResult;
           const hasUsefulData = !!(data.name || data.description || (data.price && data.price > 0));
           console.log("[AddItemForm] analysis succeeded, hasUsefulData:", hasUsefulData);
@@ -156,7 +161,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
         setAnalyzing(false);
       })
       .catch((err) => {
-        console.error("[AddItemForm] analyzeItemAction threw:", err);
+        console.error("[AddItemForm] analyze fetch threw:", err);
         if (token === analysisTokenRef.current) {
           setAnalyzing(false);
         }
@@ -193,30 +198,61 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
     setError("");
     setSubmitState("submitting");
 
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("description", description);
-    formData.append("category", category);
-    formData.append("condition", condition);
-    formData.append("price", price);
-    formData.append("quantity", quantity);
-    formData.append("user_id", userId);
-    formData.append("project_id", projectId);
-    if (insights) {
-      formData.append("ai_insights", JSON.stringify(insights));
-    }
-    if (imageFile) {
-      formData.append("image", imageFile);
-    }
+    try {
+      // 1. Prepare: insert DB row + get signed upload URL
+      const prepResult = await prepareInventoryItem({
+        name,
+        description,
+        category,
+        price: parseFloat(price) || 0,
+        condition,
+        quantity: parseInt(quantity, 10) || 1,
+        userId,
+        projectId,
+        hasImage: !!imageFile,
+        aiInsights: insights ?? undefined,
+      });
 
-    const result = await createInventoryItem(formData);
+      if (prepResult.error || !prepResult.data) {
+        setError(prepResult.error || "Failed to prepare item.");
+        setSubmitState("error");
+        return;
+      }
 
-    if (result.error) {
-      setError(result.error);
-      setSubmitState("error");
-    } else {
+      const { itemId, upload } = prepResult.data;
+
+      // Navigate optimistically — the item row already exists
       setSubmitState("success");
       router.push("/inventory");
+
+      // 2. Compress + direct-upload + finalize in the background
+      if (upload && imageFile) {
+        (async () => {
+          try {
+            const { blob } = await compressImage(imageFile);
+            const res = await fetch(upload.signedUrl, {
+              method: "PUT",
+              headers: { "Content-Type": "image/webp" },
+              body: blob,
+            });
+            if (res.ok) {
+              await finalizeInventoryUpload({
+                itemId: upload.itemId,
+                storagePath: upload.storagePath,
+                skipAnalysis: !!insights,
+              });
+            } else {
+              console.error("Direct upload failed:", res.status, await res.text());
+            }
+          } catch (err) {
+            console.error("Background upload error:", err);
+          }
+        })();
+      }
+    } catch (err) {
+      console.error("Submit error:", err);
+      setError("An unexpected error occurred.");
+      setSubmitState("error");
     }
   }
 

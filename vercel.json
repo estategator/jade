@@ -61,6 +61,15 @@
       "experimentalTriggers": [
         { "type": "queue/v2beta", "topic": "contract-sent-email" }
       ]
+    },
+    "app/api/cleanup-abandoned/route.ts": {
+      "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cleanup-abandoned",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }

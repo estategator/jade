@@ -15,14 +15,14 @@ import {
   PiArrowsClockwiseDuotone,
 } from "react-icons/pi";
 import { cn } from "@/lib/cn";
-import { INVENTORY_CATEGORIES, INVENTORY_CONDITIONS } from "@/lib/inventory";
+import { INVENTORY_CATEGORIES, INVENTORY_CONDITIONS, type AIAnalysisResult } from "@/lib/inventory";
 import {
-  createBulkInventoryItemsWithImages,
-  analyzeItemAction,
-  batchAnalyzeItemsAction,
+  prepareBulkInventoryItems,
+  finalizeBulkUploads,
   type UserProject,
 } from "@/app/inventory/actions";
 import { PageHeader } from "@/app/components/page-header";
+import { compressImage, getAdaptiveConcurrency, pooledMap } from "@/lib/client-image-compress";
 
 type BulkItem = {
   id: string;
@@ -36,7 +36,7 @@ type BulkItem = {
   price: string;
   analysisStatus: 'none' | 'queued' | 'analyzing' | 'complete' | 'failed';
   analysisError?: string;
-  aiInsights?: unknown;
+  aiInsights?: AIAnalysisResult | null;
 };
 
 function newEmptyItem(): BulkItem {
@@ -68,7 +68,19 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
   const [error, setError] = useState("");
   const [projectId, setProjectId] = useState("");
 
+  // Per-item analysis generation tokens: only the latest request for a given
+  // item id can write back results. Prevents stale/duplicate overwrites.
+  const analysisTokensRef = useRef<Map<string, number>>(new Map());
+  // Global generation: bumped on submit to invalidate all pending analyses.
+  const analysisGenerationRef = useRef(0);
+
   async function analyzeItem(id: string, file: File) {
+    // Bump per-item token so any prior in-flight request for this item is stale.
+    const gen = analysisGenerationRef.current;
+    const prevToken = analysisTokensRef.current.get(id) ?? 0;
+    const token = prevToken + 1;
+    analysisTokensRef.current.set(id, token);
+
     setItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, analysisStatus: "analyzing", analysisError: undefined } : it))
     );
@@ -77,13 +89,27 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
       const formData = new FormData();
       formData.append("image", file);
 
-      const result = await analyzeItemAction(formData);
+      const res = await fetch("/api/inventory/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await res.json() as { success?: boolean; data?: AIAnalysisResult; error?: string };
+
+      // Guard: discard if a newer request was issued for this item,
+      // the item was removed, or a submit invalidated all analyses.
+      if (
+        analysisTokensRef.current.get(id) !== token ||
+        analysisGenerationRef.current !== gen
+      ) {
+        return;
+      }
 
       setItems((prev) =>
         prev.map((it) => {
           if (it.id !== id) return it;
 
-          if (result.error || !result.data) {
+          if (!res.ok || result.error || !result.data) {
             return {
               ...it,
               aiInsights: null,
@@ -107,6 +133,13 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
       );
     } catch (analysisError) {
       console.error("Analysis client error:", analysisError);
+      // Guard stale responses on error path too.
+      if (
+        analysisTokensRef.current.get(id) !== token ||
+        analysisGenerationRef.current !== gen
+      ) {
+        return;
+      }
       setItems((prev) =>
         prev.map((it) =>
           it.id === id
@@ -137,79 +170,10 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
 
     setItems((prev) => [...prev, ...newItems]);
 
-    if (imageFiles.length === 1) {
-      const item = newItems[0];
-      analyzeItem(item.id, imageFiles[0]);
-      return;
-    }
-
-    const BATCH_SIZE = 15;
-    const chunks: { files: File[]; items: BulkItem[] }[] = [];
-    for (let index = 0; index < imageFiles.length; index += BATCH_SIZE) {
-      chunks.push({
-        files: imageFiles.slice(index, index + BATCH_SIZE),
-        items: newItems.slice(index, index + BATCH_SIZE),
-      });
-    }
-
-    for (const chunk of chunks) {
-      const formData = new FormData();
-      formData.append("count", chunk.files.length.toString());
-      chunk.files.forEach((file, index) => formData.append(`image-${index}`, file));
-
-      batchAnalyzeItemsAction(formData)
-        .then((response) => {
-          if (response.error || !response.data) {
-            setItems((prev) =>
-              prev.map((it) =>
-                chunk.items.some((candidate) => candidate.id === it.id)
-                  ? { ...it, aiInsights: null, analysisStatus: "failed" as const, analysisError: response.error || "Batch analysis failed" }
-                  : it
-              )
-            );
-            return;
-          }
-
-          setItems((prev) =>
-            prev.map((it) => {
-              const itemIndex = chunk.items.findIndex((candidate) => candidate.id === it.id);
-              if (itemIndex === -1) return it;
-
-              const analysisItem = response.data!.find((result) => result.index === itemIndex);
-              if (!analysisItem || !analysisItem.result) {
-                return {
-                  ...it,
-                  aiInsights: null,
-                  analysisStatus: "failed" as const,
-                  analysisError: analysisItem?.error || "Analysis failed",
-                };
-              }
-
-              const data = analysisItem.result;
-              return {
-                ...it,
-                name: it.name || data.name,
-                description: it.description || data.description,
-                category: it.category === "Other" && data.category ? data.category : it.category,
-                condition: it.condition === "Good" && data.condition ? data.condition : it.condition,
-                price: !it.price && data.price ? data.price.toString() : it.price,
-                aiInsights: data,
-                analysisStatus: "complete" as const,
-              };
-            })
-          );
-        })
-        .catch((analysisError) => {
-          console.error("Batch analysis error:", analysisError);
-          setItems((prev) =>
-            prev.map((it) =>
-              chunk.items.some((candidate) => candidate.id === it.id)
-                ? { ...it, aiInsights: null, analysisStatus: "failed" as const, analysisError: "Network or server error" }
-                : it
-            )
-          );
-        });
-    }
+    // Dispatch analyses with bounded concurrency to avoid rate-limit cascades
+    const analysisConcurrency = Math.min(3, getAdaptiveConcurrency());
+    const analysisTasks = newItems.map((item) => () => analyzeItem(item.id, item.imageFile!));
+    pooledMap(analysisTasks, analysisConcurrency);
   }
 
   function retryAnalysis(id: string) {
@@ -231,6 +195,8 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
   }
 
   function removeItem(id: string) {
+    // Invalidate pending analysis for this item so late responses are discarded.
+    analysisTokensRef.current.delete(id);
     setItems((prev) => prev.filter((it) => it.id !== id));
   }
 
@@ -273,8 +239,6 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
     items.length > 0 &&
     items.every(
       (it) =>
-        it.analysisStatus !== 'queued' &&
-        it.analysisStatus !== 'analyzing' &&
         (it.name.trim() && !isNaN(parseFloat(it.price)) && parseFloat(it.price) >= 0)
     );
 
@@ -287,34 +251,106 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
 
     setSubmitting(true);
 
-    const formData = new FormData();
+    // Invalidate all pending analyses so late responses don't mutate state.
+    analysisGenerationRef.current++;
 
-    const payload = items.map((it) => ({
-      name: it.name.trim(),
-      description: it.description.trim(),
-      category: it.category,
-      price: parseFloat(it.price) || 0,
-      condition: it.condition,
-      ai_insights: it.aiInsights ?? undefined,
-      user_id: userId,
-      project_id: projectId || undefined,
-    }));
+    // ── Snapshot: freeze items at submit time so mutations can't corrupt mapping ──
+    const snapshot = [...items];
 
-    formData.append("items", JSON.stringify(payload));
+    try {
+      const payload = snapshot.map((it) => ({
+        name: it.name.trim(),
+        description: it.description.trim(),
+        category: it.category,
+        price: parseFloat(it.price) || 0,
+        condition: it.condition,
+        ai_insights: it.aiInsights ?? null,
+        user_id: userId,
+        project_id: projectId || undefined,
+      }));
 
-    items.forEach((item, i) => {
-      if (item.imageFile) {
-        formData.append(`image-${i}`, item.imageFile);
+      const imageIndexes = snapshot
+        .map((it, i) => (it.imageFile ? i : -1))
+        .filter((i) => i !== -1);
+
+      // 1. Prepare: insert all rows + get signed upload URLs
+      const prepResult = await prepareBulkInventoryItems({
+        items: payload,
+        imageIndexes,
+      });
+
+      if (prepResult.error || !prepResult.data) {
+        setError(prepResult.error || "Failed to prepare items.");
+        setSubmitting(false);
+        return;
       }
-    });
 
-    const result = await createBulkInventoryItemsWithImages(formData);
+      const { itemIds, uploads } = prepResult.data;
 
-    if (result.error) {
-      setError(result.error);
-      setSubmitting(false);
-    } else {
+      // ── Build deterministic itemId → file map from snapshot ──
+      // This is immune to items being deleted/reordered in the UI after submit.
+      const itemIdToFile = new Map<string, { file: File; hasAi: boolean }>();
+      for (let i = 0; i < snapshot.length; i++) {
+        if (snapshot[i].imageFile) {
+          itemIdToFile.set(itemIds[i], {
+            file: snapshot[i].imageFile!,
+            hasAi: !!(snapshot[i].aiInsights),
+          });
+        }
+      }
+
+      // Navigate optimistically — rows already exist
       router.push("/inventory");
+
+      // 2. Compress + direct-upload with adaptive concurrency
+      if (uploads.length > 0) {
+        const concurrency = getAdaptiveConcurrency();
+        const succeeded: { itemId: string; storagePath: string; skipAnalysis: boolean }[] = [];
+        const failedItemIds: string[] = [];
+
+        const tasks = uploads.map((upload) => async () => {
+          const entry = itemIdToFile.get(upload.itemId);
+          if (!entry) {
+            failedItemIds.push(upload.itemId);
+            return;
+          }
+
+          try {
+            const { blob } = await compressImage(entry.file);
+            const res = await fetch(upload.signedUrl, {
+              method: "PUT",
+              headers: { "Content-Type": "image/webp" },
+              body: blob,
+            });
+
+            if (res.ok) {
+              succeeded.push({
+                itemId: upload.itemId,
+                storagePath: upload.storagePath,
+                skipAnalysis: entry.hasAi,
+              });
+            } else {
+              console.error("Direct upload failed:", upload.itemId, res.status);
+              failedItemIds.push(upload.itemId);
+            }
+          } catch (err) {
+            console.error("Upload error:", upload.itemId, err);
+            failedItemIds.push(upload.itemId);
+          }
+        });
+
+        await pooledMap(tasks, concurrency);
+
+        // 3. Finalize: enqueue processing for successful uploads
+        const finalizeResult = await finalizeBulkUploads({ succeeded, failedItemIds });
+        if (finalizeResult.error) {
+          console.error("Finalize error:", finalizeResult.error);
+        }
+      }
+    } catch (err) {
+      console.error("Bulk submit error:", err);
+      setError("An unexpected error occurred.");
+      setSubmitting(false);
     }
   }
 
@@ -322,7 +358,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
     <main className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <PageHeader
         title="Bulk add items"
-        description="Select images, wait for analysis to populate the form, then upload everything once it looks right."
+        description="Select images, review AI suggestions, then upload. You don't need to wait for analysis to finish."
         backLink={{ href: "/inventory", label: "Back to inventory" }}
       />
 
@@ -398,7 +434,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
               Add as many JPG, PNG, or WebP images as you need &middot; 10 MB max each
             </p>
             <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400">
-              Analysis starts after selection. You can upload only after every image has finished populating.
+              AI analysis runs in the background &mdash; you can upload before it finishes.
             </p>
           </div>
           <input
@@ -624,10 +660,8 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
           >
             {submitting ? (
               <><PiSpinnerDuotone className="h-4 w-4 animate-spin" /> Adding…</>
-            ) : analysisInProgress ? (
-              <><PiSpinnerDuotone className="h-4 w-4 animate-spin" /> Analyzing {analyzedImageCount} of {imageItems.length} images…</>
             ) : (
-              <><PiCheckDuotone className="h-4 w-4" /> Upload {items.length} {items.length === 1 ? "item" : "items"}</>
+              <><PiCheckDuotone className="h-4 w-4" /> Upload {items.length} {items.length === 1 ? "item" : "items"}{analysisInProgress ? " (analysis still running)" : ""}</>
             )}
           </button>
         </motion.div>

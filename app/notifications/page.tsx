@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,76 +13,22 @@ import {
   ShoppingBag,
   X,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/app/components/page-header";
 import {
-  getNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   acceptOrgInvite,
   declineOrgInvite,
   type UserNotification,
 } from "@/app/notifications/actions";
+import { useNotifications } from "@/lib/notification-context";
 import { cn } from "@/lib/cn";
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<UserNotification[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { notifications, setNotifications, unreadCount, loading, userId } = useNotifications();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
-
-  const load = useCallback(async (uid: string) => {
-    const result = await getNotifications(uid);
-    if (result.data) {
-      setNotifications(result.data);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-      setUserId(session.user.id);
-      load(session.user.id);
-    }
-    init();
-  }, [router, load]);
-
-  // Real-time: listen for new notifications inserted for this user
-  useEffect(() => {
-    if (!userId) return;
-
-    const channel = supabase
-      .channel('user-notifications-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'user_notifications',
-          filter: `recipient_user_id=eq.${userId}`,
-        },
-        (payload) => {
-          const newNotification = payload.new as UserNotification;
-          setNotifications((prev) => {
-            // Avoid duplicates if already fetched
-            if (prev.some((n) => n.id === newNotification.id)) return prev;
-            return [newNotification, ...prev];
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId]);
 
   async function handleAcceptInvite(notification: UserNotification) {
     if (!userId) return;
@@ -134,8 +80,6 @@ export default function NotificationsPage() {
       prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() }))
     );
   }
-
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
 
   if (loading) {
     return (

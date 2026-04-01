@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/app/components/sidebar";
 import { SidebarProvider, useSidebar } from "@/lib/sidebar-context";
+import { NotificationProvider } from "@/lib/notification-context";
 import { cn } from "@/lib/cn";
 
 interface DashboardLayoutProps {
@@ -33,7 +34,9 @@ function DashboardShell({ children }: DashboardLayoutProps) {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <SidebarProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <NotificationProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </NotificationProvider>
     </SidebarProvider>
   );
 }

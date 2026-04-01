@@ -29,7 +29,7 @@ import { OrgSwitcher } from "@/app/components/org-switcher";
 import { ThemeToggle } from "@/app/components/theme-toggle";
 import { cn } from "@/lib/cn";
 import { useSidebar } from "@/lib/sidebar-context";
-import { getUnreadNotificationCount } from "@/app/notifications/actions";
+import { useNotifications } from "@/lib/notification-context";
 import { getProfileRole } from "@/app/developer/actions";
 
 function Tooltip({
@@ -89,9 +89,9 @@ interface NavSection {
 
 export function Sidebar() {
   const { isExpanded, toggle, isMobileOpen, closeMobile, toggleMobile } = useSidebar();
+  const { unreadCount } = useNotifications();
   const pathname = usePathname();
   const router = useRouter();
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isDeveloper, setIsDeveloper] = useState(false);
 
   /* Close mobile drawer on route change */
@@ -110,25 +110,19 @@ export function Sidebar() {
 
   useEffect(() => {
     let cancelled = false;
-    async function loadCount() {
+    async function loadRole() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session || cancelled) return;
-      const [notifResult, role] = await Promise.all([
-        getUnreadNotificationCount(session.user.id),
-        getProfileRole(session.user.id),
-      ]);
+      const role = await getProfileRole(session.user.id);
       if (!cancelled) {
-        setUnreadCount(notifResult.count);
         setIsDeveloper(role === "developer");
       }
     }
-    loadCount();
-    const interval = setInterval(loadCount, 30_000);
+    loadRole();
     return () => {
       cancelled = true;
-      clearInterval(interval);
     };
   }, []);
 

@@ -290,7 +290,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
                   alt="Item preview"
                   width={600}
                   height={600}
-                  className="aspect-square w-full object-contain"
+                  className="aspect-square w-full h-auto object-contain"
                 />
                 <div className="absolute right-2 top-2">
                   <button

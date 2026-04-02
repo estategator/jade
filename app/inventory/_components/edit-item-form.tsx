@@ -114,7 +114,7 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
                 alt={item.name}
                 width={600}
                 height={600}
-                className="aspect-square w-full object-contain"
+                className="aspect-square w-full h-auto object-contain"
               />
             ) : (
               <div className="flex aspect-square w-full items-center justify-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -13,7 +13,19 @@ import {
   PiCaretUpDuotone,
   PiCheckDuotone,
   PiArrowsClockwiseDuotone,
+  PiWarningDuotone,
+  PiCheckCircleDuotone,
+  PiXCircleDuotone,
 } from "react-icons/pi";
+
+type UploadPhase = 'idle' | 'preparing' | 'uploading' | 'finalizing' | 'complete' | 'error';
+
+type UploadProgress = {
+  phase: UploadPhase;
+  totalUploads: number;
+  completedUploads: number;
+  failedUploads: number;
+};
 import { cn } from "@/lib/cn";
 import { INVENTORY_CATEGORIES, INVENTORY_CONDITIONS, type AIAnalysisResult } from "@/lib/inventory";
 import {
@@ -67,6 +79,34 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [projectId, setProjectId] = useState("");
+
+  // ── Upload lifecycle state ──
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
+    phase: 'idle',
+    totalUploads: 0,
+    completedUploads: 0,
+    failedUploads: 0,
+  });
+
+  const uploadActive = uploadProgress.phase !== 'idle' && uploadProgress.phase !== 'complete' && uploadProgress.phase !== 'error';
+  const showOverlay = uploadProgress.phase !== 'idle';
+  const uploadPercent = uploadProgress.totalUploads > 0
+    ? Math.round(((uploadProgress.completedUploads + uploadProgress.failedUploads) / uploadProgress.totalUploads) * 100)
+    : 0;
+
+  const handleGoToInventory = useCallback(() => {
+    router.push('/inventory');
+  }, [router]);
+
+  // ── Browser unload warning while upload is in flight ──
+  useEffect(() => {
+    if (!uploadActive) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [uploadActive]);
 
   // Per-item analysis generation tokens: only the latest request for a given
   // item id can write back results. Prevents stale/duplicate overwrites.
@@ -273,6 +313,9 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
         .map((it, i) => (it.imageFile ? i : -1))
         .filter((i) => i !== -1);
 
+      // Phase: preparing
+      setUploadProgress({ phase: 'preparing', totalUploads: imageIndexes.length, completedUploads: 0, failedUploads: 0 });
+
       // 1. Prepare: insert all rows + get signed upload URLs
       const prepResult = await prepareBulkInventoryItems({
         items: payload,
@@ -281,6 +324,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
 
       if (prepResult.error || !prepResult.data) {
         setError(prepResult.error || "Failed to prepare items.");
+        setUploadProgress({ phase: 'error', totalUploads: 0, completedUploads: 0, failedUploads: 0 });
         setSubmitting(false);
         return;
       }
@@ -288,7 +332,6 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
       const { itemIds, uploads } = prepResult.data;
 
       // ── Build deterministic itemId → file map from snapshot ──
-      // This is immune to items being deleted/reordered in the UI after submit.
       const itemIdToFile = new Map<string, { file: File; hasAi: boolean }>();
       for (let i = 0; i < snapshot.length; i++) {
         if (snapshot[i].imageFile) {
@@ -299,11 +342,11 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
         }
       }
 
-      // Navigate optimistically — rows already exist
-      router.push("/inventory");
-
       // 2. Compress + direct-upload with adaptive concurrency
       if (uploads.length > 0) {
+        // Phase: uploading
+        setUploadProgress({ phase: 'uploading', totalUploads: uploads.length, completedUploads: 0, failedUploads: 0 });
+
         const concurrency = getAdaptiveConcurrency();
         const succeeded: { itemId: string; storagePath: string; skipAnalysis: boolean }[] = [];
         const failedItemIds: string[] = [];
@@ -312,6 +355,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
           const entry = itemIdToFile.get(upload.itemId);
           if (!entry) {
             failedItemIds.push(upload.itemId);
+            setUploadProgress((prev) => ({ ...prev, failedUploads: prev.failedUploads + 1 }));
             return;
           }
 
@@ -329,27 +373,46 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
                 storagePath: upload.storagePath,
                 skipAnalysis: entry.hasAi,
               });
+              setUploadProgress((prev) => ({ ...prev, completedUploads: prev.completedUploads + 1 }));
             } else {
               console.error("Direct upload failed:", upload.itemId, res.status);
               failedItemIds.push(upload.itemId);
+              setUploadProgress((prev) => ({ ...prev, failedUploads: prev.failedUploads + 1 }));
             }
           } catch (err) {
             console.error("Upload error:", upload.itemId, err);
             failedItemIds.push(upload.itemId);
+            setUploadProgress((prev) => ({ ...prev, failedUploads: prev.failedUploads + 1 }));
           }
         });
 
         await pooledMap(tasks, concurrency);
+
+        // Phase: finalizing
+        setUploadProgress((prev) => ({ ...prev, phase: 'finalizing' }));
 
         // 3. Finalize: enqueue processing for successful uploads
         const finalizeResult = await finalizeBulkUploads({ succeeded, failedItemIds });
         if (finalizeResult.error) {
           console.error("Finalize error:", finalizeResult.error);
         }
+
+        // Resolve to completion or error
+        if (failedItemIds.length > 0 && succeeded.length === 0) {
+          setUploadProgress((prev) => ({ ...prev, phase: 'error' }));
+          setError("All uploads failed. Your items were saved but images could not be uploaded.");
+        } else {
+          setUploadProgress((prev) => ({ ...prev, phase: 'complete' }));
+        }
+      } else {
+        // No images to upload — go straight to complete
+        setUploadProgress({ phase: 'complete', totalUploads: 0, completedUploads: 0, failedUploads: 0 });
       }
     } catch (err) {
       console.error("Bulk submit error:", err);
       setError("An unexpected error occurred.");
+      setUploadProgress((prev) => ({ ...prev, phase: 'error' }));
+    } finally {
       setSubmitting(false);
     }
   }
@@ -668,7 +731,7 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
       )}
 
       {/* Empty state */}
-      {items.length === 0 && (
+      {items.length === 0 && uploadProgress.phase === 'idle' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mt-12 text-center">
           <p className="text-sm text-stone-500 dark:text-zinc-500">
             Drop images above to get started, or{" "}
@@ -678,6 +741,154 @@ export function BulkAddForm({ projects, userId }: BulkAddFormProps) {
           </p>
         </motion.div>
       )}
+
+      {/* ── Upload progress overlay ── */}
+      <AnimatePresence>
+        {showOverlay && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Upload progress"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              {/* ── Active upload phases: preparing / uploading / finalizing ── */}
+              {uploadActive && (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-900/20">
+                      <PiSpinnerDuotone className="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-stone-900 dark:text-white">
+                        {uploadProgress.phase === 'preparing' && 'Preparing items…'}
+                        {uploadProgress.phase === 'uploading' && 'Uploading images…'}
+                        {uploadProgress.phase === 'finalizing' && 'Finalizing…'}
+                      </h2>
+                      <p className="text-sm text-stone-500 dark:text-zinc-400">
+                        {uploadProgress.phase === 'preparing' && 'Creating inventory records and generating upload URLs.'}
+                        {uploadProgress.phase === 'uploading' && `${uploadProgress.completedUploads} of ${uploadProgress.totalUploads} images uploaded`}
+                        {uploadProgress.phase === 'finalizing' && 'Processing uploaded images. Almost done.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Progress bar (visible during uploading) */}
+                  {uploadProgress.phase === 'uploading' && uploadProgress.totalUploads > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-stone-500 dark:text-zinc-500">
+                        <span>{uploadPercent}%</span>
+                        {uploadProgress.failedUploads > 0 && (
+                          <span className="text-red-600 dark:text-red-400">{uploadProgress.failedUploads} failed</span>
+                        )}
+                      </div>
+                      <div className="h-2.5 overflow-hidden rounded-full bg-stone-100 dark:bg-zinc-800">
+                        <div
+                          className="h-full rounded-full bg-indigo-500 transition-[width] duration-300"
+                          style={{ width: `${uploadPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Warning banner */}
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/30">
+                    <div className="flex gap-2">
+                      <PiWarningDuotone className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        <strong>Do not close or refresh this tab.</strong> Closing now may interrupt the upload and you may need to re-add these items.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Complete state ── */}
+              {uploadProgress.phase === 'complete' && (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
+                      <PiCheckCircleDuotone className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-stone-900 dark:text-white">
+                        {uploadProgress.failedUploads > 0 ? 'Upload partially complete' : 'Upload complete'}
+                      </h2>
+                      <p className="text-sm text-stone-500 dark:text-zinc-400">
+                        {uploadProgress.failedUploads > 0
+                          ? `${uploadProgress.completedUploads} of ${uploadProgress.totalUploads} images uploaded successfully. ${uploadProgress.failedUploads} failed — those items were saved without images.`
+                          : uploadProgress.totalUploads > 0
+                            ? `All ${uploadProgress.totalUploads} images uploaded successfully.`
+                            : 'All items have been added to your inventory.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {uploadProgress.failedUploads > 0 && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/30">
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        Items with failed uploads were saved without images. You can re-upload images from the inventory detail page.
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleGoToInventory}
+                    className="w-full rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  >
+                    Go to inventory
+                  </button>
+                </div>
+              )}
+
+              {/* ── Error state ── */}
+              {uploadProgress.phase === 'error' && (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 dark:bg-red-900/20">
+                      <PiXCircleDuotone className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-stone-900 dark:text-white">Upload failed</h2>
+                      <p className="text-sm text-stone-500 dark:text-zinc-400">
+                        {error || 'Something went wrong during the upload. Your items may have been partially saved.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleGoToInventory}
+                      className="flex-1 rounded-xl border border-stone-200 bg-white px-5 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      Go to inventory
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadProgress({ phase: 'idle', totalUploads: 0, completedUploads: 0, failedUploads: 0 })}
+                      className="flex-1 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

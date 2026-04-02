@@ -187,7 +187,7 @@ function ItemThumbnail({ item }: { item: InventoryItem }) {
           alt={item.name}
           width={40}
           height={40}
-          className="h-10 w-10 rounded-md object-cover"
+          className="h-auto w-10 rounded-md object-cover"
           unoptimized
         />
       ) : (

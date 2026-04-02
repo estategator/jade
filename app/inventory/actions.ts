@@ -1295,7 +1295,7 @@ export async function finalizeBulkUploads(input: {
   failedItemIds: string[];
 }): Promise<{ success?: true; error?: string }> {
   try {
-    // Mark failed uploads
+    // Mark failed uploads in one batch
     if (input.failedItemIds.length > 0) {
       await supabase
         .from('inventory_items')
@@ -1303,21 +1303,30 @@ export async function finalizeBulkUploads(input: {
         .in('id', input.failedItemIds);
     }
 
-    // Enqueue processing for successful uploads
-    for (const item of input.succeeded) {
-      const { data: { publicUrl } } = supabase.storage
-        .from('inventory-images')
-        .getPublicUrl(item.storagePath);
+    if (input.succeeded.length > 0) {
+      // Batch-update original_image_url for all succeeded items at once
+      await Promise.all(
+        input.succeeded.map((item) => {
+          const { data: { publicUrl } } = supabase.storage
+            .from('inventory-images')
+            .getPublicUrl(item.storagePath);
 
-      await supabase
-        .from('inventory_items')
-        .update({ original_image_url: publicUrl })
-        .eq('id', item.itemId);
+          return supabase
+            .from('inventory_items')
+            .update({ original_image_url: publicUrl })
+            .eq('id', item.itemId);
+        })
+      );
 
-      await enqueue(
-        TOPICS.PROCESS_IMAGE,
-        { itemId: item.itemId, storagePath: item.storagePath, skipAnalysis: item.skipAnalysis },
-        async (data) => processItemImage(data.itemId, data.storagePath, { skipAnalysis: data.skipAnalysis }),
+      // Enqueue all image processing jobs in parallel
+      await Promise.all(
+        input.succeeded.map((item) =>
+          enqueue(
+            TOPICS.PROCESS_IMAGE,
+            { itemId: item.itemId, storagePath: item.storagePath, skipAnalysis: item.skipAnalysis },
+            async (data) => processItemImage(data.itemId, data.storagePath, { skipAnalysis: data.skipAnalysis }),
+          )
+        )
       );
     }
 

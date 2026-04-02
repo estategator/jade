@@ -5,17 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Loader2,
-  LogOut,
-  Plus,
-  Building2,
-  Crown,
-  Shield,
-  User,
-  Users,
-  ChevronRight,
-  Calendar,
-} from "lucide-react";
+  PiSpinnerDuotone,
+  PiPlusDuotone,
+  PiBuildingsDuotone,
+  PiCrownDuotone,
+  PiShieldCheckDuotone,
+  PiUserDuotone,
+  PiUsersDuotone,
+  PiCalendarDuotone,
+  PiArrowRightDuotone,
+} from "react-icons/pi";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/app/components/page-header";
@@ -27,10 +26,24 @@ import {
 import { TierBadge } from "@/app/components/tier-badge";
 import { type SubscriptionTier } from "@/lib/tiers";
 
-const roleBadge: Record<OrgMember["role"], { label: string; color: string; Icon: typeof Crown }> = {
-  superadmin: { label: "Super Admin", color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400", Icon: Crown },
-  admin: { label: "Admin", color: "bg-violet-50 text-violet-600 dark:bg-violet-900/20 dark:text-violet-400", Icon: Shield },
-  member: { label: "Member", color: "bg-stone-100 text-stone-600 dark:bg-zinc-800 dark:text-zinc-400", Icon: User },
+type PhosphorIcon = React.ComponentType<{ className?: string }>;
+
+const roleBadge: Record<OrgMember["role"], { label: string; color: string; Icon: PhosphorIcon }> = {
+  superadmin: {
+    label: "Super Admin",
+    color: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500/20 dark:bg-indigo-900/20 dark:text-indigo-400 dark:ring-indigo-500/20",
+    Icon: PiCrownDuotone,
+  },
+  admin: {
+    label: "Admin",
+    color: "bg-violet-50 text-violet-700 ring-1 ring-violet-500/20 dark:bg-violet-900/20 dark:text-violet-400 dark:ring-violet-500/20",
+    Icon: PiShieldCheckDuotone,
+  },
+  member: {
+    label: "Member",
+    color: "bg-stone-100 text-stone-600 ring-1 ring-stone-200/60 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700/60",
+    Icon: PiUserDuotone,
+  },
 };
 
 export default function OrganizationsPage() {
@@ -71,7 +84,7 @@ export default function OrganizationsPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-stone-50 dark:bg-zinc-950">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <PiSpinnerDuotone className="h-8 w-8 animate-spin text-indigo-600" aria-hidden="true" />
       </div>
     );
   }
@@ -82,7 +95,7 @@ export default function OrganizationsPage() {
           title="Organizations"
           description={`Manage your teams, projects, and billing — ${orgs.length} ${orgs.length === 1 ? "organization" : "organizations"}.`}
           actions={[
-            { label: "New organization", href: "/organizations/new", icon: Plus, variant: "primary" },
+            { label: "New organization", href: "/organizations/new", icon: PiPlusDuotone, variant: "primary" },
           ]}
         />
 
@@ -103,7 +116,7 @@ export default function OrganizationsPage() {
             transition={{ duration: 0.4, delay: 0.1 }}
             className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900"
           >
-            <Building2 className="mx-auto mb-4 h-10 w-10 text-stone-400 dark:text-zinc-600" />
+            <PiBuildingsDuotone className="mx-auto mb-4 h-10 w-10 text-stone-300 dark:text-zinc-600" aria-hidden="true" />
             <h3 className="text-lg font-bold text-stone-900 dark:text-white">
               No organizations yet
             </h3>
@@ -114,7 +127,7 @@ export default function OrganizationsPage() {
               href="/organizations/new"
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-indigo-700"
             >
-              <Plus className="h-4 w-4" />
+              <PiPlusDuotone className="h-4 w-4" aria-hidden="true" />
               New organization
             </Link>
           </motion.div>
@@ -123,7 +136,7 @@ export default function OrganizationsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
           >
             {orgs.map((org, idx) => {
               const badge = roleBadge[org.myRole];
@@ -143,12 +156,32 @@ export default function OrganizationsPage() {
                 >
                   <Link
                     href={`/organizations/${org.id}`}
-                    className="group flex h-full flex-col rounded-2xl border border-stone-200 bg-white transition-all hover:border-indigo-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-700 dark:focus-visible:ring-offset-zinc-950"
+                    className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition-all duration-300 hover:border-indigo-300 hover:shadow-xl hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-700 dark:focus-visible:ring-offset-zinc-950"
                   >
-                    {/* Card header */}
-                    <div className="flex items-start gap-4 p-5 pb-0">
+                    {/* Cover band */}
+                    <div className="relative h-28 w-full overflow-hidden bg-gradient-to-br from-indigo-500/10 via-violet-500/5 to-stone-100 dark:from-indigo-500/15 dark:via-violet-500/10 dark:to-zinc-900">
                       {org.cover_image_url ? (
-                        <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl ring-1 ring-stone-200 dark:ring-zinc-700">
+                        <>
+                          <Image
+                            src={org.cover_image_url}
+                            alt=""
+                            fill
+                            className="object-cover transition-transform duration-500 group-hover:scale-105"
+                            unoptimized
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-white/60 via-transparent to-transparent dark:from-zinc-900/70" />
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <PiBuildingsDuotone className="h-10 w-10 text-indigo-300/60 dark:text-indigo-700/40" aria-hidden="true" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Avatar overlapping the cover band */}
+                    <div className="relative -mt-7 ml-5">
+                      {org.cover_image_url ? (
+                        <div className="relative h-14 w-14 overflow-hidden rounded-xl ring-[3px] ring-white shadow-md dark:ring-zinc-900">
                           <Image
                             src={org.cover_image_url}
                             alt={org.name}
@@ -158,29 +191,31 @@ export default function OrganizationsPage() {
                           />
                         </div>
                       ) : (
-                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:ring-indigo-900/40">
-                          <Building2 className="h-5.5 w-5.5" />
+                        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-[3px] ring-white shadow-md dark:bg-indigo-900/30 dark:text-indigo-400 dark:ring-zinc-900">
+                          <PiBuildingsDuotone className="h-6 w-6" aria-hidden="true" />
                         </div>
                       )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate text-base font-semibold text-stone-900 dark:text-white">
-                            {org.name}
-                          </h3>
-                          <ChevronRight className="h-4 w-4 flex-shrink-0 text-stone-400 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-zinc-500" />
-                        </div>
-                        <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-zinc-500">
-                          /{org.slug}
-                        </p>
+                    </div>
+
+                    {/* Identity */}
+                    <div className="px-5 pt-3 pb-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-lg font-bold text-stone-900 dark:text-white">
+                          {org.name}
+                        </h3>
+                        <PiArrowRightDuotone className="h-4 w-4 flex-shrink-0 text-stone-400 opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-zinc-500" aria-hidden="true" />
                       </div>
+                      <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-zinc-500">
+                        /{org.slug}
+                      </p>
                     </div>
 
                     {/* Badges */}
-                    <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
+                    <div className="flex flex-wrap items-center gap-2 px-5 pt-2 pb-4">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.color}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.color}`}
                       >
-                        <BadgeIcon className="h-3 w-3" />
+                        <BadgeIcon className="h-3 w-3" aria-hidden="true" />
                         {badge.label}
                       </span>
                       <TierBadge
@@ -188,16 +223,16 @@ export default function OrganizationsPage() {
                       />
                     </div>
 
-                    {/* Card footer — metadata */}
-                    <div className="mt-auto border-t border-stone-100 px-5 py-3 dark:border-zinc-800">
-                      <div className="flex items-center gap-4 text-xs text-stone-500 dark:text-zinc-500">
+                    {/* Footer — metadata */}
+                    <div className="mt-auto border-t border-stone-100 bg-stone-50/50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+                      <div className="flex items-center gap-4 text-xs font-medium text-stone-500 dark:text-zinc-500">
                         <span className="inline-flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5" />
+                          <PiUsersDuotone className="h-3.5 w-3.5" aria-hidden="true" />
                           {org.memberCount} {org.memberCount === 1 ? "member" : "members"}
                         </span>
                         {createdDate && (
                           <span className="inline-flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5" />
+                            <PiCalendarDuotone className="h-3.5 w-3.5" aria-hidden="true" />
                             {createdDate}
                           </span>
                         )}

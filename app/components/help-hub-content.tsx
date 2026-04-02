@@ -9,6 +9,7 @@ import {
   BookOpen,
   PlayCircle,
   Mail,
+  Phone,
   Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -20,7 +21,7 @@ import { getActiveOrgId } from "@/lib/active-org";
 import type { SubscriptionTier } from "@/lib/tiers";
 import { cn } from "@/lib/cn";
 
-type Tab = "faq" | "contact" | "docs" | "tutorials";
+type Tab = "faq" | "contact" | "docs" | "tutorials" | "call-us";
 
 interface HelpHubContentProps {
   /** Route prefix for help links, e.g. "/help" or "/dashboard/help" */
@@ -30,7 +31,7 @@ interface HelpHubContentProps {
 export function HelpHubContent({ basePath }: Readonly<HelpHubContentProps>) {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
-  const validTabs: Tab[] = ["docs", "tutorials", "contact", "faq"];
+  const validTabs: Tab[] = ["docs", "tutorials", "contact", "faq", "call-us"];
   const [activeTab, setActiveTab] = useState<Tab>(
     validTabs.includes(initialTab as Tab) ? (initialTab as Tab) : "docs"
   );
@@ -56,11 +57,21 @@ export function HelpHubContent({ basePath }: Readonly<HelpHubContentProps>) {
     init();
   }, []);
 
+  // Reset to default tab if an auth-only tab was deep-linked by an unauthenticated user
+  useEffect(() => {
+    if (!loading && !isAuthenticated && activeTab === "call-us") {
+      setActiveTab("docs");
+    }
+  }, [loading, isAuthenticated, activeTab]);
+
   const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: "docs", label: "Docs", icon: BookOpen },
     { id: "tutorials", label: "Tutorials", icon: PlayCircle },
     ...(!isAuthenticated
       ? [{ id: "contact" as Tab, label: "Contact Us", icon: Mail }]
+      : []),
+    ...(isAuthenticated
+      ? [{ id: "call-us" as Tab, label: "Call Us", icon: Phone }]
       : []),
     { id: "faq", label: "FAQs", icon: HelpCircle },
   ];
@@ -119,6 +130,8 @@ export function HelpHubContent({ basePath }: Readonly<HelpHubContentProps>) {
         {activeTab === "docs" && <DocsContent basePath={basePath} />}
 
         {activeTab === "tutorials" && <TutorialsContent />}
+
+        {activeTab === "call-us" && isAuthenticated && <CallUsContent />}
       </motion.div>
     </div>
   );
@@ -265,6 +278,43 @@ function TutorialsContent() {
       <p className="text-center text-xs text-stone-400 dark:text-zinc-500">
         More tutorials coming soon.
       </p>
+    </div>
+  );
+}
+
+
+function CallUsContent() {
+  return (
+    <div className="mx-auto max-w-md text-center">
+      <div className="rounded-xl border border-stone-200 bg-white p-8 dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-brand-subtle)] text-[var(--color-brand-primary)]">
+          <Phone className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-semibold text-stone-900 dark:text-white">
+          Talk to Our Team
+        </h2>
+        <p className="mt-2 text-sm text-stone-500 dark:text-zinc-400">
+          Prefer to speak with someone directly? Give us a call during business
+          hours and we&apos;ll be happy to help.
+        </p>
+
+        <div className="mt-6 space-y-1">
+          <p className="text-2xl font-bold text-stone-900 dark:text-white">
+            (555) 123-4567
+          </p>
+          <p className="text-sm text-stone-500 dark:text-zinc-400">
+            Mon&ndash;Fri &middot; 9 AM&ndash;5 PM ET
+          </p>
+        </div>
+
+        <a
+          href="tel:+15551234567"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+        >
+          <Phone className="h-4 w-4" />
+          Call Now
+        </a>
+      </div>
     </div>
   );
 }

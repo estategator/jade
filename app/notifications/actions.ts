@@ -5,7 +5,7 @@ import { auditLog } from '@/lib/rbac';
 
 // ── Types ────────────────────────────────────────────────────
 
-export type NotificationKind = 'org_invite' | 'sale_completed';
+export type NotificationKind = 'org_invite' | 'sale_completed' | 'frequent_buyer_suggestion';
 
 export type UserNotification = {
   id: string;

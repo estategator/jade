@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/app/components/page-header";
 import { ClientList } from "@/app/clients/_components/client-list";
-import { getOnboardingDashboard } from "@/app/onboarding/actions";
+import { getOnboardingDashboard, getFrequentBuyerSuggestions } from "@/app/onboarding/actions";
 import { resolveActiveOrgId } from "@/lib/rbac";
 import { createClient } from "@/utils/supabase/server";
 
@@ -21,7 +21,10 @@ export default async function ClientsPage() {
     redirect("/organizations");
   }
 
-  const result = await getOnboardingDashboard(user.id, activeOrgId);
+  const [result, suggestionsResult] = await Promise.all([
+    getOnboardingDashboard(user.id, activeOrgId),
+    getFrequentBuyerSuggestions(activeOrgId),
+  ]);
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -35,7 +38,10 @@ export default async function ClientsPage() {
           {result.error ?? "Failed to load clients."}
         </div>
       ) : (
-        <ClientList initialData={result.data} />
+        <ClientList
+          initialData={result.data}
+          suggestions={suggestionsResult.data ?? []}
+        />
       )}
     </div>
   );

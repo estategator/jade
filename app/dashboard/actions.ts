@@ -372,6 +372,8 @@ export type Sale = {
   status: string;
   created_at: string;
   inventory_items?: { name: string } | null;
+  is_starred?: boolean;
+  client_profile_id?: string | null;
 };
 
 export async function getRecentSales(userId: string, orgId?: string | null) {
@@ -408,7 +410,28 @@ export async function getRecentSales(userId: string, orgId?: string | null) {
       return { error: 'Failed to load sales.' };
     }
 
-    return { data: (data ?? []) as unknown as Sale[] };
+    const sales = (data ?? []) as unknown as Sale[];
+
+    // Enrich with starred state from client_profiles
+    const buyerEmails = [...new Set(sales.map((s) => s.buyer_email).filter(Boolean))] as string[];
+    if (buyerEmails.length > 0) {
+      const { data: profiles } = await supabase
+        .from('client_profiles')
+        .select('id, email, is_starred')
+        .in('org_id', orgIds)
+        .in('email', buyerEmails);
+
+      const profileMap = new Map(
+        (profiles ?? []).map((p) => [p.email as string, p as { id: string; email: string; is_starred: boolean }]),
+      );
+      for (const sale of sales) {
+        const profile = sale.buyer_email ? profileMap.get(sale.buyer_email) : undefined;
+        sale.is_starred = profile?.is_starred ?? false;
+        sale.client_profile_id = profile?.id ?? null;
+      }
+    }
+
+    return { data: sales };
   } catch (err) {
     console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };

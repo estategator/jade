@@ -8,7 +8,6 @@ import {
   PiChartBarDuotone,
   PiPackageDuotone,
   PiBuildingsDuotone,
-  PiGearDuotone,
   PiSignOutDuotone,
   PiSidebarDuotone,
   PiSidebarSimpleDuotone,
@@ -17,7 +16,7 @@ import {
   PiMegaphoneDuotone,
   PiReceiptDuotone,
   PiQuestionDuotone,
-  PiCodeDuotone,
+  PiHandHeartDuotone,
   PiTicketDuotone,
   PiListDuotone,
   PiXDuotone,
@@ -30,7 +29,7 @@ import { ThemeToggle } from "@/app/components/theme-toggle";
 import { cn } from "@/lib/cn";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNotifications } from "@/lib/notification-context";
-import { getProfileRole } from "@/app/developer/actions";
+import { getProfileRole } from "@/app/support/actions";
 
 function Tooltip({
   children,
@@ -92,7 +91,7 @@ export function Sidebar() {
   const { unreadCount } = useNotifications();
   const pathname = usePathname();
   const router = useRouter();
-  const [isDeveloper, setIsDeveloper] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
 
   /* Close mobile drawer on route change */
   useEffect(() => {
@@ -117,7 +116,7 @@ export function Sidebar() {
       if (!session || cancelled) return;
       const role = await getProfileRole(session.user.id);
       if (!cancelled) {
-        setIsDeveloper(role === "developer");
+        setIsStaff(role === "developer" || role === "support");
       }
     }
     loadRole();
@@ -164,10 +163,6 @@ export function Sidebar() {
           badge: unreadCount,
         },
         { label: "Organizations", href: "/organizations", icon: PiBuildingsDuotone },
-        { label: "Settings", href: "/settings", icon: PiGearDuotone },
-        ...(isDeveloper
-          ? [{ label: "Developer", href: "/developer", icon: PiCodeDuotone }]
-          : []),
       ],
     },
     {
@@ -175,6 +170,9 @@ export function Sidebar() {
       items: [
         { label: "Help", href: "/dashboard/help", icon: PiQuestionDuotone },
         { label: "Tickets", href: "/tickets", icon: PiTicketDuotone },
+        ...(isStaff
+          ? [{ label: "Support Portal", href: "/support", icon: PiHandHeartDuotone }]
+          : []),
       ],
     },
   ];

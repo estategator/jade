@@ -64,12 +64,19 @@
     },
     "app/api/cleanup-abandoned/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/frequent-buyers/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/cleanup-abandoned",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/frequent-buyers",
+      "schedule": "0 6 * * *"
     }
   ]
 }

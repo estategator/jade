@@ -19,7 +19,7 @@ export default function robots(): MetadataRoute.Robots {
           '/invoices/',
           '/notifications/',
           '/onboarding/',
-          '/developer/',
+          '/support/',
           '/tickets/',
           '/cart/',
           '/checkout/',

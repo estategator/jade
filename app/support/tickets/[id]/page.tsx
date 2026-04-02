@@ -22,7 +22,7 @@ import {
   updateTicketStatus,
   adminReplyToTicket,
   getProfileRole,
-} from "@/app/developer/actions";
+} from "@/app/support/actions";
 import type { SupportTicket, TicketReply, TicketStatus } from "@/app/help/actions";
 import { cn } from "@/lib/cn";
 

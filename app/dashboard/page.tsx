@@ -28,6 +28,7 @@ import {
 } from "./actions";
 import { DashboardCategoryChart } from "./_components/dashboard-charts";
 import { RevenueChartWithPeriod } from "./_components/revenue-chart-with-period";
+import { RecentSalesTable } from "./recent-sales-table";
 import { DashboardErrorToast } from "./_components/dashboard-error-toast";
 
 function formatPercent(value: number) {
@@ -515,45 +516,7 @@ export default async function DashboardPage({
               Recent Sales
             </h2>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="hidden border-b border-stone-200 px-5 py-3 sm:grid sm:grid-cols-12 sm:gap-4 dark:border-zinc-800">
-              <span className="col-span-4 text-xs font-medium uppercase tracking-wider text-stone-500">
-                Item
-              </span>
-              <span className="col-span-3 text-xs font-medium uppercase tracking-wider text-stone-500">
-                Buyer
-              </span>
-              <span className="col-span-2 text-xs font-medium uppercase tracking-wider text-stone-500">
-                Amount
-              </span>
-              <span className="col-span-3 text-xs font-medium uppercase tracking-wider text-stone-500 text-right">
-                Date
-              </span>
-            </div>
-            {recentSales.map((sale) => (
-              <div
-                key={sale.id}
-                className="grid grid-cols-1 gap-2 border-b border-stone-100 px-5 py-3.5 last:border-b-0 sm:grid-cols-12 sm:items-center sm:gap-4 dark:border-zinc-800/50"
-              >
-                <p className="col-span-4 text-sm font-medium text-stone-900 dark:text-white">
-                  {sale.inventory_items?.name ?? "Unknown item"}
-                </p>
-                <p className="col-span-3 truncate text-sm text-stone-600 dark:text-zinc-400">
-                  {sale.buyer_email ?? "—"}
-                </p>
-                <p className="col-span-2 text-sm font-medium text-stone-900 dark:text-white">
-                  ${sale.amount.toFixed(2)}
-                </p>
-                <p className="col-span-3 text-right text-sm text-stone-500 dark:text-zinc-500">
-                  {new Date(sale.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            ))}
-          </div>
+          <RecentSalesTable sales={recentSales} />
         </div>
       )}
 

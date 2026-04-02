@@ -82,4 +82,8 @@ export type AuditAction =
   | 'marketing.deleted'
   | 'invoice.created'
   | 'invoice.updated'
-  | 'invoice.deleted';
+  | 'invoice.deleted'
+  | 'onboarding.client_starred'
+  | 'onboarding.client_unstarred'
+  | 'onboarding.buyer_starred'
+  | 'onboarding.frequent_clients_notified';

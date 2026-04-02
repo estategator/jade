@@ -23,7 +23,7 @@ import {
   getTicketStats,
   getProfileRole,
   type TicketWithOrg,
-} from "@/app/developer/actions";
+} from "@/app/support/actions";
 import type { TicketStatus } from "@/app/help/actions";
 import { cn } from "@/lib/cn";
 

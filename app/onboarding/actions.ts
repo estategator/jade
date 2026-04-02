@@ -47,6 +47,20 @@ export type OnboardingClientProfile = {
   city: string | null;
   state: string | null;
   zip_code: string | null;
+  is_starred: boolean;
+  client_type: 'owner' | 'buyer';
+  created_at: string;
+};
+
+export type FrequentBuyerSuggestion = {
+  id: string;
+  org_id: string;
+  buyer_email: string;
+  sale_count: number;
+  total_spent: number;
+  last_purchase_at: string | null;
+  status: 'pending' | 'dismissed' | 'accepted';
+  client_profile_id: string | null;
   created_at: string;
 };
 
@@ -3523,6 +3537,336 @@ export async function getOrgContracts(
     });
 
     return { data: { orgId, contracts: rows } };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+// ── Frequent buyers ──────────────────────────────────────────
+
+export async function getFrequentBuyerSuggestions(
+  orgId: string,
+): Promise<{ data?: FrequentBuyerSuggestion[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('frequent_buyer_suggestions')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('status', 'pending')
+      .order('sale_count', { ascending: false });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to load buyer suggestions.' };
+    }
+
+    return { data: (data ?? []) as FrequentBuyerSuggestion[] };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function toggleStarClientProfile(clientId: string): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:update');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  if (!clientId) {
+    return { error: 'Client ID is required.' };
+  }
+
+  try {
+    const { data: client, error: fetchError } = await supabase
+      .from('client_profiles')
+      .select('id, is_starred')
+      .eq('id', clientId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (fetchError || !client) {
+      return { error: 'Client not found.' };
+    }
+
+    const { error } = await supabase
+      .from('client_profiles')
+      .update({ is_starred: !client.is_starred, updated_at: new Date().toISOString() })
+      .eq('id', clientId)
+      .eq('org_id', context.orgId);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to update starred status.' };
+    }
+
+    await auditLog({
+      orgId: context.orgId,
+      actorId: context.userId,
+      action: client.is_starred ? 'onboarding.client_unstarred' : 'onboarding.client_starred',
+      targetType: 'client_profile',
+      targetId: clientId,
+    });
+
+    revalidatePath('/clients');
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function starBuyerByEmail(email: string): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:create');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return { error: 'Email is required.' };
+  }
+
+  try {
+    // Check if a profile already exists for this email in this org
+    const { data: existing } = await supabase
+      .from('client_profiles')
+      .select('id, is_starred')
+      .eq('org_id', context.orgId)
+      .eq('email', normalizedEmail)
+      .single();
+
+    if (existing) {
+      // Already exists — just star it
+      if (!existing.is_starred) {
+        const { error } = await supabase
+          .from('client_profiles')
+          .update({ is_starred: true, updated_at: new Date().toISOString() })
+          .eq('id', existing.id);
+
+        if (error) {
+          console.error('Supabase error:', error);
+          return { error: 'Failed to star client.' };
+        }
+      }
+
+      revalidatePath('/clients');
+      revalidatePath('/dashboard');
+      return { success: true };
+    }
+
+    // Create new buyer-type profile
+    const { error } = await supabase.from('client_profiles').insert({
+      org_id: context.orgId,
+      full_name: normalizedEmail.split('@')[0],
+      email: normalizedEmail,
+      notes: '',
+      client_type: 'buyer',
+      is_starred: true,
+      created_by: context.userId,
+    });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      if (error.code === '23505') {
+        return { error: 'A client with that email already exists.' };
+      }
+      return { error: 'Failed to create buyer profile.' };
+    }
+
+    await auditLog({
+      orgId: context.orgId,
+      actorId: context.userId,
+      action: 'onboarding.buyer_starred',
+      targetType: 'client_profile',
+      metadata: { email: normalizedEmail },
+    });
+
+    revalidatePath('/clients');
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function acceptFrequentBuyerSuggestion(suggestionId: string): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:create');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  if (!suggestionId) {
+    return { error: 'Suggestion ID is required.' };
+  }
+
+  try {
+    const { data: suggestion, error: fetchError } = await supabase
+      .from('frequent_buyer_suggestions')
+      .select('id, buyer_email, status')
+      .eq('id', suggestionId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (fetchError || !suggestion) {
+      return { error: 'Suggestion not found.' };
+    }
+
+    if (suggestion.status !== 'pending') {
+      return { error: 'Suggestion has already been resolved.' };
+    }
+
+    // Star the buyer (creates profile if needed)
+    const starResult = await starBuyerByEmail(suggestion.buyer_email);
+    if (starResult.error) {
+      return starResult;
+    }
+
+    // Look up the profile we just created/starred
+    const { data: profile } = await supabase
+      .from('client_profiles')
+      .select('id')
+      .eq('org_id', context.orgId)
+      .eq('email', suggestion.buyer_email.trim().toLowerCase())
+      .single();
+
+    // Mark suggestion as accepted
+    const { error } = await supabase
+      .from('frequent_buyer_suggestions')
+      .update({
+        status: 'accepted',
+        client_profile_id: profile?.id ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', suggestionId);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to accept suggestion.' };
+    }
+
+    revalidatePath('/clients');
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function dismissFrequentBuyerSuggestion(suggestionId: string): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:update');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  if (!suggestionId) {
+    return { error: 'Suggestion ID is required.' };
+  }
+
+  try {
+    const { data: suggestion, error: fetchError } = await supabase
+      .from('frequent_buyer_suggestions')
+      .select('id, status')
+      .eq('id', suggestionId)
+      .eq('org_id', context.orgId)
+      .single();
+
+    if (fetchError || !suggestion) {
+      return { error: 'Suggestion not found.' };
+    }
+
+    if (suggestion.status !== 'pending') {
+      return { error: 'Suggestion has already been resolved.' };
+    }
+
+    const { error } = await supabase
+      .from('frequent_buyer_suggestions')
+      .update({ status: 'dismissed', updated_at: new Date().toISOString() })
+      .eq('id', suggestionId);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return { error: 'Failed to dismiss suggestion.' };
+    }
+
+    revalidatePath('/clients');
+    return { success: true };
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return { error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function notifyFrequentClients({
+  clientIds,
+  subject,
+  body,
+}: Readonly<{
+  clientIds: string[];
+  subject: string;
+  body: string;
+}>): Promise<ActionResult> {
+  const context = await getActionContext('onboarding:update');
+  if ('error' in context) {
+    return { error: context.error };
+  }
+
+  if (!clientIds.length) {
+    return { error: 'Select at least one client.' };
+  }
+  if (!subject.trim()) {
+    return { error: 'Subject is required.' };
+  }
+  if (!body.trim()) {
+    return { error: 'Message body is required.' };
+  }
+
+  try {
+    const { data: clients, error: fetchError } = await supabase
+      .from('client_profiles')
+      .select('id, email, full_name')
+      .in('id', clientIds)
+      .eq('org_id', context.orgId);
+
+    if (fetchError || !clients || clients.length === 0) {
+      return { error: 'No matching clients found.' };
+    }
+
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', context.orgId)
+      .single();
+
+    const orgName = (org?.name as string) ?? 'Curator';
+
+    // Send via queue for reliability
+    const emailAdapter = getEmailAdapter();
+
+    for (const client of clients) {
+      await emailAdapter.send({
+        welcomeMessageId: `outreach-${client.id}-${Date.now()}`,
+        to: client.email,
+        recipientName: client.full_name,
+        subject: subject.trim(),
+        textBody: body.trim(),
+        orgName,
+        projectName: '',
+      });
+    }
+
+    await auditLog({
+      orgId: context.orgId,
+      actorId: context.userId,
+      action: 'onboarding.frequent_clients_notified',
+      targetType: 'client_profile',
+      metadata: { count: clients.length, subject: subject.trim() },
+    });
+
+    return { success: true };
   } catch (error) {
     console.error('Unexpected error:', error);
     return { error: 'An unexpected error occurred.' };

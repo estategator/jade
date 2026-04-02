@@ -25,7 +25,7 @@ create table if not exists profiles (
   full_name   text not null default '',
   avatar_url  text,
   role        text not null default 'user'
-                check (role in ('user', 'admin', 'developer')),
+                check (role in ('user', 'admin', 'developer', 'support')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -1400,52 +1400,52 @@ create policy "Users can create replies on own org tickets"
     )
   );
 
--- ---- Developer portal RLS policies ----
--- Developers can view all tickets (cross-org)
-create policy "Developers can view all tickets"
+-- ---- Staff portal RLS policies ----
+-- Staff (developers + support) can view all tickets (cross-org)
+create policy "Staff can view all tickets"
   on support_tickets for select
   to authenticated
   using (
     exists (
       select 1 from profiles
       where profiles.id = auth.uid()
-        and profiles.role = 'developer'
+        and profiles.role in ('developer', 'support')
     )
   );
 
--- Developers can update any ticket (change status, priority)
-create policy "Developers can update all tickets"
+-- Staff can update any ticket (change status, priority)
+create policy "Staff can update all tickets"
   on support_tickets for update
   to authenticated
   using (
     exists (
       select 1 from profiles
       where profiles.id = auth.uid()
-        and profiles.role = 'developer'
+        and profiles.role in ('developer', 'support')
     )
   )
   with check (
     exists (
       select 1 from profiles
       where profiles.id = auth.uid()
-        and profiles.role = 'developer'
+        and profiles.role in ('developer', 'support')
     )
   );
 
--- Developers can view all ticket replies
-create policy "Developers can view all replies"
+-- Staff can view all ticket replies
+create policy "Staff can view all replies"
   on ticket_replies for select
   to authenticated
   using (
     exists (
       select 1 from profiles
       where profiles.id = auth.uid()
-        and profiles.role = 'developer'
+        and profiles.role in ('developer', 'support')
     )
   );
 
--- Developers can create admin replies on any ticket
-create policy "Developers can create admin replies"
+-- Staff can create admin replies on any ticket
+create policy "Staff can create admin replies"
   on ticket_replies for insert
   to authenticated
   with check (
@@ -1454,7 +1454,7 @@ create policy "Developers can create admin replies"
     and exists (
       select 1 from profiles
       where profiles.id = auth.uid()
-        and profiles.role = 'developer'
+        and profiles.role in ('developer', 'support')
     )
   );
 

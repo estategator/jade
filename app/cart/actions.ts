@@ -23,7 +23,7 @@ export type CartItem = {
     thumbnail_url: string | null;
     medium_image_url: string | null;
     project_id: string;
-    project?: { id: string; name: string; org_id: string; organizations?: { name: string; stripe_account_id?: string; stripe_onboarding_complete?: boolean } };
+    project?: { id: string; name: string; org_id: string; organizations?: { name: string } };
   };
 };
 
@@ -39,7 +39,7 @@ export async function getCartItems(userId: string, orgId: string): Promise<{ dat
         inventory_item:inventory_items(
           id, name, description, category, price, condition, status, quantity,
           thumbnail_url, medium_image_url, project_id,
-          project:projects(id, name, org_id, organizations(name, stripe_account_id, stripe_onboarding_complete))
+          project:projects(id, name, org_id, organizations(name))
         )
       `)
       .eq('user_id', userId)

@@ -28,7 +28,7 @@ export type InventoryItem = {
   medium_image_url: string | null;
   processing_status: InventoryProcessingStatus;
   ai_insights: AIAnalysisResult | null;
-  project?: { id: string; name: string; org_id: string; organizations?: { name: string; stripe_onboarding_complete?: boolean } };
+  project?: { id: string; name: string; org_id: string; organizations?: { name: string } };
 };
 
 type InventoryAccessItem = Pick<
@@ -450,7 +450,7 @@ export async function getInventoryItems(
     // Get inventory items for user's orgs
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('*, project:projects(id, name, org_id, organizations(name, stripe_onboarding_complete))')
+      .select('*, project:projects(id, name, org_id, organizations(name))')
       .in('project_id', projectIds)
       .range(from, to)
       .order('created_at', { ascending: false });
@@ -485,7 +485,7 @@ export async function getInventoryItem(id: string, userId: string) {
 
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('*, project:projects(id, name, org_id, organizations(name, stripe_onboarding_complete))')
+      .select('*, project:projects(id, name, org_id, organizations(name))')
       .eq('id', id)
       .single();
 

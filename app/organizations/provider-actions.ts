@@ -145,12 +145,6 @@ async function syncStripeStatus(
       })
       .eq('org_id', orgId)
       .eq('provider', 'stripe');
-
-    // Keep legacy column in sync during transition
-    await supabase
-      .from('organizations')
-      .update({ stripe_onboarding_complete: chargesEnabled, updated_at: new Date().toISOString() })
-      .eq('id', orgId);
   }
 
   return {
@@ -246,12 +240,6 @@ async function connectStripe(
       is_default: isFirst,
     });
   }
-
-  // Legacy column sync
-  await supabase
-    .from('organizations')
-    .update({ stripe_account_id: account.id, updated_at: new Date().toISOString() })
-    .eq('id', orgId);
 
   await auditLog({
     orgId,
@@ -408,18 +396,6 @@ export async function disconnectProvider(
           .update({ is_default: true, updated_at: new Date().toISOString() })
           .eq('id', nextRow.id);
       }
-    }
-
-    // Legacy sync for Stripe
-    if (provider === 'stripe') {
-      await supabase
-        .from('organizations')
-        .update({
-          stripe_account_id: null,
-          stripe_onboarding_complete: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', orgId);
     }
 
     await auditLog({

@@ -263,9 +263,10 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
                 quantity: si.quantity,
                 unit_price: si.unit_price,
                 currency: session.currency ?? 'usd',
-                stripe_checkout_session_id: session.id,
-                stripe_payment_intent_id: session.payment_intent as string,
-                stripe_connected_account_id: connectedAccountId ?? null,
+                payment_provider: 'stripe',
+                provider_session_id: session.id,
+                provider_payment_id: session.payment_intent as string,
+                provider_account_id: connectedAccountId ?? null,
                 status: 'completed',
               }).select('id').single(),
             ]);
@@ -400,9 +401,10 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             quantity: purchaseQty,
             unit_price: Number(currentItem.price),
             currency: session.currency ?? 'usd',
-            stripe_checkout_session_id: session.id,
-            stripe_payment_intent_id: session.payment_intent as string,
-            stripe_connected_account_id: connectedAccountId ?? null,
+            payment_provider: 'stripe',
+            provider_session_id: session.id,
+            provider_payment_id: session.payment_intent as string,
+            provider_account_id: connectedAccountId ?? null,
             status: 'completed',
           }).select('id').single();
 
@@ -536,12 +538,14 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
       if (account.id) {
         const chargesEnabled = account.charges_enabled ?? false;
         await supabaseAdmin
-          .from('organizations')
+          .from('payment_provider_connections')
           .update({
-            stripe_onboarding_complete: chargesEnabled,
+            onboarding_complete: chargesEnabled,
+            status: chargesEnabled ? 'connected' : 'incomplete',
             updated_at: new Date().toISOString(),
           })
-          .eq('stripe_account_id', account.id);
+          .eq('provider', 'stripe')
+          .eq('external_account_id', account.id);
       }
       break;
     }

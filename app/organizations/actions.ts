@@ -39,8 +39,6 @@ export type Organization = {
   created_at: string;
   updated_at: string;
   subscription_tier?: 'free' | 'pro' | 'enterprise';
-  stripe_account_id?: string;
-  stripe_onboarding_complete?: boolean;
   stripe_subscription_id?: string;
   stripe_customer_id?: string;
   stripe_price_id?: string;
@@ -1338,222 +1336,51 @@ export async function deleteProject(id: string, userId?: string, orgId?: string)
   }
 }
 
-// ── Stripe Connect ───────────────────────────────────────────
+// ── Stripe Connect (delegated to provider-actions.ts) ────────
 
 import { stripe } from '@/lib/stripe';
+import {
+  connectProvider,
+  syncProviderStatus,
+  getOnboardingUrl,
+  disconnectProvider,
+} from '@/app/organizations/provider-actions';
 
+/** @deprecated Use connectProvider(orgId, userId, 'stripe') from provider-actions.ts */
 export async function createStripeConnectAccount(orgId: string, userId: string) {
-  if (!orgId) return { error: 'Organization ID is required.' };
-  if (!userId) return { error: 'User not authenticated.' };
-
-  try {
-    const check = await requirePermission(orgId, userId, 'billing:manage');
-    if (!check.granted) return { error: check.error };
-
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('stripe_account_id')
-      .eq('id', orgId)
-      .single();
-
-    if (org?.stripe_account_id) {
-      return { error: 'This organization already has a Stripe account linked.' };
-    }
-
-    const account = await stripe.accounts.create({
-      type: 'express',
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-    });
-
-    const { error: updateError } = await supabase
-      .from('organizations')
-      .update({
-        stripe_account_id: account.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', orgId);
-
-    if (updateError) {
-      console.error('Supabase error:', updateError);
-      return { error: 'Failed to save Stripe account.' };
-    }
-
-    await auditLog({ orgId, actorId: userId, action: 'billing.stripe_connected', targetType: 'organization', targetId: orgId, metadata: { accountId: account.id } });
-    return { success: true, accountId: account.id };
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    return { error: 'An unexpected error occurred.' };
-  }
+  const result = await connectProvider(orgId, userId, 'stripe');
+  if (result.error) return { error: result.error };
+  return { success: true };
 }
 
+/** @deprecated Use getOnboardingUrl(orgId, userId, 'stripe') from provider-actions.ts */
 export async function getStripeOnboardingLink(orgId: string, userId: string) {
-  if (!orgId) return { error: 'Organization ID is required.' };
-  if (!userId) return { error: 'User not authenticated.' };
-
-  try {
-    const check = await requirePermission(orgId, userId, 'billing:manage');
-    if (!check.granted) return { error: check.error };
-
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('stripe_account_id')
-      .eq('id', orgId)
-      .single();
-
-    if (!org?.stripe_account_id) {
-      return { error: 'No Stripe account found. Please create one first.' };
-    }
-
-    const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-
-    const accountLink = await stripe.accountLinks.create({
-      account: org.stripe_account_id,
-      refresh_url: `${origin}/organizations/${orgId}/stripe/refresh`,
-      return_url: `${origin}/organizations/${orgId}/stripe/return`,
-      type: 'account_onboarding',
-    });
-
-    return { success: true, url: accountLink.url };
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    return { error: 'An unexpected error occurred.' };
-  }
+  return getOnboardingUrl(orgId, userId, 'stripe');
 }
 
+/** @deprecated Use syncProviderStatus(orgId, 'stripe') from provider-actions.ts */
 export async function getStripeAccountStatus(orgId: string) {
-  try {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('stripe_account_id, stripe_onboarding_complete')
-      .eq('id', orgId)
-      .single();
-
-    if (!org) return { error: 'Organization not found.' };
-
-    if (!org.stripe_account_id) {
-      return { data: { connected: false, onboardingComplete: false, accountId: null, requirements: null } };
-    }
-
-    const account = await stripe.accounts.retrieve(org.stripe_account_id);
-    const chargesEnabled = account.charges_enabled ?? false;
-    const detailsSubmitted = account.details_submitted ?? false;
-    const payoutsEnabled = account.payouts_enabled ?? false;
-
-    if (chargesEnabled !== org.stripe_onboarding_complete) {
-      await supabase
-        .from('organizations')
-        .update({
-          stripe_onboarding_complete: chargesEnabled,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', orgId);
-    }
-
-    const currentlyDue = account.requirements?.currently_due ?? [];
-    const errors = (account.requirements?.errors ?? []).map(
-      (e) => e.reason ?? e.code
-    );
-
-    return {
-      data: {
-        connected: true,
-        onboardingComplete: chargesEnabled,
-        accountId: org.stripe_account_id,
-        detailsSubmitted,
-        payoutsEnabled,
-        requirements: currentlyDue.length > 0 || errors.length > 0
-          ? { currentlyDue, errors }
-          : null,
-      },
-    };
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    return { error: 'An unexpected error occurred.' };
-  }
+  const result = await syncProviderStatus(orgId, 'stripe');
+  if (result.error) return { error: result.error };
+  const d = result.data!;
+  return {
+    data: {
+      connected: d.connected,
+      onboardingComplete: d.onboardingComplete,
+      accountId: d.externalAccountId,
+      requirements: d.requirements,
+    },
+  };
 }
 
+/** @deprecated Use getOnboardingUrl(orgId, userId, 'stripe') from provider-actions.ts */
 export async function retryStripeOnboarding(orgId: string, userId: string) {
-  if (!orgId) return { error: 'Organization ID is required.' };
-  if (!userId) return { error: 'User not authenticated.' };
-
-  try {
-    const check = await requirePermission(orgId, userId, 'billing:manage');
-    if (!check.granted) return { error: check.error };
-
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('stripe_account_id')
-      .eq('id', orgId)
-      .single();
-
-    if (!org?.stripe_account_id) {
-      return { error: 'No Stripe account found. Connect Stripe first from billing settings.' };
-    }
-
-    // Verify account exists on Stripe and is not already complete
-    const account = await stripe.accounts.retrieve(org.stripe_account_id);
-    if (account.charges_enabled) {
-      return { error: 'Stripe onboarding is already complete.' };
-    }
-
-    const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-
-    const accountLink = await stripe.accountLinks.create({
-      account: org.stripe_account_id,
-      refresh_url: `${origin}/organizations/${orgId}/stripe/refresh`,
-      return_url: `${origin}/organizations/${orgId}/stripe/return`,
-      type: 'account_onboarding',
-    });
-
-    await auditLog({ orgId, actorId: userId, action: 'billing.stripe_onboarding_retry', targetType: 'organization', targetId: orgId });
-    return { success: true, url: accountLink.url };
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    return { error: 'An unexpected error occurred.' };
-  }
+  return getOnboardingUrl(orgId, userId, 'stripe');
 }
 
+/** @deprecated Use disconnectProvider(orgId, userId, 'stripe') from provider-actions.ts */
 export async function disconnectStripeAccount(orgId: string, userId: string) {
-  if (!orgId) return { error: 'Organization ID is required.' };
-  if (!userId) return { error: 'User not authenticated.' };
-
-  try {
-    const check = await requirePermission(orgId, userId, 'billing:manage');
-    if (!check.granted) return { error: check.error };
-
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('stripe_account_id')
-      .eq('id', orgId)
-      .single();
-
-    if (!org?.stripe_account_id) {
-      return { error: 'No Stripe account is connected.' };
-    }
-
-    const { error: updateError } = await supabase
-      .from('organizations')
-      .update({
-        stripe_account_id: null,
-        stripe_onboarding_complete: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', orgId);
-
-    if (updateError) {
-      console.error('Supabase error:', updateError);
-      return { error: 'Failed to disconnect Stripe account.' };
-    }
-
-    await auditLog({ orgId, actorId: userId, action: 'billing.stripe_disconnected', targetType: 'organization', targetId: orgId, metadata: { accountId: org.stripe_account_id } });
-    return { success: true };
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    return { error: 'An unexpected error occurred.' };
-  }
+  return disconnectProvider(orgId, userId, 'stripe');
 }
 
 // ── Subscription Billing ──────────────────────────────────────

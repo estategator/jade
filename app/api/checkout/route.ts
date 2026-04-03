@@ -4,10 +4,10 @@ import { createClient } from '@/utils/supabase/server';
 import { resolveActiveOrgId } from '@/lib/rbac';
 import {
   resolveDefaultProvider,
-  createProviderCheckout,
+  createCheckout,
   type ProviderAccount,
   type CheckoutLineItem,
-} from '@/lib/payment-providers/checkout';
+} from '@/lib/payment-providers';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ async function handleSingleItemCheckout(req: NextRequest, itemId: string, reques
   };
 
   try {
-    const result = await createProviderCheckout(
+    const result = await createCheckout(
       providerAccount,
       checkoutLineItems,
       metadata,
@@ -244,7 +244,7 @@ async function handleCartCheckout(req: NextRequest) {
   };
 
   try {
-    const result = await createProviderCheckout(
+    const result = await createCheckout(
       providerAccount!,
       checkoutLineItems,
       metadata,

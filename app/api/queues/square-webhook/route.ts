@@ -74,7 +74,8 @@ export async function processWebhookEvent(payload: SquareWebhookPayload): Promis
       const { data: existingSale } = await supabaseAdmin
         .from('sales')
         .select('id')
-        .eq('stripe_payment_intent_id', `sq_${paymentId}`)
+        .eq('payment_provider', 'square')
+        .eq('provider_payment_id', paymentId)
         .maybeSingle();
 
       if (existingSale) {
@@ -88,7 +89,8 @@ export async function processWebhookEvent(payload: SquareWebhookPayload): Promis
         const { data: cs } = await supabaseAdmin
           .from('checkout_sessions')
           .select('id')
-          .eq('stripe_checkout_session_id', `sq_${orderId}`)
+          .eq('payment_provider', 'square')
+          .eq('provider_session_id', orderId)
           .eq('org_id', orgId)
           .maybeSingle();
         checkoutSessionId = cs?.id ?? null;
@@ -150,9 +152,10 @@ export async function processWebhookEvent(payload: SquareWebhookPayload): Promis
               quantity: si.quantity,
               unit_price: si.unit_price,
               currency,
-              stripe_checkout_session_id: `sq_${orderId}`,
-              stripe_payment_intent_id: `sq_${paymentId}`,
-              stripe_connected_account_id: `sq_${merchantId}`,
+              payment_provider: 'square',
+              provider_session_id: orderId ?? null,
+              provider_payment_id: paymentId,
+              provider_account_id: merchantId,
               status: 'completed',
             }).select('id').single();
 
@@ -199,7 +202,7 @@ export async function processWebhookEvent(payload: SquareWebhookPayload): Promis
               await enqueueInvoiceGeneration({
                 orgId,
                 projectId: null,
-                stripeCheckoutSessionId: `sq_${orderId ?? paymentId}`,
+                stripeCheckoutSessionId: orderId ?? paymentId,
                 buyerEmail,
                 currency,
                 createdBy,
@@ -220,9 +223,10 @@ export async function processWebhookEvent(payload: SquareWebhookPayload): Promis
           quantity: 1,
           unit_price: amount,
           currency,
-          stripe_checkout_session_id: orderId ? `sq_${orderId}` : null,
-          stripe_payment_intent_id: `sq_${paymentId}`,
-          stripe_connected_account_id: `sq_${merchantId}`,
+          payment_provider: 'square',
+          provider_session_id: orderId ?? null,
+          provider_payment_id: paymentId,
+          provider_account_id: merchantId,
           status: 'completed',
         }).select('id').single();
 

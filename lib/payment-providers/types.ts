@@ -46,6 +46,54 @@ export interface ProviderDisplayInfo {
   oauthSupported: boolean;
 }
 
+// ── Checkout types ──────────────────────────────────────────
+
+export type ProviderAccount = {
+  provider: PaymentProvider;
+  externalAccountId: string;
+  accessToken: string | null;
+  orgId: string;
+};
+
+export type CheckoutLineItem = {
+  name: string;
+  description: string | null;
+  unitAmountCents: number;
+  quantity: number;
+  imageUrl: string | null;
+};
+
+export type CheckoutResult = {
+  url: string;
+  providerSessionId: string;
+};
+
+// ── Refund types ────────────────────────────────────────────
+
+export type RefundInput = {
+  providerPaymentId: string;
+  amountCents?: number;
+  reason?: string;
+};
+
+export type RefundResult = {
+  refundId: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  amountCents: number;
+};
+
+// ── Payment status types ────────────────────────────────────
+
+export type PaymentStatusResult = {
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  providerPaymentId: string;
+  amountCents: number;
+  currency: string;
+  metadata: Record<string, unknown>;
+};
+
+// ── Provider display config ─────────────────────────────────
+
 export const PROVIDER_DISPLAY: Record<PaymentProvider, ProviderDisplayInfo> = {
   stripe: {
     provider: 'stripe',

@@ -8,7 +8,7 @@ import {
   paragraph,
 } from '../shared/layout';
 import { ONBOARDING_STEP_BLUEPRINTS } from '@/lib/onboarding';
-import type { EmailContent, WelcomeEmailRequest } from '../types';
+import type { EmailContent, WelcomeEmailBuilderInput } from '../types';
 
 // ── Step icon SVGs (inline, 20×20, indigo-600 fill) ─────────
 
@@ -41,7 +41,7 @@ const DEFAULT_ICON =
  * and the client's immediate next step in the onboarding journey
  * (with icon and description). Also includes a plain-text fallback.
  */
-export function buildWelcomeEmailContent(request: WelcomeEmailRequest): EmailContent {
+export function buildWelcomeEmailContent(request: WelcomeEmailBuilderInput): EmailContent {
   // Resolve the next step after welcome_sent from the blueprints
   const welcomeIndex = ONBOARDING_STEP_BLUEPRINTS.findIndex((s) => s.key === 'welcome_sent');
   const nextStep = ONBOARDING_STEP_BLUEPRINTS[welcomeIndex + 1];

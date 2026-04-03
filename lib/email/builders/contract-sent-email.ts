@@ -9,19 +9,7 @@ import {
   paragraph,
   type MetadataRow,
 } from '../shared/layout';
-import type { EmailContent } from '../types';
-
-// ── Request type ─────────────────────────────────────────────
-
-export type ContractSentEmailRequest = {
-  recipientName: string;
-  orgName: string;
-  projectName: string;
-  contractName: string;
-  provider: string;
-  /** If the e-sign provider supplies a direct signing URL, include it. */
-  signingUrl?: string;
-};
+import type { ContractSentEmailBuilderInput, EmailContent } from '../types';
 
 // ── Builder ──────────────────────────────────────────────────
 
@@ -32,7 +20,7 @@ export type ContractSentEmailRequest = {
  * client via DocuSign / Dropbox Sign / manual provider.
  */
 export function buildContractSentEmailContent(
-  request: ContractSentEmailRequest,
+  request: ContractSentEmailBuilderInput,
 ): EmailContent {
   // ── Plain text ─────────────────────────────────────────────
   const lines: string[] = [];

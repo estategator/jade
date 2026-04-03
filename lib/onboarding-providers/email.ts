@@ -1,51 +1,27 @@
 import 'server-only';
 
+import type {
+  EmailKind,
+  EmailProviderAdapter,
+  EmailSendRequest,
+  EmailSendResult,
+} from '@/lib/email/types';
+
 /**
- * Email delivery abstraction for onboarding welcome messages.
+ * Email delivery abstraction for all onboarding email flows.
  *
- * Provider-agnostic — onboarding actions call sendWelcomeEmail() and
- * the active adapter handles template rendering + delivery.
+ * Provider-agnostic — processors call adapter.send() with a
+ * discriminated EmailSendRequest and the adapter handles delivery.
  */
 
-// ── Types ────────────────────────────────────────────────────
+// ── Re-export types consumers may need ───────────────────────
 
-export type EmailProvider = 'resend' | 'sendgrid' | 'manual';
+export type { EmailProviderAdapter, EmailSendRequest, EmailSendResult };
 
-export type ContractSnapshot = {
-  status: string;
-  templateName: string;
-  provider: string;
-  signedAt: string | null;
-};
+// ── Tag helpers ──────────────────────────────────────────────
 
-export type WelcomeEmailRequest = {
-  /** Internal welcome_messages row ID — used for status callbacks. */
-  welcomeMessageId: string;
-  to: string;
-  recipientName: string;
-  subject: string;
-  /** Plain-text body. */
-  textBody: string;
-  /** HTML body (optional — provider may use its own template). */
-  htmlBody?: string;
-  /** Org/project context for template rendering. */
-  orgName: string;
-  projectName: string;
-  /** Share URL (used by client portal email — not used by welcome email). */
-  shareUrl?: string;
-};
-
-export type EmailSendResult = {
-  /** Provider-assigned message ID. */
-  externalMessageId: string | null;
-  status: 'sent' | 'queued' | 'failed';
-  error?: string;
-};
-
-// ── Adapter interface ────────────────────────────────────────
-
-export interface EmailProviderAdapter {
-  send(request: WelcomeEmailRequest): Promise<EmailSendResult>;
+function emailKindTag(kind: EmailKind): string {
+  return kind; // 'welcome' | 'client_portal' | 'contract_sent'
 }
 
 // ── Resend adapter ───────────────────────────────────────────
@@ -73,8 +49,8 @@ export function createResendAdapter(): EmailProviderAdapter {
           html: request.htmlBody ?? `<p>${request.textBody.replace(/\n/g, '<br>')}</p>`,
           text: request.textBody,
           tags: [
-            { name: 'welcome_message_id', value: request.welcomeMessageId },
-            { name: 'type', value: 'welcome' },
+            { name: 'message_id', value: request.messageId },
+            { name: 'type', value: emailKindTag(request.kind) },
           ],
         }),
       });
@@ -117,7 +93,8 @@ export function createSendGridAdapter(): EmailProviderAdapter {
             {
               to: [{ email: request.to, name: request.recipientName }],
               custom_args: {
-                welcome_message_id: request.welcomeMessageId,
+                message_id: request.messageId,
+                email_type: emailKindTag(request.kind),
               },
             },
           ],
@@ -142,7 +119,6 @@ export function createSendGridAdapter(): EmailProviderAdapter {
         };
       }
 
-      // SendGrid returns 202 with x-message-id header
       const messageId = res.headers.get('x-message-id');
       return { externalMessageId: messageId, status: 'sent' };
     },
@@ -154,121 +130,24 @@ export function createSendGridAdapter(): EmailProviderAdapter {
 export function createManualEmailAdapter(): EmailProviderAdapter {
   return {
     async send(request) {
-      console.log(`[email-manual] Would send welcome to ${request.to}: "${request.subject}"`);
-      return { externalMessageId: `manual_${request.welcomeMessageId}`, status: 'sent' };
+      console.log(`[email-manual] Would send ${request.kind} to ${request.to}: "${request.subject}"`);
+      return { externalMessageId: `manual_${request.messageId}`, status: 'sent' };
     },
   };
 }
 
-// ── Email content builder ─────────────────────────────────────
+// ── Adapter factory ──────────────────────────────────────────
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-export function buildWelcomeEmailContent(request: WelcomeEmailRequest): {
-  textBody: string;
-  htmlBody: string;
-} {
-  const lines: string[] = [];
-  const htmlParts: string[] = [];
-
-  // Greeting
-  lines.push(`Hi ${request.recipientName},`);
-  lines.push('');
-  htmlParts.push(`<p>Hi ${escapeHtml(request.recipientName)},</p>`);
-
-  // Intro
-  const intro = `Welcome to your project "${request.projectName}" with ${request.orgName}.`;
-  lines.push(intro);
-  lines.push('');
-  htmlParts.push(`<p>${escapeHtml(intro)}</p>`);
-
-  // User-supplied body (if provided)
-  if (request.textBody) {
-    lines.push(request.textBody);
-    lines.push('');
-    htmlParts.push(`<p>${escapeHtml(request.textBody).replace(/\n/g, '<br>')}</p>`);
-  }
-
-  // Public project link
-  if (request.shareUrl) {
-    lines.push('You can view your project details and progress at any time:');
-    lines.push(request.shareUrl);
-    lines.push('');
-    htmlParts.push(
-      `<p>You can view your project details and progress at any time:</p>` +
-      `<p><a href="${escapeHtml(request.shareUrl)}" style="color:#4f46e5;text-decoration:underline;">${escapeHtml(request.shareUrl)}</a></p>`,
-    );
-  }
-
-  // Sign-off
-  lines.push(`Thank you,`);
-  lines.push(`The ${request.orgName} team`);
-  htmlParts.push(`<p>Thank you,<br>The ${escapeHtml(request.orgName)} team</p>`);
-
-  return {
-    textBody: lines.join('\n'),
-    htmlBody: htmlParts.join(''),
-  };
-}
-
-/** Build email content specifically for the client portal link delivery. */
-export function buildClientPortalEmailContent(request: {
-  recipientName: string;
-  orgName: string;
-  projectName: string;
-  shareUrl: string;
-}): {
-  textBody: string;
-  htmlBody: string;
-} {
-  const textLines = [
-    `Hi ${request.recipientName},`,
-    '',
-    `Your client portal for "${request.projectName}" with ${request.orgName} is ready.`,
-    '',
-    'You can view your project details, progress updates, and key documents at any time:',
-    request.shareUrl,
-    '',
-    'This link is private — please do not share it with others.',
-    '',
-    `Thank you,`,
-    `The ${request.orgName} team`,
-  ];
-
-  const htmlParts = [
-    `<p>Hi ${escapeHtml(request.recipientName)},</p>`,
-    `<p>Your client portal for &ldquo;${escapeHtml(request.projectName)}&rdquo; with ${escapeHtml(request.orgName)} is ready.</p>`,
-    `<p>You can view your project details, progress updates, and key documents at any time:</p>`,
-    `<p style="margin:16px 0;"><a href="${escapeHtml(request.shareUrl)}" style="display:inline-block;padding:12px 24px;background-color:#4f46e5;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Open Client Portal</a></p>`,
-    `<p style="font-size:13px;color:#6b7280;">Or copy this link: <a href="${escapeHtml(request.shareUrl)}" style="color:#4f46e5;text-decoration:underline;">${escapeHtml(request.shareUrl)}</a></p>`,
-    `<p style="font-size:13px;color:#6b7280;">This link is private — please do not share it with others.</p>`,
-    `<p>Thank you,<br>The ${escapeHtml(request.orgName)} team</p>`,
-  ];
-
-  return {
-    textBody: textLines.join('\n'),
-    htmlBody: htmlParts.join(''),
-  };
-}
-
-// ── Factory ──────────────────────────────────────────────────
-
-export function getEmailAdapter(provider?: EmailProvider): EmailProviderAdapter {
-  const active = provider ?? (process.env.EMAIL_PROVIDER as EmailProvider | undefined) ?? 'manual';
-  switch (active) {
+export function getEmailAdapter(): EmailProviderAdapter {
+  const provider = (process.env.EMAIL_PROVIDER as string) ?? 'manual';
+  switch (provider) {
     case 'resend':
       return createResendAdapter();
     case 'sendgrid':
       return createSendGridAdapter();
-    case 'manual':
-      return createManualEmailAdapter();
     default:
-      throw new Error(`Unsupported email provider: ${active as string}`);
+      return createManualEmailAdapter();
   }
 }
+
+// ── (end of module) ──

@@ -2345,6 +2345,7 @@ export async function sendWelcomeEmail(formData: FormData): Promise<ActionResult
       .insert({
         org_id: context.orgId,
         assignment_id: assignmentId,
+        email_type: 'welcome',
         provider: (process.env.EMAIL_PROVIDER as string) ?? 'manual',
         status: 'queued',
         subject,
@@ -2423,21 +2424,23 @@ export async function processWelcomeEmailDelivery(payload: WelcomeEmailQueuePayl
   const adapter = getEmailAdapter();
 
   // Build enriched text + HTML from structured fields
-  const enrichedRequest = {
-    welcomeMessageId: payload.welcomeMessageId,
+  const composed = buildWelcomeEmailContent({
+    recipientName: payload.recipientName,
+    orgName: payload.orgName,
+    projectName: payload.projectName,
+    textBody: payload.textBody,
+  });
+
+  const result = await adapter.send({
+    kind: 'welcome',
+    messageId: payload.welcomeMessageId,
     to: payload.to,
     recipientName: payload.recipientName,
     subject: payload.subject,
-    textBody: payload.textBody,
+    textBody: composed.textBody,
+    htmlBody: composed.htmlBody,
     orgName: payload.orgName,
     projectName: payload.projectName,
-  };
-  const composed = buildWelcomeEmailContent(enrichedRequest);
-  enrichedRequest.textBody = composed.textBody;
-
-  const result = await adapter.send({
-    ...enrichedRequest,
-    htmlBody: composed.htmlBody,
   });
 
   const now = new Date().toISOString();
@@ -2597,12 +2600,13 @@ export async function sendClientPortalEmail(formData: FormData): Promise<ActionR
     const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/client/${token}`;
     const subject = `Your client portal for ${project?.name ?? 'your project'}`;
 
-    // Create welcome_messages row (reuse table for portal emails)
+    // Create welcome_messages row for portal email
     const { data: message, error: messageError } = await supabase
       .from('welcome_messages')
       .insert({
         org_id: context.orgId,
         assignment_id: assignmentId,
+        email_type: 'client_portal',
         provider: (process.env.EMAIL_PROVIDER as string) ?? 'manual',
         status: 'queued',
         subject,
@@ -2696,7 +2700,8 @@ export async function processClientPortalEmailDelivery(payload: ClientPortalEmai
   });
 
   const result = await adapter.send({
-    welcomeMessageId: payload.welcomeMessageId,
+    kind: 'client_portal',
+    messageId: payload.welcomeMessageId,
     to: payload.to,
     recipientName: payload.recipientName,
     subject: payload.subject,
@@ -2772,7 +2777,8 @@ export async function processContractSentEmailDelivery(
   });
 
   const result = await adapter.send({
-    welcomeMessageId: payload.contractId,
+    kind: 'contract_sent',
+    messageId: payload.contractId,
     to: payload.to,
     recipientName: payload.recipientName,
     subject: payload.subject,
@@ -2780,6 +2786,9 @@ export async function processContractSentEmailDelivery(
     htmlBody: composed.htmlBody,
     orgName: payload.orgName,
     projectName: payload.projectName,
+    contractName: payload.contractName,
+    contractProvider: payload.provider,
+    signingUrl: payload.signingUrl,
   });
 
   if (result.status === 'sent') {
@@ -3789,7 +3798,8 @@ export async function notifyFrequentClients({
 
     for (const client of clients) {
       await emailAdapter.send({
-        welcomeMessageId: `outreach-${client.id}-${Date.now()}`,
+        kind: 'welcome',
+        messageId: `outreach-${client.id}-${Date.now()}`,
         to: client.email,
         recipientName: client.full_name,
         subject: subject.trim(),

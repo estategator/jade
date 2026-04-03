@@ -10,12 +10,18 @@ import 'server-only';
 // ── Re-export types ──────────────────────────────────────────
 
 export type {
+  ClientPortalEmailBuilderInput,
   ClientPortalEmailRequest,
+  ContractSentEmailBuilderInput,
+  ContractSentEmailRequest,
   ContractSnapshot,
   EmailContent,
+  EmailKind,
   EmailProvider,
   EmailProviderAdapter,
+  EmailSendRequest,
   EmailSendResult,
+  WelcomeEmailBuilderInput,
   WelcomeEmailRequest,
 } from './types';
 
@@ -24,12 +30,8 @@ export type {
 export { buildWelcomeEmailContent } from './builders/welcome-email';
 export { buildClientPortalEmailContent } from './builders/client-portal-email';
 export { buildContractSentEmailContent } from './builders/contract-sent-email';
-export type { ContractSentEmailRequest } from './builders/contract-sent-email';
 
 // ── Re-export adapter factory ────────────────────────────────
-// Adapters stay in the original file for now — avoids touching
-// provider-specific fetch logic in this change.  The factory is
-// re-exported so consuming code only needs one import source.
 
 export {
   getEmailAdapter,

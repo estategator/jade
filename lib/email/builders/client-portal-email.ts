@@ -7,7 +7,7 @@ import {
   paragraph,
   secondaryLink,
 } from '../shared/layout';
-import type { ClientPortalEmailRequest, EmailContent } from '../types';
+import type { ClientPortalEmailBuilderInput, EmailContent } from '../types';
 
 /**
  * Compose the client portal link email.
@@ -16,7 +16,7 @@ import type { ClientPortalEmailRequest, EmailContent } from '../types';
  * plain-text equivalent that carries the same information.
  */
 export function buildClientPortalEmailContent(
-  request: ClientPortalEmailRequest,
+  request: ClientPortalEmailBuilderInput,
 ): EmailContent {
   // ── Plain text ─────────────────────────────────────────────
   const textLines = [

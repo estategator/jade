@@ -43,6 +43,7 @@ const PROVIDER_OPTIONS = [
   { value: "manual", label: "Manual / in-person" },
   { value: "docusign", label: "DocuSign" },
   { value: "dropbox_sign", label: "Dropbox Sign" },
+  { value: "docuseal", label: "Docuseal" },
 ] as const;
 
 const inputClass =

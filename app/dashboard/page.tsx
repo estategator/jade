@@ -15,7 +15,7 @@ import {
 
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { resolveActiveOrgId } from "@/lib/rbac";
+import { resolveActiveOrgId, hasPermission } from "@/lib/rbac";
 import { PageHeader } from "@/app/components/page-header";
 import { UpgradeIntentHandler } from "@/app/dashboard/upgrade-intent-handler";
 import {
@@ -119,6 +119,24 @@ export default async function DashboardPage({
   }
 
   const activeOrgId = await resolveActiveOrgId(user.id);
+
+  // ── Member access restriction ──────────────────────────
+  if (activeOrgId) {
+    const canViewDashboard = await hasPermission(activeOrgId, user.id, 'analytics:view');
+    if (!canViewDashboard) {
+      return (
+        <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <PageHeader title="Dashboard" description="Organization analytics and insights." />
+          <div className="mt-8 rounded-3xl border border-stone-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="text-lg font-bold text-stone-900 dark:text-white">Access Denied</h2>
+            <p className="mt-2 text-sm text-stone-500 dark:text-zinc-400">
+              You don&apos;t have permission to view the dashboard. Contact an admin to request access.
+            </p>
+          </div>
+        </div>
+      );
+    }
+  }
 
   const [statsRes, catRes, revRes, salesRes, salesRevRes, healthRes] = await Promise.all([
     getDashboardStats(user.id, activeOrgId),

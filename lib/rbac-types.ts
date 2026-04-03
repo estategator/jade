@@ -36,6 +36,18 @@ export type Permission =
 
 export type OrgRole = 'superadmin' | 'admin' | 'member';
 
+export type StaffRole = 'developer' | 'support';
+
+export type ProfileRole = 'user' | 'admin' | 'developer' | 'support';
+
+export type StaffPermission =
+  | 'support:view_tickets'
+  | 'support:manage_tickets'
+  | 'support:view_users'
+  | 'discounts:create'
+  | 'discounts:revoke'
+  | 'discounts:view';
+
 export type MemberStatus = 'active' | 'suspended';
 
 export type AuditAction =
@@ -86,4 +98,11 @@ export type AuditAction =
   | 'onboarding.client_starred'
   | 'onboarding.client_unstarred'
   | 'onboarding.buyer_starred'
-  | 'onboarding.frequent_clients_notified';
+  | 'onboarding.frequent_clients_notified'
+  | 'billing.discount_created'
+  | 'billing.discount_revoked'
+  | 'billing.discount_redeemed'
+  | 'billing.discount_applied'
+  | 'contracts.template_created'
+  | 'contracts.template_updated'
+  | 'contracts.template_archived';

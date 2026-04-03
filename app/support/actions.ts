@@ -1,6 +1,7 @@
 'use server';
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { isStaffUser as _isStaffUser, getProfileRole as _getProfileRole } from '@/lib/rbac';
 import type { SupportTicket, TicketReply, TicketStatus } from '@/app/help/actions';
 
 // ── Types ────────────────────────────────────────────────────
@@ -11,30 +12,16 @@ export type TicketWithOrg = SupportTicket & {
   reply_count: number;
 };
 
-export type ProfileRole = 'user' | 'admin' | 'developer' | 'support';
+export type { ProfileRole } from '@/lib/rbac-types';
 
-// ── Auth helpers ─────────────────────────────────────────────
-
-export async function isStaffUser(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single();
-
-  if (error || !data) return false;
-  return data.role === 'developer' || data.role === 'support';
+// Wrap centralized helpers as proper server actions (re-exports from
+// a 'use server' module are not callable across the client boundary).
+export async function getProfileRole(userId: string) {
+  return _getProfileRole(userId);
 }
 
-export async function getProfileRole(userId: string): Promise<ProfileRole> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single();
-
-  if (error || !data) return 'user';
-  return data.role as ProfileRole;
+export async function isStaffUser(userId: string) {
+  return _isStaffUser(userId);
 }
 
 // ── Queries ──────────────────────────────────────────────────

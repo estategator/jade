@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   CreditCard,
   Sparkles,
+  Tag,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TierBadge } from "@/app/components/tier-badge";
@@ -29,6 +30,42 @@ export function BillingManager({
 }: BillingManagerProps) {
   const [error, setError] = useState("");
   const [success] = useState("");
+  const [discount, setDiscount] = useState<{
+    code: string;
+    percent_off: number;
+    duration_months: number;
+    applied_at: string;
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadDiscount() {
+      const { data: redemption } = await supabase
+        .from('subscription_discount_redemptions')
+        .select('discount_code_id, created_at')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (redemption) {
+        const { data: code } = await supabase
+          .from('subscription_discount_codes')
+          .select('code, percent_off, duration_months')
+          .eq('id', redemption.discount_code_id)
+          .single();
+
+        if (code) {
+          setDiscount({
+            code: code.code,
+            percent_off: code.percent_off,
+            duration_months: code.duration_months,
+            applied_at: redemption.created_at,
+          });
+        }
+      }
+    }
+    loadDiscount();
+  }, [orgId]);
 
   return (
     <>
@@ -152,6 +189,37 @@ export function BillingManager({
             })()}
           </div>
         </div>
+
+        {/* Active Discount */}
+        {discount && (
+          <div className="rounded-xl border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center gap-2 border-b border-stone-100 px-5 py-3 dark:border-zinc-800/60">
+              <Tag className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <h2 className="text-sm font-semibold text-stone-900 dark:text-white">Active Discount</h2>
+            </div>
+            <div className="px-5 py-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-stone-500 dark:text-zinc-500">Code</p>
+                  <p className="font-mono font-medium text-stone-900 dark:text-white">{discount.code}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-stone-500 dark:text-zinc-500">Discount</p>
+                  <p className="font-medium text-emerald-600 dark:text-emerald-400">{discount.percent_off}% off</p>
+                </div>
+                <div>
+                  <p className="text-xs text-stone-500 dark:text-zinc-500">Duration</p>
+                  <p className="font-medium text-stone-900 dark:text-white">
+                    {discount.duration_months} {discount.duration_months === 1 ? "month" : "months"}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-stone-400 dark:text-zinc-500">
+                Applied {new Date(discount.applied_at).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        )}
 
       </motion.div>
     </>

@@ -167,6 +167,7 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
         const tier = session.metadata?.tier as 'pro' | 'enterprise' | undefined;
         const subscriptionId = session.subscription as string | null;
         const customerId = typeof session.customer === 'string' ? session.customer : null;
+        const discountCodeId = session.metadata?.discount_code_id;
         if (orgId && tier) {
           console.log('[stripe-webhook-queue] checkout.session.completed: upserting subscription', { orgId, tier, subscriptionId, customerId });
           const { error } = await supabaseAdmin
@@ -184,6 +185,57 @@ export async function processWebhookEvent(payload: WebhookPayload): Promise<void
             );
           if (error) console.error('[stripe-webhook-queue] upsert_subscription_from_checkout FAILED:', error);
           else console.log('[stripe-webhook-queue] upsert_subscription_from_checkout SUCCESS for org:', orgId);
+
+          // Record discount redemption if a code was used
+          if (discountCodeId && !error) {
+            const userId = session.metadata?.user_id;
+            // Extract Stripe coupon ID from the session's total_details if available
+            const stripeCouponId = (session as unknown as Record<string, unknown>).discount
+              ? ((session as unknown as Record<string, { coupon?: { id?: string } }>).discount?.coupon?.id ?? null)
+              : null;
+
+            const { error: redemptionError } = await supabaseAdmin
+              .from('subscription_discount_redemptions')
+              .insert({
+                discount_code_id: discountCodeId,
+                org_id: orgId,
+                redeemed_by_user_id: userId,
+                applied_via: 'self_serve',
+                stripe_coupon_id: stripeCouponId,
+                stripe_subscription_id: subscriptionId,
+              });
+
+            if (redemptionError) {
+              console.error('[stripe-webhook-queue] discount redemption insert FAILED:', redemptionError);
+            } else {
+              // Update code status
+              await supabaseAdmin.rpc('increment_discount_redemption', { p_code_id: discountCodeId }).then(
+                () => console.log('[stripe-webhook-queue] discount redemption recorded for code:', discountCodeId),
+                (err: unknown) => {
+                  // Fallback: manually update if RPC not available
+                  console.warn('[stripe-webhook-queue] RPC fallback for discount:', err);
+                  supabaseAdmin
+                    .from('subscription_discount_codes')
+                    .select('times_redeemed, max_redemptions')
+                    .eq('id', discountCodeId)
+                    .single()
+                    .then(({ data: codeRow }) => {
+                      if (codeRow) {
+                        const newCount = (codeRow.times_redeemed ?? 0) + 1;
+                        supabaseAdmin
+                          .from('subscription_discount_codes')
+                          .update({
+                            times_redeemed: newCount,
+                            status: newCount >= codeRow.max_redemptions ? 'redeemed' : 'active',
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq('id', discountCodeId);
+                      }
+                    });
+                }
+              );
+            }
+          }
         }
         break;
       }

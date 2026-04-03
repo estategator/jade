@@ -36,6 +36,7 @@ import {
   type AddressParts,
 } from "@/app/components/address-autocomplete";
 
+import type { PickerTemplate } from "@/app/components/agreement-type-selector";
 import { WorkflowTimeline } from "./step-action-panel";
 
 const stageBadge: Record<string, { text: string; className: string }> = {
@@ -65,6 +66,7 @@ function AssignmentAccordion({
   isPending,
   onRemove,
   onChange,
+  contractTemplates,
 }: Readonly<{
   assignment: ClientAssignmentDetail;
   clientName: string;
@@ -72,6 +74,7 @@ function AssignmentAccordion({
   isPending: boolean;
   onRemove: (assignmentId: string) => void;
   onChange: (assignmentId: string, newProjectId: string) => void;
+  contractTemplates?: PickerTemplate[];
 }>) {
   const [expanded, setExpanded] = useState(true);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -195,6 +198,7 @@ function AssignmentAccordion({
                 shareLink={assignment.shareLink}
                 clientName={clientName}
                 projectName={assignment.project.name}
+                contractTemplates={contractTemplates}
               />
             </div>
           </div>
@@ -379,10 +383,12 @@ export function ClientWizard({
   client,
   projects,
   assignments,
+  contractTemplates,
 }: Readonly<{
   client: OnboardingClientProfile;
   projects: OnboardingProjectOption[];
   assignments: ClientAssignmentDetail[];
+  contractTemplates?: PickerTemplate[];
 }>) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -847,6 +853,7 @@ export function ClientWizard({
             isPending={isPending}
             onRemove={handleRemoveAssignment}
             onChange={handleChangeAssignment}
+            contractTemplates={contractTemplates}
           />
         ))
       )}
@@ -877,6 +884,7 @@ export function ClientWizard({
                   isPending={isPending}
                   onRemove={handleRemoveAssignment}
                   onChange={handleChangeAssignment}
+                  contractTemplates={contractTemplates}
                 />
               ))}
             </div>

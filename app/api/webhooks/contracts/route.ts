@@ -6,6 +6,7 @@ import {
   type ContractWebhookPayload,
 } from '@/lib/onboarding-webhook-processors';
 
+// Docuseal webhooks are handled by /api/webhooks/docuseal — not routed through here.
 const SUPPORTED_PROVIDERS: ContractProvider[] = ['docusign', 'dropbox_sign'];
 
 export async function POST(req: NextRequest) {

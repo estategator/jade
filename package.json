@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.48",
+    "@docuseal/api": "^1.0.22",
+    "@docuseal/react": "^1.0.71",
     "@stripe/stripe-js": "^8.9.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.89.0",
@@ -20,6 +22,7 @@
     "ai": "^6.0.138",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.26",
+    "jose": "^6.2.2",
     "lucide-react": "^0.562.0",
     "next": "16.2.1",
     "openai": "^6.32.0",

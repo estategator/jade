@@ -3,8 +3,8 @@ import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createClient } from '@/utils/supabase/server';
 
-export type { Permission, OrgRole, AuditAction, MemberStatus } from '@/lib/rbac-types';
-import type { Permission, OrgRole, AuditAction, MemberStatus } from '@/lib/rbac-types';
+export type { Permission, OrgRole, AuditAction, MemberStatus, StaffRole, ProfileRole, StaffPermission } from '@/lib/rbac-types';
+import type { Permission, OrgRole, AuditAction, MemberStatus, StaffRole, StaffPermission } from '@/lib/rbac-types';
 
 // ── Default role → permission mapping (code-level, fast path) ─
 
@@ -37,9 +37,21 @@ const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'projects:view',
     'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:view',
     'settings:view',
-    'analytics:view', 'sales:view',
     'marketing:view', 'marketing:create',
     'invoices:view', 'invoices:create',
+  ],
+} as const;
+
+// ── Staff (profile-level) role → permission mapping ──────────
+
+const STAFF_ROLE_PERMISSIONS: Record<StaffRole, readonly StaffPermission[]> = {
+  developer: [
+    'support:view_tickets', 'support:manage_tickets', 'support:view_users',
+    'discounts:create', 'discounts:revoke', 'discounts:view',
+  ],
+  support: [
+    'support:view_tickets', 'support:manage_tickets', 'support:view_users',
+    'discounts:create', 'discounts:revoke', 'discounts:view',
   ],
 } as const;
 
@@ -212,6 +224,60 @@ export async function requireAllPermissions(
     return { granted: false, error: 'You do not have permission to perform this action.' };
   }
   return { granted: true };
+}
+
+// ── Staff (profile-level) helpers ────────────────────────────
+
+/**
+ * Fetch the user's profile-level role from the profiles table.
+ * Returns 'user' for regular users, or the staff role.
+ */
+export async function getProfileRole(
+  userId: string
+): Promise<'user' | 'admin' | StaffRole> {
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (error || !data) return 'user';
+  return data.role as 'user' | 'admin' | StaffRole;
+}
+
+/**
+ * Check whether a profile role qualifies as staff (developer or support).
+ */
+export function isStaffRole(role: string): role is StaffRole {
+  return role === 'developer' || role === 'support';
+}
+
+/**
+ * Check whether a user has staff access (developer or support profile role).
+ */
+export async function isStaffUser(userId: string): Promise<boolean> {
+  const role = await getProfileRole(userId);
+  return isStaffRole(role);
+}
+
+/**
+ * Get the staff permissions for a given profile role.
+ * Returns an empty array for non-staff roles.
+ */
+export function getStaffPermissions(role: string): readonly StaffPermission[] {
+  if (!isStaffRole(role)) return [];
+  return STAFF_ROLE_PERMISSIONS[role];
+}
+
+/**
+ * Check whether a user has a specific staff permission.
+ */
+export async function hasStaffPermission(
+  userId: string,
+  permission: StaffPermission
+): Promise<boolean> {
+  const role = await getProfileRole(userId);
+  return getStaffPermissions(role).includes(permission);
 }
 
 // ── Audit logging ────────────────────────────────────────────

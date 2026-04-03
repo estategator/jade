@@ -27,6 +27,7 @@ import {
   createProjectShareLink,
   scheduleWalkthrough,
   createContractDraft,
+  createAndSendTemplateContract,
   sendClientPortalEmail,
   sendWelcomeEmail,
   updateOnboardingStepStatus,
@@ -36,7 +37,11 @@ import {
   US_STATES,
   type AddressParts,
 } from "@/app/components/address-autocomplete";
-import { AgreementTypeSelector } from "@/app/components/agreement-type-selector";
+import {
+  AgreementTypeSelector,
+  type ContractSelection,
+  type PickerTemplate,
+} from "@/app/components/agreement-type-selector";
 
 type ShareResultState = Record<
   string,
@@ -48,8 +53,10 @@ type ShareResultState = Record<
 
 export function OnboardingConsole({
   initialData,
+  contractTemplates,
 }: Readonly<{
   initialData: OnboardingDashboardData;
+  contractTemplates?: PickerTemplate[];
 }>) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -212,16 +219,31 @@ export function OnboardingConsole({
     }
   };
 
-  const handleCreateContract = (assignmentId: string, agreementType: AgreementType) => {
+  const handleCreateContract = (
+    assignmentId: string,
+    agreementType: AgreementType,
+    selection?: ContractSelection,
+  ) => {
     setActionError(null);
 
     const formData = new FormData();
     formData.set("assignment_id", assignmentId);
-    formData.set("provider", "manual");
+    formData.set(
+      "provider",
+      selection?.kind === "template" ? "docuseal" : "manual",
+    );
     formData.set("agreement_type", agreementType);
+    if (selection?.kind === "template") {
+      formData.set("contract_template_id", selection.templateId);
+    }
 
     startTransition(async () => {
-      const result = await createContractDraft(formData);
+      // Template-backed contracts skip the editor and send immediately
+      const action =
+        selection?.kind === "template"
+          ? createAndSendTemplateContract
+          : createContractDraft;
+      const result = await action(formData);
       if (result.error) {
         setActionError(result.error);
         return;
@@ -671,9 +693,14 @@ export function OnboardingConsole({
                         </button>
                         {contractSelectorFor === assignment.id && (
                           <AgreementTypeSelector
-                            onSelect={(type) => {
+                            templates={contractTemplates}
+                            onSelect={(type, selection) => {
                               setContractSelectorFor(null);
-                              handleCreateContract(assignment.id, type);
+                              handleCreateContract(
+                                assignment.id,
+                                type,
+                                selection,
+                              );
                             }}
                             onCancel={() => setContractSelectorFor(null)}
                           />

@@ -1477,3 +1477,117 @@ create policy "Allow anonymous inserts"
   on contact_submissions for insert
   to anon
   with check (true);
+
+-- =========================
+-- Subscription discount codes (support-issued, user-targeted)
+-- =========================
+create table if not exists subscription_discount_codes (
+  id               uuid primary key default gen_random_uuid(),
+  code             text not null unique,
+  target_user_id   uuid not null references auth.users (id) on delete cascade,
+  issuer_user_id   uuid not null references auth.users (id) on delete cascade,
+  percent_off      integer not null
+                     check (percent_off >= 1 and percent_off <= 50),
+  duration_months  integer not null
+                     check (duration_months >= 1 and duration_months <= 3),
+  status           text not null default 'active'
+                     check (status in ('active', 'expired', 'revoked', 'redeemed')),
+  max_redemptions  integer not null default 1
+                     check (max_redemptions >= 1),
+  times_redeemed   integer not null default 0,
+  note             text,
+  expires_at       timestamptz,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+create index if not exists idx_discount_codes_code
+  on subscription_discount_codes (code);
+
+create index if not exists idx_discount_codes_target_user
+  on subscription_discount_codes (target_user_id, status);
+
+create index if not exists idx_discount_codes_issuer
+  on subscription_discount_codes (issuer_user_id, created_at desc);
+
+-- ---- subscription_discount_codes RLS ----
+alter table subscription_discount_codes enable row level security;
+
+create policy "Staff can manage discount codes"
+  on subscription_discount_codes for all
+  to authenticated
+  using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role in ('developer', 'support')
+    )
+  )
+  with check (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role in ('developer', 'support')
+    )
+  );
+
+create policy "Target user can view own active codes"
+  on subscription_discount_codes for select
+  to authenticated
+  using (
+    target_user_id = auth.uid()
+    and status = 'active'
+  );
+
+-- =========================
+-- Subscription discount redemptions
+-- =========================
+create table if not exists subscription_discount_redemptions (
+  id                        uuid primary key default gen_random_uuid(),
+  discount_code_id          uuid not null references subscription_discount_codes (id) on delete cascade,
+  org_id                    uuid not null references organizations (id) on delete cascade,
+  redeemed_by_user_id       uuid not null references auth.users (id) on delete cascade,
+  applied_via               text not null
+                              check (applied_via in ('self_serve', 'support')),
+  stripe_coupon_id          text,
+  stripe_subscription_id    text,
+  created_at                timestamptz not null default now()
+);
+
+create index if not exists idx_discount_redemptions_code
+  on subscription_discount_redemptions (discount_code_id);
+
+create index if not exists idx_discount_redemptions_org
+  on subscription_discount_redemptions (org_id, created_at desc);
+
+-- ---- subscription_discount_redemptions RLS ----
+alter table subscription_discount_redemptions enable row level security;
+
+create policy "Staff can manage redemptions"
+  on subscription_discount_redemptions for all
+  to authenticated
+  using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role in ('developer', 'support')
+    )
+  )
+  with check (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role in ('developer', 'support')
+    )
+  );
+
+create policy "Org members can view redemptions"
+  on subscription_discount_redemptions for select
+  to authenticated
+  using (
+    exists (
+      select 1 from org_members
+      where org_members.org_id = subscription_discount_redemptions.org_id
+        and org_members.user_id = auth.uid()
+    )
+  );

@@ -1480,6 +1480,30 @@ function parseContractTerms(formData: FormData): ContractTerms {
 }
 
 /**
+ * One-step: create a draft from a Docuseal template, then immediately send it.
+ * Used when the user picks an org template in the contract picker —
+ * the document is already authored so no editor is needed.
+ */
+export async function createAndSendTemplateContract(formData: FormData): Promise<ActionResult & { data?: { contractId: string } }> {
+  // Step 1 — create draft (reuse existing action)
+  const draftResult = await createContractDraft(formData);
+  if (draftResult.error || !draftResult.data?.contractId) {
+    return draftResult;
+  }
+
+  // Step 2 — send immediately
+  const sendFd = new FormData();
+  sendFd.set('contract_id', draftResult.data.contractId);
+  const sendResult = await sendContract(sendFd);
+
+  if (sendResult.error) {
+    return { error: sendResult.error, data: draftResult.data };
+  }
+
+  return { success: true, data: draftResult.data };
+}
+
+/**
  * Create a new contract in draft status with financial terms.
  * Does NOT send — the user edits the draft first, then sends.
  */
@@ -1493,6 +1517,7 @@ export async function createContractDraft(formData: FormData): Promise<ActionRes
   const provider = ((formData.get('provider') as string | null)?.trim() ?? 'manual') as ContractProvider;
   const templateName = (formData.get('template_name') as string | null)?.trim() ?? '';
   const agreementType = (formData.get('agreement_type') as string | null)?.trim() ?? '';
+  const contractTemplateId = (formData.get('contract_template_id') as string | null)?.trim() || null;
 
   if (!assignmentId) {
     return { error: 'Missing client assignment.' };
@@ -1500,7 +1525,7 @@ export async function createContractDraft(formData: FormData): Promise<ActionRes
   if (!VALID_AGREEMENT_TYPES.has(agreementType)) {
     return { error: 'Agreement type is required.' };
   }
-  if (!['docusign', 'dropbox_sign', 'manual'].includes(provider)) {
+  if (!['docusign', 'dropbox_sign', 'docuseal', 'manual'].includes(provider)) {
     return { error: 'Invalid contract provider.' };
   }
 
@@ -1539,6 +1564,7 @@ export async function createContractDraft(formData: FormData): Promise<ActionRes
       signer_email: client.email,
       created_by: context.userId,
     };
+    if (contractTemplateId) insertPayload.contract_template_id = contractTemplateId;
     // Only include terms columns when the migration has been applied
     if (terms.commission_rate !== null) insertPayload.commission_rate = terms.commission_rate;
     if (terms.minimum_commission !== null) insertPayload.minimum_commission = terms.minimum_commission;
@@ -1626,7 +1652,7 @@ export async function updateContractDraft(formData: FormData): Promise<ActionRes
     const updatePayload: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
-    if (provider && ['docusign', 'dropbox_sign', 'manual'].includes(provider)) {
+    if (provider && ['docusign', 'dropbox_sign', 'docuseal', 'manual'].includes(provider)) {
       updatePayload.provider = provider;
     }
     if (templateName !== null) {
@@ -1839,7 +1865,7 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
 
     const assignmentId = row.assignment_id as string;
     const providerRaw = row.provider as string;
-    if (!['docusign', 'dropbox_sign', 'manual'].includes(providerRaw)) {
+    if (!['docusign', 'dropbox_sign', 'docuseal', 'manual'].includes(providerRaw)) {
       return { error: 'Invalid contract provider.' };
     }
 
@@ -1935,6 +1961,20 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
       })
       : undefined;
 
+    // Resolve Docuseal template ID if this contract is template-backed
+    let docusealTemplateId: string | undefined;
+    const contractTemplateId = row.contract_template_id as string | null;
+    if (contractTemplateId && provider === 'docuseal') {
+      const { data: tpl } = await supabase
+        .from('contract_templates')
+        .select('docuseal_template_id')
+        .eq('id', contractTemplateId)
+        .single();
+      if (tpl?.docuseal_template_id) {
+        docusealTemplateId = String(tpl.docuseal_template_id);
+      }
+    }
+
     // Send via provider adapter
     const adapter = getContractAdapter(provider);
     const sendResult = await adapter.send({
@@ -1943,7 +1983,12 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
       signerEmail: client.email,
       documentTitle: templateName,
       document: generatedDocument,
+      templateId: docusealTemplateId,
       metadata: { org_id: context.orgId, assignment_id: assignmentId, agreement_type: agreementType },
+      projectContext: {
+        orgName: org?.name ?? 'Curator',
+        projectName: project?.name ?? 'Client Project',
+      },
     });
 
     // Update contract with external ID and status
@@ -2027,6 +2072,7 @@ export async function sendContract(formData: FormData): Promise<ActionResult> {
           provider,
           assignmentId,
           orgId: context.orgId,
+          signingUrl: sendResult.signingUrl,
         };
 
         await enqueue(TOPICS.CONTRACT_SENT_EMAIL, emailPayload, processContractSentEmailDelivery);

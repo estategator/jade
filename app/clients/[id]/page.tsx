@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 
 import { PageHeader } from "@/app/components/page-header";
 import { ClientWizard } from "@/app/clients/_components/client-wizard";
+import { getContractTemplates } from "@/app/contracts/actions";
 import { getClientDetail } from "@/app/onboarding/actions";
 import { resolveActiveOrgId } from "@/lib/rbac";
 import { createClient } from "@/utils/supabase/server";
@@ -26,7 +27,10 @@ export default async function ClientDetailPage({
     redirect("/organizations");
   }
 
-  const result = await getClientDetail(id, user.id, activeOrgId);
+  const [result, templatesResult] = await Promise.all([
+    getClientDetail(id, user.id, activeOrgId),
+    getContractTemplates(),
+  ]);
 
   if (result.error) {
     if (result.error === "Client not found.") {
@@ -57,6 +61,7 @@ export default async function ClientDetailPage({
         client={client}
         projects={projects}
         assignments={assignments}
+        contractTemplates={templatesResult.data ?? []}      
       />
     </div>
   );

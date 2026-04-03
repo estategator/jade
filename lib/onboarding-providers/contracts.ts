@@ -3,6 +3,13 @@ import 'server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import {
+  createSubmission as docusealCreateSubmission,
+  getSubmission as docusealGetSubmission,
+  normalizeWebhookEvent as docusealNormalizeWebhookEvent,
+  verifyWebhookSignature as docusealVerifyWebhookSignature,
+  docusealStatusMap,
+} from '@/lib/docuseal';
+import {
   CONTRACT_SIGN_DATE_ANCHOR,
   CONTRACT_SIGN_HERE_ANCHOR,
   type ContractSendDocument,
@@ -18,7 +25,7 @@ import {
 
 // ── Types ────────────────────────────────────────────────────
 
-export type ContractProvider = 'docusign' | 'dropbox_sign' | 'manual';
+export type ContractProvider = 'docusign' | 'dropbox_sign' | 'docuseal' | 'manual';
 
 export type ContractSendRequest = {
   /** Organization-scoped contract ID (used for metadata/callbacks). */
@@ -34,6 +41,11 @@ export type ContractSendRequest = {
   documentTitle: string;
   /** Arbitrary key-value metadata forwarded to the provider. */
   metadata?: Record<string, string>;
+  /** Project / org context used to enrich provider emails. */
+  projectContext?: {
+    orgName: string;
+    projectName: string;
+  };
 };
 
 export type ContractSendResult = {
@@ -41,6 +53,8 @@ export type ContractSendResult = {
   externalContractId: string;
   /** Current status as returned by the provider after sending. */
   status: 'sent' | 'draft';
+  /** Direct signing URL when the provider supplies one (e.g. Docuseal embed_src). */
+  signingUrl?: string;
   /** Provider-specific raw response data for traceability. */
   rawResponse?: Record<string, unknown>;
 };
@@ -405,6 +419,77 @@ export function createDropboxSignAdapter(): ContractProviderAdapter {
   };
 }
 
+// ── Docuseal adapter ─────────────────────────────────────────
+
+export function createDocusealAdapter(): ContractProviderAdapter {
+  return {
+    async send(request) {
+      const docusealTemplateId = request.templateId;
+      if (!docusealTemplateId) {
+        throw new Error('Docuseal send requires a templateId (Docuseal template ID).');
+      }
+
+      // Disable Docuseal's built-in email — we send via Curator's
+      // branded email queue instead, using the signing URL.
+      const result = await docusealCreateSubmission({
+        templateId: Number(docusealTemplateId),
+        signerEmail: request.signerEmail,
+        signerName: request.signerName,
+        sendEmail: false,
+        metadata: {
+          contractId: request.contractId,
+          ...request.metadata,
+        },
+      });
+
+      if (!result.submissionId) {
+        throw new Error('Docuseal createSubmission returned no submission ID.');
+      }
+
+      // Extract the signing URL from the first submitter's embed_src
+      const signingUrl = result.submitters[0]?.embed_src;
+      if (!signingUrl) {
+        throw new Error('Docuseal createSubmission returned no signing URL (embed_src).');
+      }
+
+      return {
+        externalContractId: String(result.submissionId),
+        status: 'sent' as const,
+        signingUrl,
+        rawResponse: result as unknown as Record<string, unknown>,
+      };
+    },
+
+    async getStatus(externalContractId) {
+      const submission = await docusealGetSubmission(Number(externalContractId));
+
+      return {
+        status: docusealStatusMap(submission.status),
+        updatedAt: submission.updated_at,
+        rawResponse: submission as unknown as Record<string, unknown>,
+      };
+    },
+
+    normalizeWebhookEvent(payload) {
+      const event = docusealNormalizeWebhookEvent(payload);
+      if (!event) return null;
+
+      return {
+        externalContractId: String(event.submissionId),
+        eventType: event.eventType,
+        normalizedStatus: event.normalizedStatus,
+        timestamp: event.timestamp,
+        rawPayload: event.rawPayload,
+      };
+    },
+
+    verifyWebhookSignature(body, hdrs) {
+      const sig = hdrs['x-docuseal-signature'] ?? '';
+      return docusealVerifyWebhookSignature(body, sig);
+    },
+  };
+}
+
 // ── Manual/no-op adapter ─────────────────────────────────────
 
 export function createManualContractAdapter(): ContractProviderAdapter {
@@ -435,6 +520,8 @@ export function getContractAdapter(provider: ContractProvider): ContractProvider
       return createDocuSignAdapter();
     case 'dropbox_sign':
       return createDropboxSignAdapter();
+    case 'docuseal':
+      return createDocusealAdapter();
     case 'manual':
       return createManualContractAdapter();
     default:

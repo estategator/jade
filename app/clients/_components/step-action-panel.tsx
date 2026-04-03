@@ -28,6 +28,7 @@ import type {
 import type { AgreementType } from "@/lib/agreement-types";
 import {
   createProjectShareLink,
+  createAndSendTemplateContract,
   deleteContractDraft,
   getContractDetail,
   recordClientProvidedContract,
@@ -37,7 +38,11 @@ import {
   updateOnboardingStepStatus,
 } from "@/app/onboarding/actions";
 import { ContractEditor } from "@/app/components/contract-editor";
-import { AgreementTypeSelector } from "@/app/components/agreement-type-selector";
+import {
+  AgreementTypeSelector,
+  type ContractSelection,
+  type PickerTemplate,
+} from "@/app/components/agreement-type-selector";
 
 const statusLabel: Record<string, { text: string; className: string }> = {
   pending: { text: "Pending", className: "bg-stone-100 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300" },
@@ -75,6 +80,7 @@ export function StepActionPanel({
   shareLink,
   clientName,
   projectName,
+  contractTemplates,
 }: Readonly<{
   step: OnboardingStepSummary;
   assignmentId: string;
@@ -84,6 +90,7 @@ export function StepActionPanel({
   shareLink: { id: string; status: string; expires_at: string | null; created_at: string } | null;
   clientName: string;
   projectName: string;
+  contractTemplates?: PickerTemplate[];
 }>) {
   return (
     <WorkflowStep
@@ -96,6 +103,7 @@ export function StepActionPanel({
       shareLink={shareLink}
       clientName={clientName}
       projectName={projectName}
+      contractTemplates={contractTemplates}
     />
   );
 }
@@ -124,6 +132,7 @@ export function WorkflowTimeline({
   shareLink,
   clientName,
   projectName,
+  contractTemplates,
 }: Readonly<{
   steps: OnboardingStepSummary[];
   progressPercent: number;
@@ -134,6 +143,7 @@ export function WorkflowTimeline({
   shareLink: { id: string; status: string; expires_at: string | null; created_at: string } | null;
   clientName: string;
   projectName: string;
+  contractTemplates?: PickerTemplate[];
 }>) {
   if (steps.length === 0) {
     return (
@@ -172,6 +182,7 @@ export function WorkflowTimeline({
             shareLink={shareLink}
             clientName={clientName}
             projectName={projectName}
+            contractTemplates={contractTemplates}
           />
         ))}
       </ol>
@@ -189,6 +200,7 @@ function WorkflowStep({
   shareLink,
   clientName,
   projectName,
+  contractTemplates,
 }: Readonly<{
   step: OnboardingStepSummary;
   isLast: boolean;
@@ -199,6 +211,7 @@ function WorkflowStep({
   shareLink: { id: string; status: string; expires_at: string | null; created_at: string } | null;
   clientName: string;
   projectName: string;
+  contractTemplates?: PickerTemplate[];
 }>) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -528,10 +541,31 @@ function WorkflowStep({
             {/* Agreement type selector */}
             {showContract && showTypeSelector && !showContractEditor && (
               <AgreementTypeSelector
-                onSelect={(type) => {
-                  setSelectedAgreementType(type);
+                templates={contractTemplates}
+                onSelect={(type, selection) => {
                   setShowTypeSelector(false);
-                  setShowContractEditor(true);
+
+                  if (selection?.kind === "template") {
+                    // Template-backed: skip editor, create + send immediately
+                    setError(null);
+                    const fd = new FormData();
+                    fd.set("assignment_id", assignmentId);
+                    fd.set("provider", "docuseal");
+                    fd.set("agreement_type", type);
+                    fd.set("contract_template_id", selection.templateId);
+                    startTransition(async () => {
+                      const res = await createAndSendTemplateContract(fd);
+                      if (res.error) {
+                        setError(res.error);
+                        return;
+                      }
+                      router.refresh();
+                    });
+                  } else {
+                    // Built-in type: open editor form
+                    setSelectedAgreementType(type);
+                    setShowContractEditor(true);
+                  }
                 }}
                 onCancel={() => setShowTypeSelector(false)}
               />

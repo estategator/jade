@@ -89,7 +89,7 @@ const SECTIONS = [
     content: [
       {
         heading: "Plan comparison",
-        text: "Free: 1 member, basic AI. Pro ($50/mo): 5 members, advanced AI, Stripe integration. Enterprise: unlimited members, priority support, custom integrations.",
+        text: "Free: 1 member, basic AI. Pro ($150/mo): 5 members, advanced AI, Stripe integration. Enterprise: unlimited members, priority support, custom integrations.",
       },
       {
         heading: "Upgrading",

@@ -22,6 +22,7 @@ import {
   PiXDuotone,
   PiUsersDuotone,
   PiFileTextDuotone,
+  PiTagDuotone,
 } from "react-icons/pi";
 import { supabase } from "@/lib/supabase";
 import { OrgSwitcher } from "@/app/components/org-switcher";
@@ -30,6 +31,8 @@ import { cn } from "@/lib/cn";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNotifications } from "@/lib/notification-context";
 import { getProfileRole } from "@/app/support/actions";
+import { getMyOrgRole } from "@/app/organizations/actions";
+import { useSettings } from "@/app/components/settings-provider";
 
 function Tooltip({
   children,
@@ -89,9 +92,11 @@ interface NavSection {
 export function Sidebar() {
   const { isExpanded, toggle, isMobileOpen, closeMobile, toggleMobile } = useSidebar();
   const { unreadCount } = useNotifications();
+  const { activeOrgId } = useSettings();
   const pathname = usePathname();
   const router = useRouter();
   const [isStaff, setIsStaff] = useState(false);
+  const [isMember, setIsMember] = useState(false);
 
   /* Close mobile drawer on route change */
   useEffect(() => {
@@ -118,12 +123,19 @@ export function Sidebar() {
       if (!cancelled) {
         setIsStaff(role === "developer" || role === "support");
       }
+      // Load org role for nav filtering
+      if (activeOrgId && !cancelled) {
+        const { role: orgRole } = await getMyOrgRole(activeOrgId, session.user.id);
+        if (!cancelled) {
+          setIsMember(orgRole === "member");
+        }
+      }
     }
     loadRole();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeOrgId]);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -139,9 +151,9 @@ export function Sidebar() {
     {
       title: "Core",
       items: [
-        { label: "Dashboard", href: "/dashboard", icon: PiChartBarDuotone },
+        ...(!isMember ? [{ label: "Dashboard", href: "/dashboard", icon: PiChartBarDuotone }] : []),
         { label: "Inventory", href: "/inventory", icon: PiPackageDuotone },
-        { label: "Pricing", href: "/pricing-optimization", icon: PiTrendUpDuotone },
+        ...(!isMember ? [{ label: "Pricing", href: "/pricing-optimization", icon: PiTrendUpDuotone }] : []),
         { label: "Marketing", href: "/marketing", icon: PiMegaphoneDuotone },
         { label: "Invoices", href: "/invoices", icon: PiReceiptDuotone },
       ],
@@ -171,7 +183,10 @@ export function Sidebar() {
         { label: "Help", href: "/dashboard/help", icon: PiQuestionDuotone },
         { label: "Tickets", href: "/tickets", icon: PiTicketDuotone },
         ...(isStaff
-          ? [{ label: "Support Portal", href: "/support", icon: PiHandHeartDuotone }]
+          ? [
+              { label: "Support Portal", href: "/support", icon: PiHandHeartDuotone },
+              { label: "Discounts", href: "/discounts", icon: PiTagDuotone },
+            ]
           : []),
       ],
     },

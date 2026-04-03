@@ -47,7 +47,7 @@ export const TIERS: Record<SubscriptionTier, PricingTier> = {
     id: 'pro',
     name: 'Pro',
     description: 'For growing teams',
-    price: 50,
+    price: 150,
     pricingPeriod: 'month',
     memberLimit: 5,
     features: [

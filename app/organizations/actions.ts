@@ -1426,7 +1426,8 @@ async function getOrCreateStripeCustomer(orgId: string, email: string): Promise<
 export async function createSubscriptionCheckoutSession(
   orgId: string,
   tier: 'pro',
-  userId: string
+  userId: string,
+  discountCodeId?: string
 ) {
   try {
     // Permission check — requires billing:manage
@@ -1476,6 +1477,45 @@ export async function createSubscriptionCheckoutSession(
 
     const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
+    // If a discount code was provided, validate and create Stripe coupon
+    let stripeCouponId: string | undefined;
+    if (discountCodeId) {
+      const { data: discountCode, error: dcError } = await supabase
+        .from('subscription_discount_codes')
+        .select('*')
+        .eq('id', discountCodeId)
+        .single();
+
+      if (dcError || !discountCode) {
+        return { error: 'Invalid discount code.' };
+      }
+      if (discountCode.status !== 'active') {
+        return { error: 'This discount code is no longer valid.' };
+      }
+      if (discountCode.target_user_id !== userId) {
+        return { error: 'This discount code is not valid for your account.' };
+      }
+      if (discountCode.times_redeemed >= discountCode.max_redemptions) {
+        return { error: 'This discount code has already been used.' };
+      }
+      if (discountCode.expires_at && new Date(discountCode.expires_at) < new Date()) {
+        return { error: 'This discount code has expired.' };
+      }
+
+      const coupon = await stripe.coupons.create({
+        percent_off: discountCode.percent_off,
+        duration: 'repeating',
+        duration_in_months: discountCode.duration_months,
+        name: `Support: ${discountCode.code}`,
+        metadata: {
+          discount_code_id: discountCode.id,
+          target_user_id: discountCode.target_user_id,
+          issuer_user_id: discountCode.issuer_user_id,
+        },
+      });
+      stripeCouponId = coupon.id;
+    }
+
     // Create Stripe checkout session for subscription
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -1486,12 +1526,14 @@ export async function createSubscriptionCheckoutSession(
           quantity: 1,
         },
       ],
+      ...(stripeCouponId ? { discounts: [{ coupon: stripeCouponId }] } : {}),
       success_url: `${origin}/dashboard?subscription=success`,
       cancel_url: `${origin}/dashboard?subscription=cancelled`,
       metadata: {
         org_id: orgId,
         user_id: userId,
         tier,
+        ...(discountCodeId ? { discount_code_id: discountCodeId } : {}),
       },
     });
 

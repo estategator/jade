@@ -12,7 +12,7 @@ export const metadata = buildMetadata({
 
 export default function TutorialsPage() {
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

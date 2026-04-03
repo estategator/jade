@@ -306,7 +306,7 @@ export default function LoginPage() {
   ];
 
   return (
-    <div className="flex min-h-screen font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+    <div className="flex min-h-screen font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
       {/* ── Left branded panel (lg+) ── */}
       <div className="relative hidden w-1/2 overflow-hidden bg-indigo-600 dark:bg-indigo-700 lg:flex lg:flex-col lg:justify-between">
         {/* Gradient mesh overlay */}
@@ -351,7 +351,7 @@ export default function LoginPage() {
               <span className="text-xl font-bold text-white">Curator</span>
             </Link>
 
-            <h2 className="text-4xl font-bold leading-tight text-white xl:text-5xl">
+            <h2 className="text-4xl font-bold leading-tight text-white xl:text-5xl font-display">
               Estate sales,{" "}
               <span className="text-indigo-200">simplified.</span>
             </h2>
@@ -424,7 +424,7 @@ export default function LoginPage() {
               <p className="text-sm font-medium uppercase tracking-wider text-stone-500">
                 {modeCopy[mode].label}
               </p>
-              <h1 className="mt-3 text-3xl font-bold text-stone-900 dark:text-white sm:text-4xl">
+              <h1 className="mt-3 text-3xl font-bold text-stone-900 dark:text-white sm:text-4xl font-display">
                 {modeCopy[mode].heading}
               </h1>
               <p className="mt-3 text-sm leading-relaxed text-stone-600 dark:text-zinc-400">

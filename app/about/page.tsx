@@ -69,7 +69,7 @@ const stats = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
       <Navbar launchBadge="Launching Feb 2026" />
       <main>
         {/* Hero */}
@@ -80,7 +80,7 @@ export default function AboutPage() {
             transition={{ duration: 0.6 }}
             className="max-w-3xl mx-auto text-center"
           >
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6 font-display">
               Modernizing estate sales,{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-brand-primary)] to-violet-600">
                 one home at a time
@@ -104,7 +104,7 @@ export default function AboutPage() {
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
               >
-                <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-6">
+                <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-6 font-display">
                   Our mission
                 </h2>
                 <p className="text-lg text-stone-600 dark:text-zinc-400 leading-relaxed mb-4">
@@ -151,7 +151,7 @@ export default function AboutPage() {
         <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">
                 What we believe
               </h2>
               <p className="text-lg text-stone-600 dark:text-zinc-400 max-w-2xl mx-auto">
@@ -187,7 +187,7 @@ export default function AboutPage() {
         <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-stone-100/50 dark:bg-zinc-900/30 border-t border-stone-200 dark:border-zinc-800">
           <div className="max-w-3xl mx-auto">
             <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">
                 Our story
               </h2>
               <p className="text-lg text-stone-600 dark:text-zinc-400 max-w-2xl mx-auto">

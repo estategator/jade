@@ -127,7 +127,7 @@ const additionalFeatures = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
       <Navbar launchBadge="Launching Feb 2026" />
       <main>
         {/* Hero */}
@@ -142,7 +142,7 @@ export default function FeaturesPage() {
               <Zap className="w-4 h-4" />
               Built for estate sale professionals
             </span>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6 font-display">
               Every tool you need, in one platform
             </h1>
             <p className="text-lg sm:text-xl text-stone-600 dark:text-zinc-400 leading-relaxed">
@@ -155,7 +155,7 @@ export default function FeaturesPage() {
         <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-stone-100/50 dark:bg-zinc-900/30 border-t border-stone-200 dark:border-zinc-800">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">
                 Core capabilities
               </h2>
               <p className="text-lg text-stone-600 dark:text-zinc-400 max-w-2xl mx-auto">
@@ -186,7 +186,7 @@ export default function FeaturesPage() {
                       </h3>
                     </div>
                   </div>
-                  <p className="text-stone-600 dark:text-zinc-400 leading-relaxed mb-6">
+                  <p className="text-stone-600 dark:text-zinc-400 leading-relaxed mb-6 font-body">
                     {feature.description}
                   </p>
                   <ul className="space-y-2">
@@ -207,7 +207,7 @@ export default function FeaturesPage() {
         <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">
                 And so much more
               </h2>
               <p className="text-lg text-stone-600 dark:text-zinc-400 max-w-2xl mx-auto">
@@ -228,7 +228,7 @@ export default function FeaturesPage() {
                   <div className="w-10 h-10 rounded-lg bg-[var(--color-brand-subtle)] flex items-center justify-center mb-4 text-[var(--color-brand-primary)] group-hover:bg-[var(--color-brand-subtle)] transition-colors">
                     {feature.icon}
                   </div>
-                  <h3 className="text-lg font-bold text-stone-900 dark:text-white mb-2">
+                  <h3 className="text-lg font-bold text-stone-900 dark:text-white mb-2 font-display">
                     {feature.title}
                   </h3>
                   <p className="text-sm text-stone-600 dark:text-zinc-400 leading-relaxed">
@@ -244,7 +244,7 @@ export default function FeaturesPage() {
         <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-stone-100/50 dark:bg-zinc-900/30 border-t border-stone-200 dark:border-zinc-800">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">
                 How it works
               </h2>
               <p className="text-lg text-stone-600 dark:text-zinc-400 max-w-2xl mx-auto">
@@ -305,7 +305,7 @@ export default function FeaturesPage() {
             transition={{ duration: 0.6 }}
             className="max-w-2xl mx-auto text-center text-white"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 font-display">
               Ready to see it in action?
             </h2>
             <p className="text-lg mb-8 text-white/80">

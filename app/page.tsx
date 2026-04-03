@@ -116,13 +116,13 @@ const Hero = () => {
             transition={{ duration: 0.5 }}
             className="text-center lg:text-left"
           >
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6 font-display">
               Estate sales management,{" "}
               <br></br>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-brand-primary)] to-violet-600">10x faster.</span>
             </h1>
             
-            <p className="text-lg text-stone-600 dark:text-zinc-400 mb-6 leading-relaxed max-w-xl mx-auto lg:mx-0">
+            <p className="text-lg text-stone-600 dark:text-zinc-400 mb-6 leading-relaxed max-w-xl mx-auto lg:mx-0 font-body">
               Curator is the AI-powered platform that helps estate sale professionals price items instantly, manage inventory effortlessly, and close sales faster than ever before.
             </p>
 
@@ -320,8 +320,8 @@ const Features = () => {
     <section className="py-24 bg-stone-100/50 dark:bg-zinc-900/30 border-t border-stone-200 dark:border-zinc-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">Everything you need to run a professional sale</h2>
-          <p className="text-lg text-stone-600 dark:text-zinc-400 max-w-2xl mx-auto">From valuation to payment, Curator handles the entire workflow so you can focus on what matters—selling.</p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">Everything you need to run a professional sale</h2>
+          <p className="text-lg text-stone-600 dark:text-zinc-400 max-w-2xl mx-auto font-body">From valuation to payment, Curator handles the entire workflow so you can focus on what matters—selling.</p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => (
@@ -337,8 +337,8 @@ const Features = () => {
                 {feature.icon}
               </div>
               <span className="inline-block text-xs font-semibold text-[var(--color-brand-primary)] bg-[var(--color-brand-subtle)] px-2 py-1 rounded-full mb-3">{feature.highlight}</span>
-              <h3 className="text-lg font-bold text-stone-900 dark:text-white mb-2">{feature.title}</h3>
-              <p className="text-sm text-stone-600 dark:text-zinc-400 leading-relaxed">
+              <h3 className="text-lg font-bold text-stone-900 dark:text-white mb-2 font-display">{feature.title}</h3>
+              <p className="text-sm text-stone-600 dark:text-zinc-400 leading-relaxed font-body">
                 {feature.description}
               </p>
             </motion.div>
@@ -438,8 +438,8 @@ const CTASection = () => {
               <Zap className="w-4 h-4" />
               Limited Early Access
             </span>
-            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">Ready to transform your estate sales?</h2>
-            <p className="text-xl text-stone-400 max-w-2xl mx-auto leading-relaxed">
+            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6 font-display">Ready to transform your estate sales?</h2>
+            <p className="text-xl text-stone-400 max-w-2xl mx-auto leading-relaxed font-body">
               Join 2,000+ professionals on the waitlist. Get exclusive early access, founding member pricing, and priority support.
             </p>
           </motion.div>
@@ -523,7 +523,7 @@ const CTASection = () => {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
       <Navbar launchBadge="Launching Feb 2026" />
       <main>
         <Hero />

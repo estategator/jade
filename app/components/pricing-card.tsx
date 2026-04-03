@@ -44,10 +44,10 @@ export function PricingCard({ tier, isPopular = false, onSelectTier }: PricingCa
 
       {/* Header */}
       <div className="mb-6">
-        <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-2">
+        <h3 className="text-2xl font-bold text-stone-900 dark:text-white mb-2 font-display">
           {tier.name}
         </h3>
-        <p className="text-sm text-stone-600 dark:text-zinc-400 mb-4">
+        <p className="text-sm text-stone-600 dark:text-zinc-400 mb-4 font-body">
           {tier.description}
         </p>
 

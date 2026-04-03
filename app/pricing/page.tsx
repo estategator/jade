@@ -54,7 +54,7 @@ export default function PricingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
       <Navbar launchBadge="Launching Feb 2026" />
       <main>
         {/* Hero Section */}
@@ -65,10 +65,10 @@ export default function PricingPage() {
             transition={{ duration: 0.6 }}
             className="max-w-3xl mx-auto text-center"
           >
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6 font-display">
               Simple, transparent pricing
             </h1>
-            <p className="text-lg sm:text-xl text-stone-600 dark:text-zinc-400 mb-8">
+            <p className="text-lg sm:text-xl text-stone-600 dark:text-zinc-400 mb-8 font-body">
               Choose the perfect plan for your estate sales business. Start free, upgrade whenever you&apos;re ready.
             </p>
           </motion.div>
@@ -100,10 +100,10 @@ export default function PricingPage() {
               transition={{ duration: 0.6 }}
               className="text-center mb-12"
             >
-              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">
                 Feature Comparison
               </h2>
-              <p className="text-lg text-stone-600 dark:text-zinc-400">
+              <p className="text-lg text-stone-600 dark:text-zinc-400 font-body">
                 Everything you need to succeed with Curator
               </p>
             </motion.div>
@@ -175,10 +175,10 @@ export default function PricingPage() {
               transition={{ duration: 0.6 }}
               className="text-center mb-12"
             >
-              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-stone-900 dark:text-white mb-4 font-display">
                 Frequently Asked Questions
               </h2>
-              <p className="text-lg text-stone-600 dark:text-zinc-400">
+              <p className="text-lg text-stone-600 dark:text-zinc-400 font-body">
                 Everything you need to know about our pricing and plans
               </p>
             </motion.div>
@@ -193,7 +193,7 @@ export default function PricingPage() {
                   transition={{ duration: 0.4, delay: index * 0.05 }}
                   className="group border border-stone-200 dark:border-zinc-800 rounded-lg p-4 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors cursor-pointer"
                 >
-                  <summary className="flex items-center justify-between font-semibold text-stone-900 dark:text-white cursor-pointer list-none">
+                  <summary className="flex items-center justify-between font-semibold text-stone-900 dark:text-white cursor-pointer list-none font-display">
                     {faq.question}
                     <span className="text-indigo-600 dark:text-indigo-400 group-open:rotate-180 transition-transform">
                       ▼
@@ -217,10 +217,10 @@ export default function PricingPage() {
             transition={{ duration: 0.6 }}
             className="max-w-2xl mx-auto text-center text-white"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 font-display">
               Ready to get started?
             </h2>
-            <p className="text-lg mb-8 text-indigo-100">
+            <p className="text-lg mb-8 text-indigo-100 font-body">
               Choose a plan and start managing your estate sales with AI-powered insights today.
             </p>
             <button

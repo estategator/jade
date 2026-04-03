@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="bg-stone-50 dark:bg-zinc-950 border-t border-stone-200 dark:border-zinc-800 py-12">
+    <footer className="bg-stone-50 dark:bg-zinc-950 border-t border-stone-200 dark:border-zinc-800 py-12 font-body">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-8">
           {/* Brand */}
@@ -11,14 +11,14 @@ export function Footer() {
               <div className="w-6 h-6 bg-stone-900 dark:bg-white rounded flex items-center justify-center text-white dark:text-stone-900 text-xs font-bold">
                 C
               </div>
-              <span className="font-bold text-stone-900 dark:text-white">Curator</span>
+              <span className="font-bold text-stone-900 dark:text-white font-display">Curator</span>
             </div>
-            <p className="text-sm text-stone-500 dark:text-zinc-400">AI-powered estate sales management</p>
+            <p className="text-sm text-stone-500 dark:text-zinc-400 font-body">AI-powered estate sales management</p>
           </div>
 
           {/* Product */}
           <div className="flex flex-col gap-3">
-            <h4 className="font-semibold text-stone-900 dark:text-white">Product</h4>
+            <h4 className="font-semibold text-stone-900 dark:text-white font-display">Product</h4>
             <Link href="/features" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Features
             </Link>
@@ -29,7 +29,7 @@ export function Footer() {
 
           {/* Company */}
           <div className="flex flex-col gap-3">
-            <h4 className="font-semibold text-stone-900 dark:text-white">Company</h4>
+            <h4 className="font-semibold text-stone-900 dark:text-white font-display">Company</h4>
             <Link href="/about" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               About
             </Link>
@@ -37,7 +37,7 @@ export function Footer() {
 
           {/* Support */}
           <div className="flex flex-col gap-3">
-            <h4 className="font-semibold text-stone-900 dark:text-white">Support</h4>
+            <h4 className="font-semibold text-stone-900 dark:text-white font-display">Support</h4>
             <Link href="/help" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Help Center
             </Link>
@@ -54,7 +54,7 @@ export function Footer() {
 
           {/* Legal */}
           <div className="flex flex-col gap-3">
-            <h4 className="font-semibold text-stone-900 dark:text-white">Legal</h4>
+            <h4 className="font-semibold text-stone-900 dark:text-white font-display">Legal</h4>
             <Link href="/privacy" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Privacy Policy
             </Link>
@@ -66,7 +66,7 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="border-t border-stone-200 dark:border-zinc-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-stone-500 dark:text-zinc-400">&copy; {new Date().getFullYear()} Curator Inc. All rights reserved.</p>
+          <p className="text-sm text-stone-500 dark:text-zinc-400 font-body">&copy; {new Date().getFullYear()} Curator Inc. All rights reserved.</p>
         </div>
       </div>
     </footer>

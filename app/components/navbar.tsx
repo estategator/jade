@@ -60,7 +60,7 @@ export function Navbar({ authenticated = false, onSignOut, launchBadge }: Navbar
                   C
                 </div>
               )}
-              <span className="hidden text-xl font-bold tracking-tight text-stone-900 sm:inline dark:text-white">
+              <span className="hidden text-xl font-bold tracking-tight text-stone-900 sm:inline dark:text-white font-display">
                 Curator
               </span>
             </Link>
@@ -109,17 +109,17 @@ export function Navbar({ authenticated = false, onSignOut, launchBadge }: Navbar
             ) : (
               <>
                 {launchBadge && (
-                  <span className="text-sm font-medium text-stone-500">{launchBadge}</span>
+                  <span className="text-sm font-medium text-stone-500 font-body">{launchBadge}</span>
                 )}
                 <Link
                   href="/pricing"
-                  className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+                  className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] font-body"
                 >
                   Pricing
                 </Link>
                 <Link
                   href="/login"
-                  className="inline-flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-xl text-white bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-focus-ring)] transition-all shadow-sm"
+                  className="inline-flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-xl text-white bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-focus-ring)] transition-all shadow-sm font-body"
                 >
                   Log in
                 </Link>

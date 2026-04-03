@@ -224,7 +224,7 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800">
+    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
       <Navbar launchBadge="Launching Feb 2026" />
       <main>
         {/* Hero */}
@@ -235,10 +235,10 @@ export default function TermsPage() {
             transition={{ duration: 0.6 }}
             className="max-w-3xl mx-auto text-center"
           >
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 dark:text-white mb-6 font-display">
               Terms of Service
             </h1>
-            <p className="text-lg sm:text-xl text-stone-600 dark:text-zinc-400 mb-4">
+            <p className="text-lg sm:text-xl text-stone-600 dark:text-zinc-400 mb-4 font-body">
               Please read these terms carefully before using Curator.
             </p>
             <p className="text-sm text-stone-500 dark:text-zinc-500">
@@ -259,7 +259,7 @@ export default function TermsPage() {
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: sectionIndex * 0.03 }}
                 >
-                  <h2 className="text-2xl font-bold text-stone-900 dark:text-white mb-6">
+                  <h2 className="text-2xl font-bold text-stone-900 dark:text-white mb-6 font-display">
                     {section.title}
                   </h2>
                   <div className="space-y-6">

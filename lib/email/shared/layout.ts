@@ -154,6 +154,39 @@ export function metadataCard(rows: MetadataRow[]): string {
 </table>`;
 }
 
+// ── Next-step card ───────────────────────────────────────────
+
+export type NextStepInfo = {
+  /** Inline SVG icon (24×24, single-colour) — rendered left of the title. */
+  iconSvg: string;
+  title: string;
+  description: string;
+};
+
+/**
+ * Renders a bordered card with an icon, title, and description representing
+ * the client's immediate next step in the onboarding process.
+ */
+export function nextStepCard(step: NextStepInfo): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:480px;border:1px solid ${COLORS.border};border-radius:10px;border-collapse:separate;overflow:hidden;margin:20px 0;">
+  <tr>
+    <td style="padding:20px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
+        <tr>
+          <td style="width:40px;vertical-align:top;padding-right:14px;">
+            <div style="width:36px;height:36px;border-radius:8px;background-color:#eef2ff;text-align:center;line-height:36px;">${step.iconSvg}</div>
+          </td>
+          <td style="vertical-align:top;">
+            <p style="margin:0 0 4px;font-size:15px;font-weight:600;color:${COLORS.text};line-height:1.3;">${escapeHtml(step.title)}</p>
+            <p style="margin:0;font-size:14px;color:${COLORS.textSecondary};line-height:1.5;">${escapeHtml(step.description)}</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>`;
+}
+
 // ── Footer ───────────────────────────────────────────────────
 
 export function emailFooter(orgName: string): string {

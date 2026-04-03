@@ -5,6 +5,11 @@ export const ONBOARDING_STEP_BLUEPRINTS = [
     description: "Share the onboarding overview and next steps.",
   },
   {
+    key: "walkthrough_scheduled",
+    title: "Schedule walkthrough",
+    description: "Book the walkthrough and confirm meeting details.",
+  },
+  {
     key: "contract_sent",
     title: "Create contract",
     description: "Prepare and send the client agreement for review.",
@@ -13,11 +18,6 @@ export const ONBOARDING_STEP_BLUEPRINTS = [
     key: "contract_signed",
     title: "Contract signed",
     description: "Confirm the signed agreement is complete.",
-  },
-  {
-    key: "walkthrough_scheduled",
-    title: "Schedule walkthrough",
-    description: "Book the walkthrough and confirm meeting details.",
   },
   {
     key: "project_shared",

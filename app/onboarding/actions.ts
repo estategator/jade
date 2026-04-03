@@ -29,7 +29,6 @@ import {
   buildWelcomeEmailContent,
   buildClientPortalEmailContent,
   buildContractSentEmailContent,
-  type ContractSnapshot,
 } from '@/lib/email';
 import {
   getSchedulingAdapter,
@@ -2330,64 +2329,14 @@ export async function sendWelcomeEmail(formData: FormData): Promise<ActionResult
       return { error: 'Client assignment not found.' };
     }
 
-    const [{ data: client }, { data: org }, { data: project }, { data: latestContract }] = await Promise.all([
+    const [{ data: client }, { data: org }, { data: project }] = await Promise.all([
       supabase.from('client_profiles').select('full_name, email').eq('id', assignment.client_profile_id).single(),
       supabase.from('organizations').select('name').eq('id', context.orgId).single(),
       supabase.from('projects').select('name').eq('id', assignment.project_id).single(),
-      supabase
-        .from('contracts')
-        .select('status, template_name, provider, signed_at')
-        .eq('assignment_id', assignmentId)
-        .eq('org_id', context.orgId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
     ]);
 
     if (!client) {
       return { error: 'Client profile not found.' };
-    }
-
-    // Build contract snapshot for the email
-    const contractSnapshot: ContractSnapshot | undefined = latestContract
-      ? {
-          status: latestContract.status as string,
-          templateName: (latestContract.template_name as string) ?? (AGREEMENT_TYPE_DEFAULTS[(latestContract as Record<string, unknown>).agreement_type as AgreementType] || 'Estate Sale Agreement'),
-          provider: latestContract.provider as string,
-          signedAt: (latestContract.signed_at as string) ?? null,
-        }
-      : undefined;
-
-    // Generate or rotate a share link so the email contains a usable public URL
-    let shareUrl: string | undefined;
-    {
-      const now = new Date().toISOString();
-      // Revoke any existing active link first
-      await supabase
-        .from('project_share_links')
-        .update({ status: 'revoked', updated_at: now })
-        .eq('assignment_id', assignmentId)
-        .eq('status', 'active');
-
-      const token = randomBytes(24).toString('base64url');
-      const tokenHash = hashShareToken(token);
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
-      const { error: shareLinkError } = await supabase
-        .from('project_share_links')
-        .insert({
-          org_id: context.orgId,
-          assignment_id: assignmentId,
-          project_id: assignment.project_id,
-          token_hash: tokenHash,
-          status: 'active',
-          expires_at: expiresAt,
-          created_by: context.userId,
-        });
-
-      if (!shareLinkError) {
-        shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/client/${token}`;
-      }
     }
 
     // Create welcome message row
@@ -2424,8 +2373,6 @@ export async function sendWelcomeEmail(formData: FormData): Promise<ActionResult
       projectName: project?.name ?? '',
       assignmentId,
       orgId: context.orgId,
-      shareUrl,
-      contract: contractSnapshot,
     };
 
     await enqueue(TOPICS.WELCOME_EMAIL, emailPayload, processWelcomeEmailDelivery);
@@ -2470,8 +2417,6 @@ export type WelcomeEmailQueuePayload = {
   projectName: string;
   assignmentId: string;
   orgId: string;
-  shareUrl?: string;
-  contract?: ContractSnapshot;
 };
 
 export async function processWelcomeEmailDelivery(payload: WelcomeEmailQueuePayload): Promise<void> {
@@ -2486,8 +2431,6 @@ export async function processWelcomeEmailDelivery(payload: WelcomeEmailQueuePayl
     textBody: payload.textBody,
     orgName: payload.orgName,
     projectName: payload.projectName,
-    shareUrl: payload.shareUrl,
-    contract: payload.contract,
   };
   const composed = buildWelcomeEmailContent(enrichedRequest);
   enrichedRequest.textBody = composed.textBody;
@@ -2507,8 +2450,6 @@ export async function processWelcomeEmailDelivery(payload: WelcomeEmailQueuePayl
         sent_at: now,
         metadata: {
           external_message_id: result.externalMessageId,
-          had_share_link: !!payload.shareUrl,
-          contract_status_snapshot: payload.contract?.status ?? null,
         },
         updated_at: now,
       })

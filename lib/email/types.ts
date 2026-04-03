@@ -35,9 +35,8 @@ export type WelcomeEmailRequest = {
   /** Org/project context for template rendering. */
   orgName: string;
   projectName: string;
+  /** Share URL (used by client portal email — not used by welcome email). */
   shareUrl?: string;
-  /** Contract context (optional — included when a contract exists). */
-  contract?: ContractSnapshot;
 };
 
 export type ClientPortalEmailRequest = {

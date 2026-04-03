@@ -11,6 +11,15 @@ import {
   Mail,
   Phone,
   Loader2,
+  Package,
+  TrendingUp,
+  Megaphone,
+  CreditCard,
+  Users,
+  UserPlus,
+  FileText,
+  ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/app/components/page-header";
@@ -145,37 +154,55 @@ function DocsContent({ basePath }: { basePath: string }) {
       title: "Getting Started Guide",
       description: "Set up your first estate sale in minutes.",
       href: `${basePath}/docs`,
-      icon: BookOpen,
+      icon: Zap,
     },
     {
       title: "Inventory Management",
       description: "Add, edit, bulk-import, and organize your items.",
       href: `${basePath}/docs#inventory`,
-      icon: BookOpen,
+      icon: Package,
     },
     {
       title: "AI Pricing",
       description: "How our AI analyzes and prices your items.",
       href: `${basePath}/docs#pricing`,
-      icon: BookOpen,
+      icon: TrendingUp,
     },
     {
       title: "Marketing Tools",
       description: "Create professional flyers, emails, and social media posts.",
       href: `${basePath}/docs#marketing`,
-      icon: BookOpen,
+      icon: Megaphone,
     },
     {
       title: "Billing & Plans",
       description: "Manage your subscription, payments, and invoices.",
       href: `${basePath}/docs#billing`,
-      icon: BookOpen,
+      icon: CreditCard,
     },
     {
       title: "Team Management",
       description: "Invite members, assign roles, and manage permissions.",
       href: `${basePath}/docs#team`,
-      icon: BookOpen,
+      icon: Users,
+    },
+    {
+      title: "Client Management",
+      description: "Add clients, track onboarding, and manage assignments.",
+      href: `${basePath}/docs#clients`,
+      icon: UserPlus,
+    },
+    {
+      title: "Contracts & E-Signatures",
+      description: "Create contracts, send for signature, and manage templates.",
+      href: `${basePath}/docs#contracts`,
+      icon: FileText,
+    },
+    {
+      title: "Account Sharing & Fair Use",
+      description: "Understand our fair use policy and abuse prevention.",
+      href: `${basePath}/docs#account-sharing`,
+      icon: ShieldCheck,
     },
   ];
 
@@ -241,6 +268,16 @@ function TutorialsContent() {
       title: "Stripe Integration & Payments",
       duration: "4 min",
       description: "Connect Stripe to accept payments directly from buyers at your sales.",
+    },
+    {
+      title: "Client Management 101",
+      duration: "4 min",
+      description: "Create client profiles, track onboarding, and manage relationships.",
+    },
+    {
+      title: "Contracts 101: Creating & Sending",
+      duration: "5 min",
+      description: "Create contracts, set terms, and send for electronic signature.",
     },
   ];
 

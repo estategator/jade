@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getAllPosts } from '@/lib/blog';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://inventorytools.app';
 
@@ -52,5 +53,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }));
   }
 
-  return [...staticRoutes, ...projectRoutes, ...itemRoutes];
+  // Blog routes
+  const posts = getAllPosts();
+  const blogRoutes: MetadataRoute.Sitemap = [
+    { url: `${BASE_URL}/blog`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
+    ...posts.map((post) => ({
+      url: `${BASE_URL}/blog/${post.slug}`,
+      lastModified: new Date(post.updatedAt ?? post.publishedAt),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    })),
+  ];
+
+  return [...staticRoutes, ...blogRoutes, ...projectRoutes, ...itemRoutes];
 }

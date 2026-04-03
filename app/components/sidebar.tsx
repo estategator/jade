@@ -23,6 +23,7 @@ import {
   PiUsersDuotone,
   PiFileTextDuotone,
   PiTagDuotone,
+  PiShieldWarningDuotone,
 } from "react-icons/pi";
 import { supabase } from "@/lib/supabase";
 import { OrgSwitcher } from "@/app/components/org-switcher";
@@ -185,6 +186,7 @@ export function Sidebar() {
         ...(isStaff
           ? [
               { label: "Support Portal", href: "/support", icon: PiHandHeartDuotone },
+              { label: "Abuse Monitor", href: "/abuse", icon: PiShieldWarningDuotone },
               { label: "Discounts", href: "/discounts", icon: PiTagDuotone },
             ]
           : []),

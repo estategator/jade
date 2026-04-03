@@ -118,6 +118,12 @@ export function Navbar({ authenticated = false, onSignOut, launchBadge }: Navbar
                   Pricing
                 </Link>
                 <Link
+                  href="/blog"
+                  className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] font-body"
+                >
+                  Blog
+                </Link>
+                <Link
                   href="/login"
                   className="inline-flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-xl text-white bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-focus-ring)] transition-all shadow-sm font-body"
                 >

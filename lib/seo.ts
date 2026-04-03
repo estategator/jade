@@ -123,3 +123,28 @@ export function productJsonLd(product: {
     },
   };
 }
+
+export function articleJsonLd(article: {
+  title: string;
+  description: string;
+  url: string;
+  image?: string;
+  publishedAt: string;
+  updatedAt?: string;
+  author: string;
+  tags?: string[];
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: article.title,
+    description: article.description,
+    url: article.url,
+    ...(article.image ? { image: article.image } : {}),
+    datePublished: article.publishedAt,
+    ...(article.updatedAt ? { dateModified: article.updatedAt } : {}),
+    author: { '@type': 'Person', name: article.author },
+    publisher: { '@type': 'Organization', name: SITE_NAME, logo: { '@type': 'ImageObject', url: `${SITE_URL}/android-chrome-512x512.png` } },
+    ...(article.tags?.length ? { keywords: article.tags.join(', ') } : {}),
+  };
+}

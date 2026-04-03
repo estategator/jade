@@ -25,6 +25,9 @@ export function Footer() {
             <Link href="/pricing" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
               Pricing
             </Link>
+            <Link href="/blog" className="text-sm text-stone-600 hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+              Blog
+            </Link>
           </div>
 
           {/* Company */}

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { syncPendingInvitesForUser } from '@/app/notifications/actions'
 import { ensureDefaultOrg } from '@/app/organizations/actions'
+import { recordSessionSignal } from '@/lib/abuse-detection'
 
 const ACTIVE_ORG_COOKIE = 'curator_active_org';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
@@ -35,6 +36,20 @@ export async function GET(request: Request) {
         if ('orgId' in result) {
           defaultOrgId = result.orgId;
         }
+
+        // Record session signal for anti-sharing detection (fire-and-forget)
+        const ipAddress =
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+          request.headers.get('x-real-ip') ??
+          'unknown';
+        const userAgent = request.headers.get('user-agent') ?? 'unknown';
+
+        recordSessionSignal({
+          userId: user.id,
+          orgId: defaultOrgId,
+          ipAddress,
+          userAgent,
+        }).catch(() => {});
       }
 
       const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer

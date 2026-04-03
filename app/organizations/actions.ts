@@ -5,6 +5,7 @@ import { logProjectTransparencyEvent } from '@/lib/project-transparency';
 import { getMemberLimit } from '@/lib/tiers';
 import { requirePermission, auditLog, getUserPermissions as _getUserPermissions } from '@/lib/rbac';
 import type { Permission } from '@/lib/rbac-types';
+import { checkInviteAbuse, recordChurnSignal } from '@/lib/abuse-detection';
 
 // Re-export as server action so client components can call it
 export async function getPermissionsForOrg(orgId: string, userId: string): Promise<Permission[]> {
@@ -614,6 +615,20 @@ export async function inviteOrgMember(orgId: string, email: string, role: OrgMem
       return { error: `Cannot add more members. ${tier === 'free' ? 'Free tier allows only 1 member. Upgrade to Pro to add more members.' : `${tier} tier allows up to ${memberLimit} members.`}` };
     }
 
+    // Anti-sharing abuse check
+    const abuseCheck = await checkInviteAbuse({
+      orgId,
+      actorUserId: invitedByUserId,
+      recipientEmail: email.trim().toLowerCase(),
+      tier,
+    });
+
+    if (!abuseCheck.allowed) {
+      return {
+        error: abuseCheck.message ?? 'Invitations are temporarily restricted for this organization.',
+      };
+    }
+
     // Find user by email
     const { data: { users }, error: userError } = await supabase.auth.admin.listUsers();
     
@@ -707,6 +722,21 @@ export async function sendOrgInvitation(
           tier === 'free'
             ? 'Cannot invite more members. Free tier allows only 1 member. Upgrade to Pro to add more members.'
             : `Cannot invite more members. ${tier} tier allows up to ${memberLimit} members.`,
+      };
+    }
+
+    // Anti-sharing abuse check (runs after seat-cap, before insert)
+    const abuseCheck = await checkInviteAbuse({
+      orgId,
+      actorUserId: invitedByUserId,
+      recipientEmail: normalizedEmail,
+      tier,
+    });
+
+    if (!abuseCheck.allowed) {
+      return {
+        error: abuseCheck.message ?? 'Invitations are temporarily restricted for this organization.',
+        retryAfter: abuseCheck.retryAfter,
       };
     }
 
@@ -850,9 +880,11 @@ export async function sendOrgInvitation(
     return {
       success: true,
       data: invitation as OrgInvitation,
-      warning: targetUser
-        ? 'This user already has an account. They\'ll see the invitation when they log in.'
-        : undefined,
+      warning: abuseCheck.level === 'warning'
+        ? (abuseCheck.message ?? 'Unusual invitation activity detected.')
+        : targetUser
+          ? 'This user already has an account. They\'ll see the invitation when they log in.'
+          : undefined,
     };
   } catch (err) {
     console.error('Unexpected error:', err);
@@ -888,6 +920,15 @@ export async function cancelInvitation(orgId: string, invitationId: string, user
     const check = await requirePermission(orgId, userId, 'members:invite');
     if (!check.granted) return { error: check.error };
 
+    // Fetch the invitation email before canceling (needed for churn signal)
+    const { data: inviteRow } = await supabase
+      .from('organization_invitations')
+      .select('email')
+      .eq('id', invitationId)
+      .eq('org_id', orgId)
+      .eq('status', 'pending')
+      .maybeSingle();
+
     const now = new Date().toISOString();
     const { error } = await supabase
       .from('organization_invitations')
@@ -913,6 +954,11 @@ export async function cancelInvitation(orgId: string, invitationId: string, user
       targetId: invitationId,
       metadata: { reason: 'invitation_canceled' },
     });
+
+    // Record churn signal for anti-sharing detection
+    if (inviteRow?.email) {
+      recordChurnSignal({ orgId, actorUserId: userId, recipientEmail: inviteRow.email }).catch(() => {});
+    }
 
     return { success: true };
   } catch (err) {

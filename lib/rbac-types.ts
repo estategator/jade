@@ -105,4 +105,7 @@ export type AuditAction =
   | 'billing.discount_applied'
   | 'contracts.template_created'
   | 'contracts.template_updated'
-  | 'contracts.template_archived';
+  | 'contracts.template_archived'
+  | 'abuse.rule_triggered'
+  | 'abuse.enforcement_changed'
+  | 'abuse.override_applied';

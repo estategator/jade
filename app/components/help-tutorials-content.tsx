@@ -58,6 +58,55 @@ const TUTORIALS = [
       "Use data-driven pricing to maximize revenue at your estate sales.",
     category: "Features",
   },
+  {
+    title: "Client Management 101",
+    duration: "4 min",
+    description:
+      "Create client profiles, track onboarding progress, and manage your client relationships.",
+    category: "Clients",
+  },
+  {
+    title: "Onboarding Workflows",
+    duration: "5 min",
+    description:
+      "Walk through the full client lifecycle from invitation to project completion.",
+    category: "Clients",
+  },
+  {
+    title: "Using Frequent Buyer Suggestions",
+    duration: "3 min",
+    description:
+      "Leverage AI-powered insights to identify repeat buyers and grow your business.",
+    category: "Clients",
+  },
+  {
+    title: "Contracts 101: Creating & Sending",
+    duration: "5 min",
+    description:
+      "Create your first contract, set terms, and send it for electronic signature.",
+    category: "Contracts",
+  },
+  {
+    title: "DocuSeal E-Signature Walkthrough",
+    duration: "4 min",
+    description:
+      "See how clients receive, review, and sign contracts through the DocuSeal integration.",
+    category: "Contracts",
+  },
+  {
+    title: "Contract Templates & Reuse",
+    duration: "4 min",
+    description:
+      "Build reusable templates with default terms to speed up your contract workflow.",
+    category: "Contracts",
+  },
+  {
+    title: "Tracking Contract Status",
+    duration: "3 min",
+    description:
+      "Monitor contracts from draft to signed, handle declines, and manage voided agreements.",
+    category: "Contracts",
+  },
 ];
 
 const CATEGORIES = [...new Set(TUTORIALS.map((t) => t.category))];

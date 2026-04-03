@@ -1,6 +1,6 @@
 import type { SubscriptionTier } from '@/lib/tiers';
 
-export type FaqCategory = 'getting-started' | 'billing' | 'inventory' | 'marketing' | 'troubleshooting';
+export type FaqCategory = 'getting-started' | 'billing' | 'inventory' | 'marketing' | 'clients' | 'contracts' | 'troubleshooting';
 
 export interface FaqItem {
   id: string;
@@ -26,6 +26,8 @@ export const FAQ_CATEGORIES: { id: FaqCategory; label: string }[] = [
   { id: 'billing', label: 'Billing & Plans' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'marketing', label: 'Marketing' },
+  { id: 'clients', label: 'Clients' },
+  { id: 'contracts', label: 'Contracts' },
   { id: 'troubleshooting', label: 'Troubleshooting' },
 ];
 
@@ -126,6 +128,66 @@ export const FAQS: FaqItem[] = [
     minTier: 'free',
   },
 
+  // ── Clients ─────────────────────────────────────────────────
+  {
+    id: 'cli-1',
+    category: 'clients',
+    question: 'How do I add a new client?',
+    answer:
+      'Go to the Clients page from the sidebar and click "Add Client". Fill in the client\'s name, contact information, and address. You can also use address autocomplete for faster entry.',
+    minTier: 'free',
+  },
+  {
+    id: 'cli-2',
+    category: 'clients',
+    question: 'What are the client onboarding stages?',
+    answer:
+      'Clients progress through five stages: Invited → Onboarding → Active → Completed → Archived. Each stage is tracked visually on the client\'s detail page so you always know where things stand.',
+    minTier: 'free',
+  },
+  {
+    id: 'cli-3',
+    category: 'clients',
+    question: 'How do Frequent Buyer suggestions work?',
+    answer:
+      'Our AI analyzes purchase history and engagement to identify clients who are likely repeat buyers. Check the Frequent Buyers tab on the Clients page for personalized recommendations.',
+    minTier: 'pro',
+  },
+
+  // ── Contracts ───────────────────────────────────────────────
+  {
+    id: 'ctr-1',
+    category: 'contracts',
+    question: 'How do I send a contract for signature?',
+    answer:
+      'Create a contract from the Contracts page, fill in the terms, and click "Send". The client will receive a secure DocuSeal link to review and sign the contract electronically.',
+    minTier: 'free',
+  },
+  {
+    id: 'ctr-2',
+    category: 'contracts',
+    question: 'What happens when a client declines a contract?',
+    answer:
+      'You\'ll receive a notification when a client declines. The contract status updates to "Declined" on your dashboard. You can create a new contract with revised terms and send it again.',
+    minTier: 'free',
+  },
+  {
+    id: 'ctr-3',
+    category: 'contracts',
+    question: 'Can I edit a contract after sending it?',
+    answer:
+      'Once a contract is sent, it cannot be edited. If changes are needed, void the existing contract and create a new one with updated terms. Voided contracts are preserved in your records.',
+    minTier: 'free',
+  },
+  {
+    id: 'ctr-4',
+    category: 'contracts',
+    question: 'How do contract templates work?',
+    answer:
+      'Templates let you define reusable document structures and default terms. Create a template once, then select it when creating new contracts to save time. Pro and Enterprise plans have access to template management.',
+    minTier: 'pro',
+  },
+
   // ── Troubleshooting ────────────────────────────────────────
   {
     id: 'ts-1',
@@ -150,6 +212,30 @@ export const FAQS: FaqItem[] = [
     answer:
       'Enterprise plan members can submit high-priority tickets from the Help Center. Priority tickets receive a guaranteed faster response time and dedicated support.',
     minTier: 'enterprise',
+  },
+  {
+    id: 'ts-4',
+    category: 'troubleshooting',
+    question: 'I received a warning about "unusual invitation activity". What does this mean?',
+    answer:
+      'Our fair-use system detected an uncommon pattern such as sending many invitations in a short time or repeatedly inviting and removing the same person. A warning is informational only and does not block any actions. If the pattern continues, invitations may be temporarily paused. Contact support if you believe this was triggered by mistake.',
+    minTier: 'free',
+  },
+  {
+    id: 'ts-5',
+    category: 'troubleshooting',
+    question: 'Invitations are blocked and I see a "cooldown" or "lock" message. How do I fix this?',
+    answer:
+      'A cooldown (24 hours) or temporary lock (72 hours) is applied when our system detects repeated patterns that look like seat-sharing abuse. The restriction lifts automatically after the period ends. If you believe this is an error, contact our support team with your organization name and we\'ll review it right away.',
+    minTier: 'free',
+  },
+  {
+    id: 'bill-4',
+    category: 'billing',
+    question: 'What is the account sharing policy?',
+    answer:
+      'Each seat on your plan is for one individual team member. Sharing login credentials or rapidly cycling members in and out to bypass your seat limit is not allowed. We enforce this with a progressive system — first a warning, then a temporary cooldown, and finally a short lock. Upgrade to a higher plan if you need more seats.',
+    minTier: 'free',
   },
 ];
 

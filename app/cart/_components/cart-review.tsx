@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, startTransition } from "react";
+import { ViewTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -113,8 +114,9 @@ export function CartReview() {
           <p className="mt-2 text-sm text-stone-600 dark:text-zinc-400">
             Browse your inventory and add items to get started.
           </p>
-          <Link
+            <Link
             href="/inventory"
+            transitionTypes={['nav-back']}
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-primary)] px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-[var(--color-brand-primary-hover)]"
           >
             <PiArrowLeftDuotone className="h-4 w-4" />
@@ -158,8 +160,8 @@ export function CartReview() {
                 const isUnavailable = item.status !== "available";
 
                 return (
+                  <ViewTransition key={ci.id} default="none">
                   <li
-                    key={ci.id}
                     className={`px-5 py-4 ${isUnavailable ? "opacity-60" : ""}`}
                   >
                     <div className="flex gap-4">
@@ -231,7 +233,7 @@ export function CartReview() {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => handleRemove(ci.id)}
+                                onClick={() => startTransition(() => { handleRemove(ci.id); })}
                                 className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
                                 title="Remove"
                               >
@@ -260,6 +262,7 @@ export function CartReview() {
                       </div>
                     </div>
                   </li>
+                  </ViewTransition>
                 );
               })}
             </ul>
@@ -298,6 +301,7 @@ export function CartReview() {
             <div className="mt-3 flex items-center justify-between">
               <Link
                 href="/inventory"
+                transitionTypes={['nav-back']}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-brand-primary)] transition-colors hover:text-[var(--color-brand-primary-hover)] dark:text-[var(--color-brand-primary)] dark:hover:text-[var(--color-brand-primary-hover)]"
               >
                 <PiArrowLeftDuotone className="h-3.5 w-3.5" />

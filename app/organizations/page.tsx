@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { ViewTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -18,6 +19,7 @@ import {
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/app/components/page-header";
+import { DirectionalTransition } from "@/app/components/directional-transition";
 import {
   getOrganizations,
   type Organization,
@@ -90,6 +92,7 @@ export default function OrganizationsPage() {
   }
 
   return (
+    <DirectionalTransition>
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
           title="Organizations"
@@ -156,6 +159,7 @@ export default function OrganizationsPage() {
                 >
                   <Link
                     href={`/organizations/${org.id}`}
+                    transitionTypes={['nav-forward']}
                     className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition-all duration-300 hover:border-indigo-300 hover:shadow-xl hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-700 dark:focus-visible:ring-offset-zinc-950"
                   >
                     {/* Cover band */}
@@ -182,13 +186,15 @@ export default function OrganizationsPage() {
                     <div className="relative -mt-7 ml-5">
                       {org.cover_image_url ? (
                         <div className="relative h-14 w-14 overflow-hidden rounded-xl ring-[3px] ring-white shadow-md dark:ring-zinc-900">
-                          <Image
-                            src={org.cover_image_url}
-                            alt={org.name}
-                            fill
-                            className="object-cover"
-                            unoptimized
-                          />
+                          <ViewTransition name={`org-avatar-${org.id}`} share="morph" default="none">
+                            <Image
+                              src={org.cover_image_url}
+                              alt={org.name}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </ViewTransition>
                         </div>
                       ) : (
                         <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-[3px] ring-white shadow-md dark:bg-indigo-900/30 dark:text-indigo-400 dark:ring-zinc-900">
@@ -245,5 +251,6 @@ export default function OrganizationsPage() {
           </motion.div>
         )}
     </div>
+    </DirectionalTransition>
   );
 }

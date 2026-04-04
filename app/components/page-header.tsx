@@ -9,7 +9,7 @@ type IconComponent = React.ComponentType<{ className?: string }>;
 type PageHeaderProps = {
   title: string;
   description?: string;
-  backLink?: { href: string; label: string };
+  backLink?: { href: string; label: string; transitionTypes?: string[] };
   action?: {
     label: string;
     href?: string;
@@ -51,6 +51,7 @@ export function PageHeader({
         {backLink && (
           <Link
             href={backLink.href}
+            transitionTypes={backLink.transitionTypes}
             className="mb-4 inline-flex items-center gap-1.5 rounded text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:text-zinc-400 dark:hover:text-white"
           >
             <PiArrowLeftDuotone className="h-4 w-4" />

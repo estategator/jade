@@ -22,6 +22,7 @@ import {
 } from "react-icons/pi";
 import { cn } from "@/lib/cn";
 import { supabase } from "@/lib/supabase";
+import { getAuthorizedRedirect } from "@/app/actions";
 
 type AuthMode = "signin" | "signup" | "forgot";
 type AuthProvider = "google" | "apple";
@@ -195,11 +196,12 @@ export default function LoginPage() {
       if (isMounted) {
         setIsAuthenticated(Boolean(session));
         if (session) {
-          const redirectUrl = new URL(next, window.location.origin).pathname;
+          const requestedPath = new URL(next, window.location.origin).pathname;
+          const authorizedPath = await getAuthorizedRedirect(requestedPath);
           if (intent && tier) {
-            router.replace(`${redirectUrl}?intent=${intent}&tier=${tier}`);
+            router.replace(`${authorizedPath}?intent=${intent}&tier=${tier}`);
           } else {
-            router.replace(redirectUrl);
+            router.replace(authorizedPath);
           }
         }
       }
@@ -209,15 +211,16 @@ export default function LoginPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setIsAuthenticated(Boolean(session));
       setLoadingProvider(null);
       if (session) {
-        const redirectUrl = new URL(next, window.location.origin).pathname;
+        const requestedPath = new URL(next, window.location.origin).pathname;
+        const authorizedPath = await getAuthorizedRedirect(requestedPath);
         if (intent && tier) {
-          router.replace(`${redirectUrl}?intent=${intent}&tier=${tier}`);
+          router.replace(`${authorizedPath}?intent=${intent}&tier=${tier}`);
         } else {
-          router.replace(redirectUrl);
+          router.replace(authorizedPath);
         }
       }
     });

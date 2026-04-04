@@ -25,21 +25,7 @@ export default async function PricingOptimizationPage({}: PageProps) {
   if (activeOrgId) {
     const canViewPricing = await hasPermission(activeOrgId, user.id, 'analytics:view');
     if (!canViewPricing) {
-      return (
-        <main className="px-4 sm:px-6 lg:px-8 py-12">
-          <PageHeader
-            title="Pricing Optimization"
-            description="AI-powered pricing for your inventory."
-            backLink={{ href: '/inventory', label: 'Back to inventory' }}
-          />
-          <div className="mt-8 rounded-3xl border border-stone-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-lg font-bold text-stone-900 dark:text-white">Access Denied</h2>
-            <p className="mt-2 text-sm text-stone-500 dark:text-zinc-400">
-              You don&apos;t have permission to access pricing optimization. Contact an admin to request access.
-            </p>
-          </div>
-        </main>
-      );
+      redirect('/inventory');
     }
   }
 

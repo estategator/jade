@@ -31,9 +31,38 @@ import { ThemeToggle } from "@/app/components/theme-toggle";
 import { cn } from "@/lib/cn";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNotifications } from "@/lib/notification-context";
-import { getProfileRole } from "@/app/support/actions";
-import { getMyOrgRole } from "@/app/organizations/actions";
-import { useSettings } from "@/app/components/settings-provider";
+import type { NavSection, SidebarIconId } from "@/lib/sidebar-nav";
+
+// ── Icon registry ────────────────────────────────────────────
+// Maps serializable icon IDs from the server to actual React components.
+
+const SIDEBAR_ICONS: Record<SidebarIconId, React.ComponentType<{ className?: string }>> = {
+  "chart-bar": PiChartBarDuotone,
+  "package": PiPackageDuotone,
+  "buildings": PiBuildingsDuotone,
+  "trend-up": PiTrendUpDuotone,
+  "bell": PiBellDuotone,
+  "megaphone": PiMegaphoneDuotone,
+  "receipt": PiReceiptDuotone,
+  "question": PiQuestionDuotone,
+  "hand-heart": PiHandHeartDuotone,
+  "ticket": PiTicketDuotone,
+  "users": PiUsersDuotone,
+  "file-text": PiFileTextDuotone,
+  "tag": PiTagDuotone,
+  "shield-warning": PiShieldWarningDuotone,
+};
+
+// ── Props ────────────────────────────────────────────────────
+
+interface SidebarClientProps {
+  /** Pre-filtered nav sections from the server (role-based links already decided). */
+  navSections: NavSection[];
+  /** Server-snapshot of unread count, used as initial value until live polling takes over. */
+  initialUnreadCount: number;
+}
+
+// ── Tooltip ──────────────────────────────────────────────────
 
 function Tooltip({
   children,
@@ -78,26 +107,16 @@ function Tooltip({
   );
 }
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: number;
-}
+// ── SidebarClient ────────────────────────────────────────────
 
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
-
-export function Sidebar() {
+export function SidebarClient({ navSections, initialUnreadCount }: SidebarClientProps) {
   const { isExpanded, toggle, isMobileOpen, closeMobile, toggleMobile } = useSidebar();
-  const { unreadCount } = useNotifications();
-  const { activeOrgId } = useSettings();
+  const { unreadCount: liveUnreadCount } = useNotifications();
   const pathname = usePathname();
   const router = useRouter();
-  const [isStaff, setIsStaff] = useState(false);
-  const [isMember, setIsMember] = useState(false);
+
+  // Use live count once available; fall back to server snapshot
+  const unreadCount = liveUnreadCount ?? initialUnreadCount;
 
   /* Close mobile drawer on route change */
   useEffect(() => {
@@ -113,31 +132,6 @@ export function Sidebar() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isMobileOpen, closeMobile]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadRole() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session || cancelled) return;
-      const role = await getProfileRole(session.user.id);
-      if (!cancelled) {
-        setIsStaff(role === "developer" || role === "support");
-      }
-      // Load org role for nav filtering
-      if (activeOrgId && !cancelled) {
-        const { role: orgRole } = await getMyOrgRole(activeOrgId, session.user.id);
-        if (!cancelled) {
-          setIsMember(orgRole === "member");
-        }
-      }
-    }
-    loadRole();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeOrgId]);
-
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
@@ -148,51 +142,11 @@ export function Sidebar() {
     router.replace("/login");
   };
 
-  const navSections: NavSection[] = [
-    {
-      title: "Core",
-      items: [
-        ...(!isMember ? [{ label: "Dashboard", href: "/dashboard", icon: PiChartBarDuotone }] : []),
-        { label: "Inventory", href: "/inventory", icon: PiPackageDuotone },
-        ...(!isMember ? [{ label: "Pricing", href: "/pricing-optimization", icon: PiTrendUpDuotone }] : []),
-        { label: "Marketing", href: "/marketing", icon: PiMegaphoneDuotone },
-        { label: "Invoices", href: "/invoices", icon: PiReceiptDuotone },
-      ],
-    },
-    {
-      title: "Clients",
-      items: [
-        { label: "Clients", href: "/clients", icon: PiUsersDuotone },
-        { label: "Contracts", href: "/contracts", icon: PiFileTextDuotone },
-      ],
-    },
-    {
-      title: "Manage",
-      items: [
-        {
-          label: "Notifications",
-          href: "/notifications",
-          icon: PiBellDuotone,
-          badge: unreadCount,
-        },
-        { label: "Organizations", href: "/organizations", icon: PiBuildingsDuotone },
-      ],
-    },
-    {
-      title: "Support",
-      items: [
-        { label: "Help", href: "/dashboard/help", icon: PiQuestionDuotone },
-        { label: "Tickets", href: "/tickets", icon: PiTicketDuotone },
-        ...(isStaff
-          ? [
-              { label: "Support Portal", href: "/support", icon: PiHandHeartDuotone },
-              { label: "Abuse Monitor", href: "/abuse", icon: PiShieldWarningDuotone },
-              { label: "Discounts", href: "/discounts", icon: PiTagDuotone },
-            ]
-          : []),
-      ],
-    },
-  ];
+  /** Resolve the badge value for an item. */
+  function resolveBadge(item: NavSection["items"][number]): number | undefined {
+    if (item.badgeKey === "unreadCount") return unreadCount;
+    return undefined;
+  }
 
   return (
     <>
@@ -273,8 +227,9 @@ export function Sidebar() {
               )}
               <div className="space-y-0.5">
                 {section.items.map((item) => {
-                  const Icon = item.icon;
+                  const Icon = SIDEBAR_ICONS[item.iconId];
                   const active = isActive(item.href);
+                  const badge = resolveBadge(item);
 
                   return (
                     <Tooltip
@@ -316,10 +271,10 @@ export function Sidebar() {
                         <span className="relative z-10 inline-flex shrink-0">
                           <Icon className="h-5 w-5" />
                           {!isExpanded &&
-                            item.badge != null &&
-                            item.badge > 0 && (
+                            badge != null &&
+                            badge > 0 && (
                               <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1 text-[9px] font-bold leading-none text-white">
-                                {item.badge > 9 ? "9+" : item.badge}
+                                {badge > 9 ? "9+" : badge}
                               </span>
                             )}
                         </span>
@@ -331,10 +286,10 @@ export function Sidebar() {
                         )}
                         {/* Inline badge (expanded only) */}
                         {isExpanded &&
-                          item.badge != null &&
-                          item.badge > 0 && (
+                          badge != null &&
+                          badge > 0 && (
                             <span className="relative z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1.5 text-[10px] font-bold leading-none text-white">
-                              {item.badge > 99 ? "99+" : item.badge}
+                              {badge > 99 ? "99+" : badge}
                             </span>
                           )}
                       </Link>
@@ -508,8 +463,9 @@ export function Sidebar() {
                     </div>
                     <div className="space-y-0.5">
                       {section.items.map((item) => {
-                        const Icon = item.icon;
+                        const Icon = SIDEBAR_ICONS[item.iconId];
                         const active = isActive(item.href);
+                        const badge = resolveBadge(item);
 
                         return (
                           <Link
@@ -530,9 +486,9 @@ export function Sidebar() {
                             )}
                             <Icon className="h-5 w-5 shrink-0" />
                             <span className="flex-1 truncate">{item.label}</span>
-                            {item.badge != null && item.badge > 0 && (
+                            {badge != null && badge > 0 && (
                               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-primary)] px-1.5 text-[10px] font-bold leading-none text-white">
-                                {item.badge > 99 ? "99+" : item.badge}
+                                {badge > 99 ? "99+" : badge}
                               </span>
                             )}
                           </Link>

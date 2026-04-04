@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, startTransition } from "react";
+import { ViewTransition, addTransitionType } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -74,7 +75,10 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
       setError(result.error);
       setSubmitting(false);
     } else {
-      router.push("/inventory");
+      startTransition(() => {
+        addTransitionType('nav-back');
+        router.push("/inventory");
+      });
     }
   }
 
@@ -95,33 +99,32 @@ export function EditItemForm({ item, projects, userId }: EditItemFormProps) {
       <PageHeader
         title="Edit item"
         description={`Update the details for ${item.name}.`}
-        backLink={{ href: "/inventory", label: "Back to inventory" }}
+        backLink={{ href: "/inventory", label: "Back to inventory", transitionTypes: ['nav-back'] }}
       />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         {/* ── Left column: image + AI action ── */}
         <div className="lg:sticky lg:top-24 lg:self-start space-y-4">
           {/* Image */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.35 }}
+          <div
             className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 dark:border-zinc-800 dark:bg-zinc-950"
           >
             {imageUrl ? (
-              <Image
-                src={imageUrl}
-                alt={item.name}
-                width={600}
-                height={600}
-                className="aspect-square w-full h-auto object-contain"
-              />
+              <ViewTransition name={`item-img-${item.id}`} share="morph" default="none">
+                <Image
+                  src={imageUrl}
+                  alt={item.name}
+                  width={600}
+                  height={600}
+                  className="aspect-square w-full h-auto object-contain"
+                />
+              </ViewTransition>
             ) : (
               <div className="flex aspect-square w-full items-center justify-center">
                 <PiImageDuotone className="h-16 w-16 text-stone-300 dark:text-zinc-700" />
               </div>
             )}
-          </motion.div>
+          </div>
 
           {/* Processing status overlay */}
           {item.processing_status === "failed" && item.original_image_url && (

@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { SettingsProvider } from "@/app/components/settings-provider";
 import { DashboardLayoutWrapper } from "@/app/components/dashboard-layout-wrapper";
+import { SidebarServer } from "@/app/components/sidebar-server";
 import { createClient } from "@/utils/supabase/server";
 import { SITE_URL, SITE_NAME, DEFAULT_DESCRIPTION, organizationJsonLd } from "@/lib/seo";
 
@@ -132,7 +133,7 @@ export default async function RootLayout({
         />
         <SettingsProvider userId={user?.id ?? null}>
           {isAuthenticated ? (
-            <DashboardLayoutWrapper>{children}</DashboardLayoutWrapper>
+            <DashboardLayoutWrapper sidebar={<SidebarServer />}>{children}</DashboardLayoutWrapper>
           ) : (
             children
           )}

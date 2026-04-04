@@ -4,6 +4,7 @@ import { resolveActiveOrgId } from "@/lib/rbac";
 import { getCartItems } from "@/app/cart/actions";
 import { CartProvider } from "@/lib/cart-context";
 import { CartReview } from "@/app/cart/_components/cart-review";
+import { DirectionalTransition } from "@/app/components/directional-transition";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,12 @@ export default async function CartPage() {
   const cartItems = cartResult.data ?? [];
 
   return (
+    <DirectionalTransition>
     <CartProvider userId={user.id} orgId={activeOrgId ?? ""} initialItems={cartItems}>
       <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <CartReview />
       </div>
     </CartProvider>
+    </DirectionalTransition>
   );
 }

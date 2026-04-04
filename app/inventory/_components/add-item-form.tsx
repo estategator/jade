@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, startTransition } from "react";
+import { addTransitionType } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -223,7 +224,10 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
 
       // Navigate optimistically — the item row already exists
       setSubmitState("success");
-      router.push("/inventory");
+      startTransition(() => {
+        addTransitionType('nav-back');
+        router.push("/inventory");
+      });
 
       // 2. Compress + direct-upload + finalize in the background
       if (upload && imageFile) {
@@ -263,7 +267,7 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
       <PageHeader
         title="Add item"
         description="Upload an image and we'll optimize it and generate AI insights in the background."
-        backLink={{ href: "/inventory", label: "Back to inventory" }}
+        backLink={{ href: "/inventory", label: "Back to inventory", transitionTypes: ['nav-back'] }}
       />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">

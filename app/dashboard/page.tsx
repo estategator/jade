@@ -124,17 +124,7 @@ export default async function DashboardPage({
   if (activeOrgId) {
     const canViewDashboard = await hasPermission(activeOrgId, user.id, 'analytics:view');
     if (!canViewDashboard) {
-      return (
-        <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-          <PageHeader title="Dashboard" description="Organization analytics and insights." />
-          <div className="mt-8 rounded-3xl border border-stone-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-lg font-bold text-stone-900 dark:text-white">Access Denied</h2>
-            <p className="mt-2 text-sm text-stone-500 dark:text-zinc-400">
-              You don&apos;t have permission to view the dashboard. Contact an admin to request access.
-            </p>
-          </div>
-        </div>
-      );
+      redirect('/inventory');
     }
   }
 

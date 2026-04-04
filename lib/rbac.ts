@@ -280,6 +280,42 @@ export async function hasStaffPermission(
   return getStaffPermissions(role).includes(permission);
 }
 
+// ── Route authorization ──────────────────────────────────────
+
+/**
+ * Routes that require specific permissions to access.
+ * When the user lacks the required permission they are sent to the fallback.
+ */
+const PROTECTED_ROUTES: { path: string; permission: Permission; fallback: string }[] = [
+  { path: '/dashboard', permission: 'analytics:view', fallback: '/inventory' },
+  { path: '/pricing-optimization', permission: 'analytics:view', fallback: '/inventory' },
+];
+
+/**
+ * Given a requested path, resolve an authorized destination for the user.
+ * If the path is protected and the user lacks the required permission,
+ * returns the configured fallback route instead.
+ *
+ * Use this before redirecting after auth callback / login bootstrap so
+ * unauthorized users never land on a restricted page.
+ */
+export async function resolveAuthorizedRoute(
+  userId: string,
+  requestedPath: string,
+  orgId: string | null,
+): Promise<string> {
+  if (!orgId) return requestedPath;
+
+  const protectedRoute = PROTECTED_ROUTES.find(
+    (r) => requestedPath === r.path || requestedPath.startsWith(r.path + '/'),
+  );
+
+  if (!protectedRoute) return requestedPath;
+
+  const allowed = await hasPermission(orgId, userId, protectedRoute.permission);
+  return allowed ? requestedPath : protectedRoute.fallback;
+}
+
 // ── Audit logging ────────────────────────────────────────────
 
 /**

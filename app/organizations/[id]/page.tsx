@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, startTransition } from "react";
+import { ViewTransition, addTransitionType } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -36,6 +37,7 @@ import {
 } from "@/app/organizations/actions";
 import type { Permission } from "@/lib/rbac-types";
 import ConfirmDeleteModal from "@/app/components/confirm-delete-modal";
+import { DirectionalTransition } from "@/app/components/directional-transition";
 import { TierBadge } from "@/app/components/tier-badge";
 import { TIERS, type SubscriptionTier } from "@/lib/tiers";
 
@@ -116,7 +118,10 @@ export default function OrganizationDetailPage() {
       setError(result.error);
       setDeleteOrgModalOpen(false);
     } else {
-      router.push("/organizations");
+      startTransition(() => {
+        addTransitionType('nav-back');
+        router.push("/organizations");
+      });
     }
   }
 
@@ -145,12 +150,14 @@ export default function OrganizationDetailPage() {
   }
 
   return (
+    <DirectionalTransition>
     <div className="min-h-screen bg-stone-50 font-sans selection:bg-stone-200 dark:bg-zinc-950 dark:selection:bg-zinc-800">
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Back */}
         <Link
           href="/organizations"
+          transitionTypes={['nav-back']}
           className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 dark:text-zinc-400 dark:hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -181,13 +188,15 @@ export default function OrganizationDetailPage() {
               <div className="flex items-start gap-4">
                 {org.cover_image_url ? (
                   <div className="relative h-14 w-14 overflow-hidden rounded-2xl">
-                    <Image
-                      src={org.cover_image_url}
-                      alt={org.name}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
+                    <ViewTransition name={`org-avatar-${orgId}`} share="morph">
+                      <Image
+                        src={org.cover_image_url}
+                        alt={org.name}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </ViewTransition>
                   </div>
                 ) : (
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
@@ -477,5 +486,6 @@ export default function OrganizationDetailPage() {
         )}
       </main>
     </div>
+    </DirectionalTransition>
   );
 }

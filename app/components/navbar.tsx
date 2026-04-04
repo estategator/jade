@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -13,12 +14,55 @@ type NavbarProps = {
   authenticated?: boolean;
   onSignOut?: () => void;
   launchBadge?: string;
+  /** Stronger glass blur/translucency treatment */
+  glassEffect?: boolean;
+  /** Hide on scroll-down, reveal on scroll-up */
+  hideOnScroll?: boolean;
 };
 
-export function Navbar({ authenticated = false, onSignOut, launchBadge }: NavbarProps) {
+export function Navbar({ authenticated = false, onSignOut, launchBadge, glassEffect = false, hideOnScroll = false }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { settings } = useSettings();
+
+  // --- scroll-direction hide/reveal ---
+  const [hidden, setHidden] = useState(false);
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
+
+  const handleScroll = useCallback(() => {
+    if (!hideOnScroll) return;
+    const currentY = window.scrollY;
+    const delta = currentY - lastScrollY.current;
+
+    // Only toggle after a minimum 10px movement to prevent jitter
+    if (Math.abs(delta) < 10) {
+      ticking.current = false;
+      return;
+    }
+
+    // Always show when near the top
+    if (currentY < 20) {
+      setHidden(false);
+    } else {
+      setHidden(delta > 0); // hide on scroll-down, show on scroll-up
+    }
+
+    lastScrollY.current = currentY;
+    ticking.current = false;
+  }, [hideOnScroll]);
+
+  useEffect(() => {
+    if (!hideOnScroll) return;
+    const onScroll = () => {
+      if (!ticking.current) {
+        ticking.current = true;
+        requestAnimationFrame(handleScroll);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [hideOnScroll, handleScroll]);
 
   const handleSignOut = async () => {
     if (onSignOut) {
@@ -40,8 +84,16 @@ export function Navbar({ authenticated = false, onSignOut, launchBadge }: Navbar
     { label: "Organizations", mobileLabel: "Orgs", href: "/organizations", icon: Building2 },
   ];
 
+  const navBaseClass = glassEffect
+    ? "sticky top-0 left-0 right-0 z-40 border-b border-stone-200/30 bg-white/60 backdrop-blur-xl shadow-sm dark:border-zinc-700/30 dark:bg-zinc-950/50 dark:shadow-zinc-900/20"
+    : "sticky top-0 left-0 right-0 z-40 border-b border-stone-200/50 bg-stone-50/90 backdrop-blur-md dark:border-zinc-800/50 dark:bg-zinc-950/90";
+
   return (
-    <nav className="sticky top-0 left-0 right-0 z-40 border-b border-stone-200/50 bg-stone-50/90 backdrop-blur-md dark:border-zinc-800/50 dark:bg-zinc-950/90">
+    <nav
+      className={`${navBaseClass} transition-transform duration-300 ease-in-out motion-reduce:transition-none ${
+        hidden ? "-translate-y-full" : "translate-y-0"
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between sm:h-16">
           <div className="flex items-center gap-2 sm:gap-3">

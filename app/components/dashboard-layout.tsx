@@ -1,21 +1,23 @@
 "use client";
 
 import { ReactNode } from "react";
-import { Sidebar } from "@/app/components/sidebar";
 import { SidebarProvider, useSidebar } from "@/lib/sidebar-context";
 import { NotificationProvider } from "@/lib/notification-context";
 import { cn } from "@/lib/cn";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  sidebar: ReactNode;
 }
 
-function DashboardShell({ children }: DashboardLayoutProps) {
+function DashboardShell({ children, sidebar }: DashboardLayoutProps) {
   const { isExpanded } = useSidebar();
 
   return (
     <>
-      <Sidebar />
+      <div style={{ viewTransitionName: "site-sidebar" }}>
+        {sidebar}
+      </div>
       <main
         className={cn(
           "min-h-screen transition-[margin-left] duration-300 ease-in-out motion-reduce:transition-none",
@@ -31,11 +33,11 @@ function DashboardShell({ children }: DashboardLayoutProps) {
   );
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children, sidebar }: DashboardLayoutProps) {
   return (
     <SidebarProvider>
       <NotificationProvider>
-        <DashboardShell>{children}</DashboardShell>
+        <DashboardShell sidebar={sidebar}>{children}</DashboardShell>
       </NotificationProvider>
     </SidebarProvider>
   );

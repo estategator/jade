@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { resolveActiveOrgId } from "@/lib/rbac";
 import { getUserProjects } from "@/app/inventory/actions";
 import { AddItemForm } from "@/app/inventory/_components/add-item-form";
+import { DirectionalTransition } from "@/app/components/directional-transition";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +23,10 @@ export default async function AddInventoryPage() {
   const projects = projResult.data ?? [];
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <AddItemForm key={activeOrgId} projects={projects} userId={user.id} />
-    </div>
+    <DirectionalTransition>
+      <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <AddItemForm key={activeOrgId} projects={projects} userId={user.id} />
+      </div>
+    </DirectionalTransition>
   );
 }

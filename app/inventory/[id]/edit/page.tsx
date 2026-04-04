@@ -6,6 +6,7 @@ import {
   getUserProjects,
 } from "@/app/inventory/actions";
 import { EditItemForm } from "@/app/inventory/_components/edit-item-form";
+import { DirectionalTransition } from "@/app/components/directional-transition";
 
 export const dynamic = "force-dynamic";
 
@@ -43,8 +44,10 @@ export default async function EditInventoryPage({
   const projects = projResult.data ?? [];
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <EditItemForm key={activeOrgId} item={result.data} projects={projects} userId={user.id} />
-    </div>
+    <DirectionalTransition>
+      <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <EditItemForm key={activeOrgId} item={result.data} projects={projects} userId={user.id} />
+      </div>
+    </DirectionalTransition>
   );
 }

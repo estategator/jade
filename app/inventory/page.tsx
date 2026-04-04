@@ -10,6 +10,7 @@ import { CartDrawer } from "@/app/components/cart-drawer";
 import { InventoryList } from "@/app/inventory/_components/inventory-list";
 import type { PaginatedInventoryResult } from "@/app/inventory/actions";
 import type { InventoryListInitialFilters } from "@/app/inventory/_components/inventory-list";
+import { DirectionalTransition } from "@/app/components/directional-transition";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,7 @@ export default async function InventoryListPage({ searchParams }: InventoryListP
   const pagination = paginatedInventory.pagination;
 
   return (
+    <DirectionalTransition>
     <CartProvider userId={user.id} orgId={activeOrgId ?? ""} initialItems={cartItems}>
       <main className="mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -103,6 +105,7 @@ export default async function InventoryListPage({ searchParams }: InventoryListP
             </Link>
             <Link
               href="/inventory/add"
+              transitionTypes={['nav-forward']}
               className="inline-flex items-center justify-center gap-2 rounded-xl border-transparent bg-[var(--color-brand-primary)] px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-all hover:bg-[var(--color-brand-primary-hover)]"
             >
               <PiPlusDuotone className="h-4 w-4" />
@@ -120,5 +123,6 @@ export default async function InventoryListPage({ searchParams }: InventoryListP
         />
       </main>
     </CartProvider>
+    </DirectionalTransition>
   );
 }

@@ -8,6 +8,7 @@ import {
 import { PageHeader } from "@/app/components/page-header";
 import { OrgSettingsNav } from "./_components/org-settings-nav";
 import { StripeOnboardingBanner } from "./_components/stripe-onboarding-banner";
+import { SettingsContentTransition } from "./_components/settings-content-transition";
 
 export default async function OrgSettingsLayout({
   children,
@@ -57,7 +58,7 @@ export default async function OrgSettingsLayout({
       )}
       <div className="mt-6 flex flex-col gap-6 lg:flex-row">
         <OrgSettingsNav orgId={orgId} />
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 flex-1"><SettingsContentTransition>{children}</SettingsContentTransition></div>
       </div>
     </div>
   );

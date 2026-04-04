@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { syncPendingInvitesForUser } from '@/app/notifications/actions'
 import { ensureDefaultOrg } from '@/app/organizations/actions'
 import { recordSessionSignal } from '@/lib/abuse-detection'
+import { resolveAuthorizedRoute } from '@/lib/rbac'
 
 const ACTIVE_ORG_COOKIE = 'curator_active_org';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
@@ -54,12 +55,20 @@ export async function GET(request: Request) {
 
       const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
       const isLocalEnv = process.env.NODE_ENV === 'development'
+
+      // ── RBAC-aware destination ─────────────────────────────
+      // Resolve whether user is authorized for the requested route.
+      // Members without analytics:view are redirected away from /dashboard
+      // and /pricing-optimization before they ever see those pages.
+      const authorizedNext = user?.id
+        ? await resolveAuthorizedRoute(user.id, next, defaultOrgId)
+        : next;
       
       // Build redirect URL with intent and tier params
       const redirectParams = new URLSearchParams()
       if (intent) redirectParams.set('intent', intent)
       if (tier) redirectParams.set('tier', tier)
-      const redirectPath = redirectParams.toString() ? `${next}?${redirectParams.toString()}` : next
+      const redirectPath = redirectParams.toString() ? `${authorizedNext}?${redirectParams.toString()}` : authorizedNext
       
       let redirectUrl: string;
       if (isLocalEnv) {

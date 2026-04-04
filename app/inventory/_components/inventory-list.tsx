@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { ViewTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -182,14 +183,16 @@ function ItemThumbnail({ item }: { item: InventoryItem }) {
       {isProcessing ? (
         <PiSpinnerDuotone className="h-5 w-5 animate-spin text-stone-400 dark:text-zinc-600" />
       ) : shouldShowImage && imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={item.name}
-          width={40}
-          height={40}
-          className="h-auto w-10 rounded-md object-cover"
-          unoptimized
-        />
+        <ViewTransition name={`item-img-${item.id}`} share="morph" default="none">
+          <Image
+            src={imageUrl}
+            alt={item.name}
+            width={40}
+            height={40}
+            className="h-auto w-10 rounded-md object-cover"
+            unoptimized
+          />
+        </ViewTransition>
       ) : (
         <PiImageBrokenDuotone className="h-5 w-5 text-stone-400 dark:text-zinc-600" />
       )}
@@ -330,6 +333,7 @@ function RowActions({
         )}
         <Link
           href={`/inventory/${item.id}/edit`}
+          transitionTypes={['nav-forward']}
           className="inline-flex items-center justify-center rounded-lg p-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white min-h-[32px] min-w-[32px]"
           title="Edit"
         >

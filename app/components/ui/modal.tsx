@@ -46,7 +46,7 @@ export function Modal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           className={cn(
-            "fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4",
+            "fixed inset-0 z-70 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4",
             scrollable && "items-start overflow-y-auto py-10",
           )}
           role="dialog"

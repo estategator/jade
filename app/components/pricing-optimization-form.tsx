@@ -305,7 +305,7 @@ export function PricingOptimizationForm({ projects, userId }: PricingOptimizatio
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="fixed top-20 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-medium shadow-lg"
+            className="fixed top-20 right-6 z-70 flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-medium shadow-lg"
           >
             <PiCheckCircleDuotone className="h-5 w-5" />
             {successMessage}

@@ -3,6 +3,17 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * ── Z-Index Scale ──────────────────────────────────────────
+ * z-10/z-20 : local stacking (dropdowns, popovers within a section)
+ * z-30      : desktop sidebar, sticky sub-headers
+ * z-40      : mobile topbar (sticky), navbar, page-level fixed CTAs
+ * z-50      : mobile sidebar backdrop
+ * z-60      : mobile sidebar panel
+ * z-70      : modal / drawer / toast overlays (always above sidebar)
+ * z-100     : view-transition pseudo-elements
+ */
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

@@ -224,7 +224,7 @@ function AddToCartButton({
       <button
         type="button"
         onClick={handleMainClick}
-        className={`inline-flex items-center justify-center rounded-lg p-1.5 text-white transition-colors min-h-[32px] min-w-[32px] ${
+        className={`inline-flex items-center justify-center rounded-lg p-2 lg:p-1.5 text-white transition-colors min-h-[36px] min-w-[36px] lg:min-h-[32px] lg:min-w-[32px] ${
           added
             ? "bg-emerald-600 hover:bg-emerald-700"
             : "bg-indigo-600 hover:bg-indigo-700"
@@ -232,9 +232,9 @@ function AddToCartButton({
         title={added ? "Added!" : "Add to cart"}
       >
         {added ? (
-          <PiCheckSquareDuotone className="h-3.5 w-3.5" />
+          <PiCheckSquareDuotone className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         ) : (
-          <PiShoppingCartDuotone className="h-3.5 w-3.5" />
+          <PiShoppingCartDuotone className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         )}
       </button>
       <AnimatePresence>
@@ -304,25 +304,25 @@ function RowActions({
   }, [open]);
 
   return (
-      <div className="flex items-center justify-end gap-1 relative" ref={menuRef}>
+      <div className="flex items-center justify-end gap-1.5 relative" ref={menuRef}>
         {item.status === "available" && (
           <AddToCartButton item={item} onAddToCart={onAddToCart} />
         )}
         <Link
           href={`/inventory/${item.id}/edit`}
           transitionTypes={['nav-forward']}
-          className="inline-flex items-center justify-center rounded-lg p-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white min-h-[32px] min-w-[32px]"
+          className="inline-flex items-center justify-center rounded-lg p-2 lg:p-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white min-h-[36px] min-w-[36px] lg:min-h-[32px] lg:min-w-[32px]"
           title="Edit"
         >
-          <PiPencilDuotone className="h-3.5 w-3.5" />
+          <PiPencilDuotone className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         </Link>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center justify-center rounded-lg p-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white min-h-[32px] min-w-[32px]"
+          className="inline-flex items-center justify-center rounded-lg p-2 lg:p-1.5 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white min-h-[36px] min-w-[36px] lg:min-h-[32px] lg:min-w-[32px]"
           title="More actions"
         >
-          <PiDotsThreeDuotone className="h-3.5 w-3.5" />
+          <PiDotsThreeDuotone className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         </button>
         <AnimatePresence>
           {open && (
@@ -336,7 +336,7 @@ function RowActions({
               <button
                 type="button"
                 onClick={() => { onQr(item); setOpen(false); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-stone-700 transition-colors hover:bg-stone-50 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="flex w-full items-center gap-2 px-3 py-2.5 lg:py-2 text-sm text-stone-700 transition-colors hover:bg-stone-50 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
                 <PiQrCodeDuotone className="h-3.5 w-3.5" />
                 QR Code
@@ -344,7 +344,7 @@ function RowActions({
               <button
                 type="button"
                 onClick={() => { onDelete(item.id); setOpen(false); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                className="flex w-full items-center gap-2 px-3 py-2.5 lg:py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
               >
                 <PiTrashDuotone className="h-3.5 w-3.5" />
                 Delete
@@ -806,53 +806,56 @@ export function InventoryList({ initialItems, pagination, userId, initialFilters
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30"
+            className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-800/40 dark:bg-indigo-950/30"
           >
-            <div className="flex items-center gap-2 text-sm font-medium text-indigo-700 dark:text-indigo-300">
-              <PiCheckSquareDuotone className="h-4 w-4" />
-              {selectedIds.size} selected
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                <PiCheckSquareDuotone className="h-4 w-4" />
+                {selectedIds.size} selected
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+              >
+                Clear
+              </button>
             </div>
-            <div className="h-4 w-px bg-indigo-200 dark:bg-indigo-800" />
-            <button
-              type="button"
-              onClick={() => setPendingBulkAction({ kind: 'status', status: 'available' })}
-              disabled={bulkBusy}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
-            >
-              Mark Available
-            </button>
-            <button
-              type="button"
-              onClick={() => setPendingBulkAction({ kind: 'status', status: 'reserved' })}
-              disabled={bulkBusy}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
-            >
-              Mark Reserved
-            </button>
-            <button
-              type="button"
-              onClick={() => setPendingBulkAction({ kind: 'status', status: 'sold' })}
-              disabled={bulkBusy}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-700"
-            >
-              Mark Sold
-            </button>
-            <div className="h-4 w-px bg-indigo-200 dark:bg-indigo-800" />
-            <button
-              type="button"
-              onClick={() => setPendingBulkAction({ kind: 'delete' })}
-              disabled={bulkBusy}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="ml-auto rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
-            >
-              Clear selection
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingBulkAction({ kind: 'status', status: 'available' })}
+                disabled={bulkBusy}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+              >
+                Mark Available
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingBulkAction({ kind: 'status', status: 'reserved' })}
+                disabled={bulkBusy}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
+              >
+                Mark Reserved
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingBulkAction({ kind: 'status', status: 'sold' })}
+                disabled={bulkBusy}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              >
+                Mark Sold
+              </button>
+              <div className="h-4 w-px bg-indigo-200 dark:bg-indigo-800" />
+              <button
+                type="button"
+                onClick={() => setPendingBulkAction({ kind: 'delete' })}
+                disabled={bulkBusy}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+              >
+                Delete
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -942,75 +945,131 @@ export function InventoryList({ initialItems, pagination, userId, initialFilters
           {filtered.map((item) => (
             <div
               key={item.id}
-              className={`grid grid-cols-1 gap-2 border-b border-stone-100 px-4 py-3 last:border-b-0 lg:grid-cols-[32px_1fr] lg:items-center lg:gap-4 lg:px-5 lg:py-4 dark:border-zinc-800/50 transition-colors ${selectedIds.has(item.id) ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}
+              className={`border-b border-stone-100 last:border-b-0 dark:border-zinc-800/50 transition-colors ${selectedIds.has(item.id) ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}
             >
-              <div className="hidden lg:flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(item.id)}
-                  onChange={() => toggleSelect(item.id)}
-                  className="h-4 w-4 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-2 lg:grid-cols-12 lg:items-center lg:gap-4">
-              <div className="col-span-1 flex justify-center sm:justify-start">
-                <ItemThumbnail item={item} />
-              </div>
-              <div className="col-span-2 lg:col-span-3 min-w-0">
-                <p className="truncate text-sm font-semibold text-stone-900 dark:text-white">
-                  {item.name}
-                </p>
-                {item.description && (
-                  <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-zinc-500">
-                    {item.description}
-                  </p>
-                )}
-              </div>
-              <div className="col-span-2 min-w-0">
-                {item.project ? (
-                  <>
-                    <p className="truncate text-sm text-stone-600 dark:text-zinc-400">
-                      {item.project.name}
-                    </p>
-                    {item.project.organizations?.name && (
-                      <p className="truncate text-xs text-stone-400 dark:text-zinc-600">
-                        {item.project.organizations.name}
+              {/* ── Mobile card (below lg) ── */}
+              <div className="flex flex-col gap-3 px-4 py-3 lg:hidden">
+                {/* Top: checkbox + thumbnail + name/desc + status */}
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(item.id)}
+                    onChange={() => toggleSelect(item.id)}
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+                  />
+                  <ItemThumbnail item={item} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate text-sm font-semibold text-stone-900 dark:text-white">
+                        {item.name}
+                      </p>
+                      <span
+                        className={`inline-block shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColors[item.status] || ""}`}
+                      >
+                        {item.status}
+                      </span>
+                    </div>
+                    {item.description && (
+                      <p className="mt-0.5 line-clamp-1 text-xs text-stone-500 dark:text-zinc-500">
+                        {item.description}
                       </p>
                     )}
-                  </>
-                ) : (
-                  <p className="text-sm text-stone-400 italic dark:text-zinc-600">
-                    No project
+                  </div>
+                </div>
+
+                {/* Middle: price & qty */}
+                <div className="flex items-center gap-4 pl-[60px] text-xs">
+                  <div>
+                    <span className="text-stone-400 dark:text-zinc-500">Price</span>
+                    <p className="font-medium text-stone-900 dark:text-white">${item.price.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 dark:text-zinc-500">Qty</span>
+                    <p className="tabular-nums text-stone-700 dark:text-zinc-300">{item.quantity ?? 1}</p>
+                  </div>
+                </div>
+
+                {/* Bottom: actions */}
+                <div className="flex items-center justify-end gap-1 pl-[60px]">
+                  <RowActions
+                    item={item}
+                    onAddToCart={handleAddToCart}
+                    onDelete={handleDelete}
+                    onQr={setQrItem}
+                  />
+                </div>
+              </div>
+
+              {/* ── Desktop table row (lg+) ── */}
+              <div className="hidden lg:grid lg:grid-cols-[32px_1fr] lg:items-center lg:gap-4 lg:px-5 lg:py-4">
+                <div className="flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(item.id)}
+                    onChange={() => toggleSelect(item.id)}
+                    className="h-4 w-4 rounded border-stone-300 text-indigo-600 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800"
+                  />
+                </div>
+                <div className="grid grid-cols-12 items-center gap-4">
+                  <div className="col-span-1 flex justify-start">
+                    <ItemThumbnail item={item} />
+                  </div>
+                  <div className="col-span-3 min-w-0">
+                    <p className="truncate text-sm font-semibold text-stone-900 dark:text-white">
+                      {item.name}
+                    </p>
+                    {item.description && (
+                      <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-zinc-500">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-2 min-w-0">
+                    {item.project ? (
+                      <>
+                        <p className="truncate text-sm text-stone-600 dark:text-zinc-400">
+                          {item.project.name}
+                        </p>
+                        {item.project.organizations?.name && (
+                          <p className="truncate text-xs text-stone-400 dark:text-zinc-600">
+                            {item.project.organizations.name}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-stone-400 italic dark:text-zinc-600">
+                        No project
+                      </p>
+                    )}
+                  </div>
+                  <p className="col-span-1 truncate text-sm text-stone-600 dark:text-zinc-400">
+                    {item.category}
                   </p>
-                )}
-              </div>
-              <p className="col-span-1 truncate text-sm text-stone-600 dark:text-zinc-400">
-                {item.category}
-              </p>
-              <p className="col-span-1 truncate text-sm text-stone-600 dark:text-zinc-400">
-                {item.condition}
-              </p>
-              <p className="col-span-1 text-sm tabular-nums text-stone-600 dark:text-zinc-400">
-                {item.quantity ?? 1}
-              </p>
-              <p className="col-span-1 text-sm font-medium text-stone-900 dark:text-white">
-                ${item.price.toFixed(2)}
-              </p>
-              <div className="col-span-1">
-                <span
-                  className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColors[item.status] || ""}`}
-                >
-                  {item.status}
-                </span>
-              </div>
-              <div className="col-span-1 flex justify-end">
-                <RowActions
-                  item={item}
-                  onAddToCart={handleAddToCart}
-                  onDelete={handleDelete}
-                  onQr={setQrItem}
-                />
-              </div>
+                  <p className="col-span-1 truncate text-sm text-stone-600 dark:text-zinc-400">
+                    {item.condition}
+                  </p>
+                  <p className="col-span-1 text-sm tabular-nums text-stone-600 dark:text-zinc-400">
+                    {item.quantity ?? 1}
+                  </p>
+                  <p className="col-span-1 text-sm font-medium text-stone-900 dark:text-white">
+                    ${item.price.toFixed(2)}
+                  </p>
+                  <div className="col-span-1">
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColors[item.status] || ""}`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <RowActions
+                      item={item}
+                      onAddToCart={handleAddToCart}
+                      onDelete={handleDelete}
+                      onQr={setQrItem}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           ))}

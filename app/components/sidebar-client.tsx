@@ -421,7 +421,7 @@ export function SidebarClient({ navSections, initialUnreadCount }: SidebarClient
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm md:hidden"
               onClick={closeMobile}
               aria-hidden="true"
             />
@@ -432,7 +432,7 @@ export function SidebarClient({ navSections, initialUnreadCount }: SidebarClient
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              className="fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] flex-col border-r border-stone-200/60 bg-white shadow-2xl shadow-black/10 dark:border-zinc-800/60 dark:bg-zinc-950 dark:shadow-black/30 md:hidden"
+              className="fixed inset-y-0 left-0 z-60 flex w-[280px] max-w-[85vw] flex-col border-r border-stone-200/60 bg-white shadow-2xl shadow-black/10 dark:border-zinc-800/60 dark:bg-zinc-950 dark:shadow-black/30 md:hidden"
             >
               {/* Drawer header */}
               <div className="flex h-14 items-center justify-between border-b border-stone-100 px-4 dark:border-zinc-800/50">

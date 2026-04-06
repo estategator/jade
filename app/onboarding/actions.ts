@@ -83,6 +83,7 @@ export type OnboardingStepSummary = {
 export type OnboardingShareLinkSummary = {
   id: string;
   status: ShareLinkStatus;
+  token: string | null;
   expires_at: string | null;
   created_at: string;
 };
@@ -300,7 +301,7 @@ export async function getOnboardingDashboard(
         .order('sort_order', { ascending: true }),
       supabase
         .from('project_share_links')
-        .select('id, assignment_id, status, expires_at, created_at')
+        .select('id, assignment_id, token, status, expires_at, created_at')
         .in('assignment_id', assignmentIds)
         .order('created_at', { ascending: false }),
       supabase
@@ -344,6 +345,7 @@ export async function getOnboardingDashboard(
         shareLinksByAssignmentId.set(link.assignment_id, {
           id: link.id,
           status: link.status,
+          token: link.token,
           expires_at: link.expires_at,
           created_at: link.created_at,
         });
@@ -1132,6 +1134,7 @@ export async function createProjectShareLink(formData: FormData): Promise<Action
         assignment_id: assignmentId,
         project_id: assignment.project_id,
         token_hash: tokenHash,
+        token,
         status: 'active',
         expires_at: expiresAt,
         created_by: context.userId,
@@ -2631,6 +2634,7 @@ export async function sendClientPortalEmail(formData: FormData): Promise<ActionR
         assignment_id: assignmentId,
         project_id: assignment.project_id,
         token_hash: tokenHash,
+        token,
         status: 'active',
         expires_at: expiresAt,
         created_by: context.userId,
@@ -3257,7 +3261,7 @@ export async function getClientDetail(
           .order('sort_order', { ascending: true }),
         supabase
           .from('project_share_links')
-          .select('id, assignment_id, status, expires_at, created_at')
+          .select('id, assignment_id, token, status, expires_at, created_at')
           .in('assignment_id', assignmentIds)
           .order('created_at', { ascending: false }),
         supabase
@@ -3308,6 +3312,7 @@ export async function getClientDetail(
         shareLinksByAssignment.set(link.assignment_id, {
           id: link.id,
           status: link.status,
+          token: link.token,
           expires_at: link.expires_at,
           created_at: link.created_at,
         });

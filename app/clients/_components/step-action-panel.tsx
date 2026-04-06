@@ -14,6 +14,7 @@ import {
   Link2,
   Mail,
   Pencil,
+  RefreshCw,
   Send,
   Trash2,
 } from "lucide-react";
@@ -24,14 +25,13 @@ import type {
   ClientWalkthroughSummary,
   ClientWelcomeMessageSummary,
   ContractDetail,
+  OnboardingShareLinkSummary,
 } from "@/app/onboarding/actions";
 import type { AgreementType } from "@/lib/agreement-types";
 import {
   createProjectShareLink,
-  createAndSendTemplateContract,
   deleteContractDraft,
   getContractDetail,
-  recordClientProvidedContract,
   scheduleWalkthrough,
   sendClientPortalEmail,
   sendWelcomeEmail,
@@ -40,7 +40,6 @@ import {
 import { ContractEditor } from "@/app/components/contract-editor";
 import {
   AgreementTypeSelector,
-  type ContractSelection,
   type PickerTemplate,
 } from "@/app/components/agreement-type-selector";
 
@@ -87,7 +86,7 @@ export function StepActionPanel({
   contracts: ClientContractSummary[];
   walkthroughs: ClientWalkthroughSummary[];
   welcomeMessages: ClientWelcomeMessageSummary[];
-  shareLink: { id: string; status: string; expires_at: string | null; created_at: string } | null;
+  shareLink: OnboardingShareLinkSummary | null;
   clientName: string;
   projectName: string;
   contractTemplates?: PickerTemplate[];
@@ -140,7 +139,7 @@ export function WorkflowTimeline({
   contracts: ClientContractSummary[];
   walkthroughs: ClientWalkthroughSummary[];
   welcomeMessages: ClientWelcomeMessageSummary[];
-  shareLink: { id: string; status: string; expires_at: string | null; created_at: string } | null;
+  shareLink: OnboardingShareLinkSummary | null;
   clientName: string;
   projectName: string;
   contractTemplates?: PickerTemplate[];
@@ -208,7 +207,7 @@ function WorkflowStep({
   contracts: ClientContractSummary[];
   walkthroughs: ClientWalkthroughSummary[];
   welcomeMessages: ClientWelcomeMessageSummary[];
-  shareLink: { id: string; status: string; expires_at: string | null; created_at: string } | null;
+  shareLink: OnboardingShareLinkSummary | null;
   clientName: string;
   projectName: string;
   contractTemplates?: PickerTemplate[];
@@ -223,10 +222,6 @@ function WorkflowStep({
   const [editingContract, setEditingContract] = useState<ContractDetail | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [selectedAgreementType, setSelectedAgreementType] = useState<AgreementType>("estate_sale");
-  const [showByocForm, setShowByocForm] = useState(false);
-  const [byocAgreementType, setByocAgreementType] = useState<AgreementType>("estate_sale");
-  const [byocExternalContractUrl, setByocExternalContractUrl] = useState("");
-  const [byocNotes, setByocNotes] = useState("");
   const isComplete = step.status === "completed";
 
   const stepKey = step.step_key;
@@ -331,25 +326,7 @@ function WorkflowStep({
                   className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
                 >
                   <FileSignature className="h-3.5 w-3.5" />
-                  Create contract
-                </button>
-              )}
-
-              {showContract && (
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => {
-                    setError(null);
-                    setShowTypeSelector(false);
-                    setShowContractEditor(false);
-                    setByocAgreementType(selectedAgreementType);
-                    setShowByocForm((value) => !value);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
-                >
-                  <FileSignature className="h-3.5 w-3.5" />
-                  Bring your own contract
+                  Select contract
                 </button>
               )}
 
@@ -415,8 +392,11 @@ function WorkflowStep({
                   }}
                   className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
                 >
-                  <Link2 className="h-3.5 w-3.5" />
-                  Generate share link
+                  {shareLink ? (
+                    <><RefreshCw className="h-3.5 w-3.5" /> Re-generate share link</>
+                  ) : (
+                    <><Link2 className="h-3.5 w-3.5" /> Generate share link</>
+                  )}
                 </button>
               )}
 
@@ -443,101 +423,6 @@ function WorkflowStep({
               )}
             </div>
 
-            {showContract && showByocForm && (
-              <div className="mt-3 space-y-3 rounded-xl border border-stone-200 bg-stone-50/60 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
-                <p className="text-xs font-medium text-stone-700 dark:text-zinc-300">
-                  Record a client-provided signed contract
-                </p>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="space-y-1">
-                    <span className="text-xs text-stone-600 dark:text-zinc-400">Agreement type</span>
-                    <select
-                      value={byocAgreementType}
-                      onChange={(event) => setByocAgreementType(event.target.value as AgreementType)}
-                      className="w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
-                    >
-                      <option value="estate_sale">Estate sale</option>
-                      <option value="buyout">Buy out</option>
-                    </select>
-                  </label>
-
-                  <label className="space-y-1">
-                    <span className="text-xs text-stone-600 dark:text-zinc-400">Signed contract URL (optional)</span>
-                    <input
-                      type="url"
-                      value={byocExternalContractUrl}
-                      onChange={(event) => setByocExternalContractUrl(event.target.value)}
-                      placeholder="https://..."
-                      className="w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-800 placeholder:text-stone-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:placeholder:text-zinc-500"
-                    />
-                  </label>
-                </div>
-
-                <label className="space-y-1">
-                  <span className="text-xs text-stone-600 dark:text-zinc-400">Notes (optional)</span>
-                  <textarea
-                    value={byocNotes}
-                    onChange={(event) => setByocNotes(event.target.value)}
-                    rows={3}
-                    className="w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-800 placeholder:text-stone-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:placeholder:text-zinc-500"
-                    placeholder="Add context about this signed agreement"
-                  />
-                </label>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => {
-                      setError(null);
-
-                      const trimmedUrl = byocExternalContractUrl.trim();
-                      if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
-                        setError("Signed contract URL must start with http:// or https://");
-                        return;
-                      }
-
-                      const fd = new FormData();
-                      fd.set("assignment_id", assignmentId);
-                      fd.set("agreement_type", byocAgreementType);
-                      fd.set("external_contract_url", trimmedUrl);
-                      fd.set("notes", byocNotes.trim());
-
-                      startTransition(async () => {
-                        const res = await recordClientProvidedContract(fd);
-                        if (res.error) {
-                          setError(res.error);
-                          return;
-                        }
-
-                        setShowByocForm(false);
-                        setByocExternalContractUrl("");
-                        setByocNotes("");
-                        router.refresh();
-                      });
-                    }}
-                    className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
-                  >
-                    Save provided contract
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => {
-                      setShowByocForm(false);
-                      setByocExternalContractUrl("");
-                      setByocNotes("");
-                    }}
-                    className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 transition hover:border-stone-300 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Agreement type selector */}
             {showContract && showTypeSelector && !showContractEditor && (
               <AgreementTypeSelector
@@ -546,23 +431,11 @@ function WorkflowStep({
                   setShowTypeSelector(false);
 
                   if (selection?.kind === "template") {
-                    // Template-backed: skip editor, create + send immediately
-                    setError(null);
-                    const fd = new FormData();
-                    fd.set("assignment_id", assignmentId);
-                    fd.set("provider", "docuseal");
-                    fd.set("agreement_type", type);
-                    fd.set("contract_template_id", selection.templateId);
-                    startTransition(async () => {
-                      const res = await createAndSendTemplateContract(fd);
-                      if (res.error) {
-                        setError(res.error);
-                        return;
-                      }
-                      router.refresh();
-                    });
+                    // Template-backed: open editor with template context
+                    setSelectedAgreementType(type);
+                    setShowContractEditor(true);
                   } else {
-                    // Built-in type: open editor form
+                    // Built-in or create from scratch: open editor form
                     setSelectedAgreementType(type);
                     setShowContractEditor(true);
                   }
@@ -692,12 +565,43 @@ function WorkflowStep({
             )}
 
             {/* Share link */}
-            {showShareLink && shareLink && (
-              <div className="mt-3 rounded-xl border border-stone-100 bg-stone-50/50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950/40">
-                <p className="text-xs text-stone-600 dark:text-zinc-400">
-                  Existing link: <StatusBadge status={shareLink.status} />
-                  {shareLink.expires_at && <> &middot; expires {new Date(shareLink.expires_at).toLocaleDateString()}</>}
-                </p>
+            {showShareLink && shareLink && !shareLinkResult && (
+              <div className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-stone-700 dark:text-zinc-300">
+                      Client portal link
+                    </p>
+                    <p className="mt-0.5 text-xs text-stone-500 dark:text-zinc-500">
+                      Status: <StatusBadge status={shareLink.status} />
+                      {shareLink.expires_at && <> &middot; expires {new Date(shareLink.expires_at).toLocaleDateString()}</>}
+                    </p>
+                  </div>
+                </div>
+                {shareLink.token && (
+                  <div className="mt-2">
+                    <p className="break-all text-xs text-stone-600 dark:text-zinc-400">
+                      {`${typeof window !== 'undefined' ? window.location.origin : ''}/client/${shareLink.token}`}
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(`${window.location.origin}/client/${shareLink.token}`)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                      >
+                        <Copy className="h-3 w-3" /> Copy
+                      </button>
+                      <a
+                        href={`/client/${shareLink.token}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Open
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

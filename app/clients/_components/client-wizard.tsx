@@ -35,6 +35,7 @@ import {
   US_STATES,
   type AddressParts,
 } from "@/app/components/address-autocomplete";
+import { Modal } from "@/app/components/ui/modal";
 
 import type { PickerTemplate } from "@/app/components/agreement-type-selector";
 import { WorkflowTimeline } from "./step-action-panel";
@@ -206,27 +207,7 @@ function AssignmentAccordion({
       </article>
 
       {/* ── Remove confirmation modal ── */}
-      <AnimatePresence>
-        {showRemoveConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            onClick={() => { if (!isPending) setShowRemoveConfirm(false); }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Remove assignment"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-              onClick={(e) => e.stopPropagation()}
-            >
+      <Modal open={showRemoveConfirm} size="md" ariaLabel="Remove assignment">
               <div className="mb-4 flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">
@@ -276,33 +257,10 @@ function AssignmentAccordion({
                   Remove
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Modal>
 
       {/* ── Change project modal ── */}
-      <AnimatePresence>
-        {showChangeModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            onClick={() => { if (!isPending) setShowChangeModal(false); }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Change project assignment"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-              onClick={(e) => e.stopPropagation()}
-            >
+      <Modal open={showChangeModal} size="md" ariaLabel="Change project assignment">
               <div className="mb-4 flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
@@ -371,10 +329,7 @@ function AssignmentAccordion({
                   Change
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Modal>
     </>
   );
 }
@@ -698,33 +653,35 @@ export function ClientWizard({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] dark:border-zinc-700 dark:text-zinc-400"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </button>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => {
-                  if (!confirm(`Delete ${client.full_name}? This will permanently remove the client and all their assignments, contracts, and workflow data. This cannot be undone.`)) return;
-                  startTransition(async () => {
-                    const res = await deleteClientProfile(client.id);
-                    if (res.error) {
-                      setEditError(res.error);
-                      return;
-                    }
-                    router.push('/clients');
-                  });
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:border-red-300 hover:text-red-600 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-800 dark:hover:text-red-400"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] dark:border-zinc-700 dark:text-zinc-400"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    if (!confirm(`Delete ${client.full_name}? This will permanently remove the client and all their assignments, contracts, and workflow data. This cannot be undone.`)) return;
+                    startTransition(async () => {
+                      const res = await deleteClientProfile(client.id);
+                      if (res.error) {
+                        setEditError(res.error);
+                        return;
+                      }
+                      router.push('/clients');
+                    });
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:border-red-300 hover:text-red-600 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-800 dark:hover:text-red-400"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
             {client.address_line1 && (
               <p className="mt-3 flex items-center gap-1.5 text-sm text-stone-500 dark:text-zinc-500">

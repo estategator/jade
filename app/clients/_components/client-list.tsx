@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo, useCallback, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useTransition, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -37,6 +36,7 @@ import {
   US_STATES,
   type AddressParts,
 } from "@/app/components/address-autocomplete";
+import { Modal } from "@/app/components/ui/modal";
 
 type ClientTab = 'all' | 'frequents';
 
@@ -390,38 +390,34 @@ export function ClientList({
         </div>
 
       {/* Add client modal */}
-      {showAddModal && createPortal(
-        <AddClientModal
-          isPending={isPending}
-          createError={createError}
-          createSuccess={createSuccess}
-          showAddress={showAddress}
-          setShowAddress={setShowAddress}
-          addressLine1={addressLine1}
-          setAddressLine1={setAddressLine1}
-          addressLine2={addressLine2}
-          setAddressLine2={setAddressLine2}
-          city={city}
-          setCity={setCity}
-          state={state}
-          setState={setState}
-          zipCode={zipCode}
-          setZipCode={setZipCode}
-          handleAddressSelect={handleAddressSelect}
-          handleCreateClient={handleCreateClient}
-          onClose={closeAddModal}
-        />,
-        document.body,
-      )}
+      <AddClientModal
+        open={showAddModal}
+        isPending={isPending}
+        createError={createError}
+        createSuccess={createSuccess}
+        showAddress={showAddress}
+        setShowAddress={setShowAddress}
+        addressLine1={addressLine1}
+        setAddressLine1={setAddressLine1}
+        addressLine2={addressLine2}
+        setAddressLine2={setAddressLine2}
+        city={city}
+        setCity={setCity}
+        state={state}
+        setState={setState}
+        zipCode={zipCode}
+        setZipCode={setZipCode}
+        handleAddressSelect={handleAddressSelect}
+        handleCreateClient={handleCreateClient}
+        onClose={closeAddModal}
+      />
 
       {/* Notify clients modal */}
-      {showNotifyModal && createPortal(
-        <NotifyClientsModal
-          starredClients={starredClients}
-          onClose={() => setShowNotifyModal(false)}
-        />,
-        document.body,
-      )}
+      <NotifyClientsModal
+        open={showNotifyModal}
+        starredClients={starredClients}
+        onClose={() => setShowNotifyModal(false)}
+      />
     </div>
   );
 }
@@ -429,6 +425,7 @@ export function ClientList({
 // ── Add client modal ─────────────────────────────────────────
 
 function AddClientModal({
+  open,
   isPending,
   createError,
   createSuccess,
@@ -448,6 +445,7 @@ function AddClientModal({
   handleCreateClient,
   onClose,
 }: {
+  open: boolean;
   isPending: boolean;
   createError: string | null;
   createSuccess: boolean;
@@ -467,21 +465,9 @@ function AddClientModal({
   handleCreateClient: (event: React.FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="w-full max-w-lg rounded-3xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
-        {/* Header */}
+    <Modal open={open} scrollable size="lg" panelClassName="rounded-3xl">
+      {/* Header */}
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-[var(--color-brand-subtle)] p-2 text-[var(--color-brand-primary)]">
@@ -645,8 +631,7 @@ function AddClientModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -741,9 +726,11 @@ function SuggestedFrequentsPanel({
 // ── Notify clients modal ─────────────────────────────────────
 
 function NotifyClientsModal({
+  open,
   starredClients,
   onClose,
 }: {
+  open: boolean;
   starredClients: OnboardingClientProfile[];
   onClose: () => void;
 }) {
@@ -755,14 +742,6 @@ function NotifyClientsModal({
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   const handleToggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -792,11 +771,7 @@ function NotifyClientsModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="w-full max-w-lg rounded-3xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+    <Modal open={open} scrollable size="lg" panelClassName="rounded-3xl">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-[var(--color-brand-subtle)] p-2 text-[var(--color-brand-primary)]">
@@ -886,7 +861,6 @@ function NotifyClientsModal({
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, Zap } from "lucide-react";
 import { TIERS, type SubscriptionTier } from "@/lib/tiers";
+import { Modal } from "@/app/components/ui/modal";
 
 type UpgradeModalProps = Readonly<{
   isOpen: boolean;
@@ -31,26 +31,7 @@ export function UpgradeModal({
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.3 }}
-            className="relative w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 sm:p-8"
-          >
+    <Modal open={isOpen} size="md" panelClassName="shadow-2xl sm:p-8">
             {/* Close button */}
             <button
               onClick={onClose}
@@ -139,9 +120,6 @@ export function UpgradeModal({
             <p className="mt-4 text-center text-xs text-stone-500 dark:text-zinc-500">
               Cancel anytime. No credit card required to start.
             </p>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+    </Modal>
   );
 }

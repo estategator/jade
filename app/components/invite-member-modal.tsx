@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Info, Loader2, Mail, X } from "lucide-react";
+import { Modal } from "@/app/components/ui/modal";
 
 type InviteMemberModalProps = Readonly<{
   isOpen: boolean;
@@ -64,24 +65,7 @@ export function InviteMemberModal({
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleClose}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.25 }}
-            className="relative w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
-          >
+    <Modal open={isOpen} size="md" panelClassName="shadow-2xl">
             <button
               type="button"
               onClick={handleClose}
@@ -226,9 +210,6 @@ export function InviteMemberModal({
                 )}
               </div>
             </form>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+    </Modal>
   );
 }

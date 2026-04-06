@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   PiShoppingCartDuotone,
   PiXDuotone,
@@ -14,6 +13,7 @@ import {
   PiImageBrokenDuotone,
 } from "react-icons/pi";
 import { useCart } from "@/lib/cart-context";
+import { Drawer } from "@/app/components/ui/drawer";
 
 export function CartDrawer() {
   const { items, count, loading, removeItem, updateQuantity, clear } = useCart();
@@ -57,24 +57,7 @@ export function CartDrawer() {
       </button>
 
       {/* Backdrop + Drawer */}
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-            />
-            <motion.aside
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-stone-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
-            >
+      <Drawer open={open}>
               {/* Header */}
               <div className="flex items-center justify-between border-b border-stone-200 px-5 py-4 dark:border-zinc-800">
                 <div className="flex items-center gap-2">
@@ -240,10 +223,7 @@ export function CartDrawer() {
                   </button>
                 </div>
               )}
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      </Drawer>
     </>
   );
 }

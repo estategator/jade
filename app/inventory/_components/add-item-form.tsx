@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { PiSpinnerDuotone, PiUploadDuotone, PiXDuotone, PiSparkleDuotone, PiCheckDuotone, PiArrowClockwiseDuotone } from "react-icons/pi";
+import { PiSpinnerDuotone, PiUploadDuotone, PiCameraDuotone, PiXDuotone, PiSparkleDuotone, PiCheckDuotone, PiArrowClockwiseDuotone } from "react-icons/pi";
 import { cn } from "@/lib/cn";
 import {
   INVENTORY_CATEGORIES,
@@ -172,6 +172,22 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) processFile(file);
+    // Remove capture attribute after selection so it doesn't persist
+    fileInputRef.current?.removeAttribute("capture");
+  }
+
+  function openFilePicker() {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.removeAttribute("capture");
+    fileInputRef.current.value = "";
+    fileInputRef.current.click();
+  }
+
+  function openCamera() {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.setAttribute("capture", "environment");
+    fileInputRef.current.value = "";
+    fileInputRef.current.click();
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -308,7 +324,6 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
               </div>
             ) : (
               <div
-                onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragging(true);
@@ -316,19 +331,37 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
                 className={cn(
-                  "flex aspect-square cursor-pointer flex-col items-center justify-center border-2 border-dashed transition-all",
+                  "flex aspect-square flex-col items-center justify-center border-2 border-dashed transition-all",
                   dragging
                     ? "border-indigo-400 bg-indigo-50/50 dark:border-indigo-600 dark:bg-indigo-900/10"
-                    : "border-stone-300 bg-white hover:border-indigo-300 hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-indigo-800 dark:hover:bg-zinc-800/50"
+                    : "border-stone-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
                 )}
               >
                 <PiUploadDuotone className="mb-3 h-8 w-8 text-stone-400 dark:text-zinc-500" />
                 <p className="text-sm font-medium text-stone-900 dark:text-white">
-                  Click or drag an image
+                  Upload or take a photo
                 </p>
                 <p className="mt-1 text-xs text-stone-500 dark:text-zinc-500">
                   JPG, PNG, or WebP up to 10 MB
                 </p>
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={openFilePicker}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  >
+                    <PiUploadDuotone className="h-3.5 w-3.5" />
+                    Upload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCamera}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+                  >
+                    <PiCameraDuotone className="h-3.5 w-3.5" />
+                    Take photo
+                  </button>
+                </div>
                 <p className="mt-3 text-xs text-indigo-600 dark:text-indigo-400">
                   AI insights generated after upload
                 </p>
@@ -337,13 +370,24 @@ export function AddItemForm({ projects, userId }: AddItemFormProps) {
           </motion.div>
 
           {imagePreview && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              Replace image
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={openFilePicker}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <PiUploadDuotone className="h-4 w-4" />
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={openCamera}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+              >
+                <PiCameraDuotone className="h-4 w-4" />
+                Retake
+              </button>
+            </div>
           )}
 
           {/* AI analysis status */}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CheckCircle2, Circle, Package, ShieldCheck, Tag } from "lucide-react";
 
 import { getClientProjectShareView } from "@/app/onboarding/actions";
+import { SoldItemsSection } from "./_components/sold-items-section";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +28,14 @@ export default async function ClientProjectSharePage({
   }
 
   const { client, project, workflow, items } = result.data;
-  const availableItems = items.filter((item) => item.status === "available").length;
-  const soldItems = items.filter((item) => item.status === "sold").length;
+  const soldItemsList = items.filter((item) => item.status === "sold");
+  const availableItemsList = items.filter((item) => item.status !== "sold");
+  const availableCount = items.filter((item) => item.status === "available").length;
+  const soldCount = soldItemsList.length;
 
   const totalValue = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
   const availableValue = items.filter((i) => i.status === "available").reduce((sum, i) => sum + (i.price ?? 0), 0);
-  const soldValue = items.filter((i) => i.status === "sold").reduce((sum, i) => sum + (i.price ?? 0), 0);
+  const soldValue = soldItemsList.reduce((sum, i) => sum + (i.price ?? 0), 0);
 
   return (
     <main className="min-h-screen bg-stone-50 dark:bg-zinc-950">
@@ -70,11 +73,11 @@ export default async function ClientProjectSharePage({
             </div>
             <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
               <p className="text-sm text-stone-500 dark:text-zinc-500">Available</p>
-              <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">{availableItems}</p>
+              <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">{availableCount}</p>
             </div>
             <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
               <p className="text-sm text-stone-500 dark:text-zinc-500">Sold</p>
-              <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">{soldItems}</p>
+              <p className="mt-2 text-2xl font-bold text-stone-900 dark:text-white">{soldCount}</p>
             </div>
           </div>
 
@@ -146,14 +149,32 @@ export default async function ClientProjectSharePage({
                 <p className="mt-1 text-lg font-bold text-stone-900 dark:text-white">${soldValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             </div>
+          </div>
+
+          <SoldItemsSection items={soldItemsList} soldValue={soldValue} />
+
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
+                <Package className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-stone-900 dark:text-white">
+                  Available items
+                </h2>
+                <p className="text-sm text-stone-500 dark:text-zinc-500">
+                  Items currently for sale.
+                </p>
+              </div>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {items.length === 0 ? (
+              {availableItemsList.length === 0 ? (
                 <div className="sm:col-span-2 xl:col-span-3 rounded-2xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500 dark:border-zinc-700 dark:text-zinc-500">
                   Inventory details will appear here once items are added.
                 </div>
               ) : (
-                items.map((item) => {
+                availableItemsList.map((item) => {
                   const imageUrl = item.medium_image_url || item.thumbnail_url;
                   const statusClass = statusClasses[item.status] ?? statusClasses.available;
 

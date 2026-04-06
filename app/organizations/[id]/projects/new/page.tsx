@@ -4,11 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
-import { Loader2, ArrowLeft, Upload, X, MapPin, Phone } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, ArrowLeft, Upload, X, MapPin, Phone, UserPlus, Users, ChevronDown, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/app/components/page-header";
-import { createProject, getOrganization } from "@/app/organizations/actions";
+import { createProject, getOrganization, getOrgClients } from "@/app/organizations/actions";
 
 const US_STATES = [
   { value: "", label: "Select state" },
@@ -54,6 +54,15 @@ export default function NewProjectPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
+  // Client assignment state
+  type ClientMode = "none" | "existing" | "new";
+  const [clientMode, setClientMode] = useState<ClientMode>("none");
+  const [existingClients, setExistingClients] = useState<{ id: string; full_name: string; email: string }[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+
   useEffect(() => {
     async function init() {
       const {
@@ -65,9 +74,15 @@ export default function NewProjectPage() {
       }
       setUserId(session.user.id);
 
-      const orgResult = await getOrganization(orgId);
+      const [orgResult, clientsResult] = await Promise.all([
+        getOrganization(orgId),
+        getOrgClients(orgId, session.user.id),
+      ]);
       if (orgResult.data) {
         setOrgName(orgResult.data.name);
+      }
+      if (clientsResult.data) {
+        setExistingClients(clientsResult.data);
       }
       setLoading(false);
     }
@@ -126,12 +141,24 @@ export default function NewProjectPage() {
       formData.append("image", imageFile);
     }
 
+    // Client data
+    formData.append("client_mode", clientMode);
+    if (clientMode === "existing" && selectedClientId) {
+      formData.append("client_profile_id", selectedClientId);
+    }
+    if (clientMode === "new") {
+      formData.append("client_full_name", clientName);
+      formData.append("client_email", clientEmail);
+      formData.append("client_phone", clientPhone);
+    }
+
     const result = await createProject(formData);
 
     if (result.error) {
       setError(result.error);
       setSubmitting(false);
     } else {
+      router.refresh();
       router.push(`/organizations/${orgId}`);
     }
   }
@@ -331,6 +358,164 @@ export default function NewProjectPage() {
                 </div>
               )}
             </div>
+
+            {/* Assign client (optional) */}
+            <fieldset className="space-y-4 rounded-2xl border border-stone-200 bg-stone-50/50 p-5 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <legend className="flex items-center gap-2 text-sm font-medium text-stone-700 dark:text-zinc-300">
+                <Users className="h-4 w-4 text-stone-400 dark:text-zinc-500" />
+                Assign a client{" "}
+                <span className="text-stone-400 dark:text-zinc-500">(optional)</span>
+              </legend>
+
+              {/* Mode selector */}
+              <div className="flex gap-2">
+                {(
+                  [
+                    { value: "none", label: "Skip" },
+                    { value: "existing", label: "Existing client" },
+                    { value: "new", label: "New client" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setClientMode(opt.value);
+                      setSelectedClientId("");
+                      setClientName("");
+                      setClientEmail("");
+                      setClientPhone("");
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                      clientMode === opt.value
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "bg-white text-stone-600 hover:bg-stone-100 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <AnimatePresence mode="wait">
+                {/* Select existing client */}
+                {clientMode === "existing" && (
+                  <motion.div
+                    key="existing"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <label
+                      htmlFor="client-select"
+                      className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-zinc-300"
+                    >
+                      Select client
+                    </label>
+                    {existingClients.length === 0 ? (
+                      <p className="text-sm text-stone-500 dark:text-zinc-500">
+                        No clients yet.{" "}
+                        <button
+                          type="button"
+                          onClick={() => setClientMode("new")}
+                          className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                        >
+                          Create one
+                        </button>
+                      </p>
+                    ) : (
+                      <select
+                        id="client-select"
+                        value={selectedClientId}
+                        onChange={(e) => setSelectedClientId(e.target.value)}
+                        className="block w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                      >
+                        <option value="">Choose a client…</option>
+                        {existingClients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.full_name} — {c.email}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Create new client inline */}
+                {clientMode === "new" && (
+                  <motion.div
+                    key="new"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-4"
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="client-name"
+                          className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-zinc-300"
+                        >
+                          Client name
+                        </label>
+                        <div className="relative">
+                          <UserPlus className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400 dark:text-zinc-500" />
+                          <input
+                            id="client-name"
+                            type="text"
+                            value={clientName}
+                            onChange={(e) => setClientName(e.target.value)}
+                            placeholder="Jane Doe"
+                            className="block w-full rounded-xl border border-stone-300 bg-white py-2.5 pl-10 pr-4 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="client-email"
+                          className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-zinc-300"
+                        >
+                          Client email
+                        </label>
+                        <div className="relative">
+                          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400 dark:text-zinc-500" />
+                          <input
+                            id="client-email"
+                            type="email"
+                            value={clientEmail}
+                            onChange={(e) => setClientEmail(e.target.value)}
+                            placeholder="jane@example.com"
+                            className="block w-full rounded-xl border border-stone-300 bg-white py-2.5 pl-10 pr-4 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="client-phone-field"
+                        className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-zinc-300"
+                      >
+                        Client phone{" "}
+                        <span className="text-stone-400 dark:text-zinc-500">(optional)</span>
+                      </label>
+                      <div className="relative">
+                        <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400 dark:text-zinc-500" />
+                        <input
+                          id="client-phone-field"
+                          type="tel"
+                          value={clientPhone}
+                          onChange={(e) => setClientPhone(e.target.value)}
+                          placeholder="(555) 987-6543"
+                          className="block w-full rounded-xl border border-stone-300 bg-white py-2.5 pl-10 pr-4 text-sm text-stone-900 placeholder-stone-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-500"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </fieldset>
 
             {/* Submit */}
             <div className="flex items-center gap-3">

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign,
@@ -29,6 +28,7 @@ import {
 } from "@/app/onboarding/actions";
 import type { AgreementType } from "@/lib/agreement-types";
 import { AGREEMENT_TYPE_DEFAULTS } from "@/lib/agreement-types";
+import { Modal } from "@/app/components/ui/modal";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -268,23 +268,9 @@ export function ContractEditor({
 
   // ── Render ─────────────────────────────────────────────────
 
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-    <div className="w-full max-w-2xl rounded-2xl border border-stone-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+  return (
+    <Modal open scrollable size="2xl" panelClassName="p-0">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4 dark:border-zinc-700/70">
         <div>
@@ -322,8 +308,8 @@ export function ContractEditor({
         )}
 
         {/* ── Contract basics ─────────────────────────────── */}
-        <fieldset disabled={!isDraft || isPending} className="px-6 py-5">
-          <legend className="mb-4 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
+        <fieldset disabled={!isDraft || isPending} className="px-6 pt-6 pb-5">
+          <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
             Contract Details
           </legend>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -360,8 +346,8 @@ export function ContractEditor({
         </fieldset>
 
         {/* ── Commission ──────────────────────────────────── */}
-        <fieldset disabled={!isDraft || isPending} className="px-6 py-5">
-          <legend className="mb-4 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
+        <fieldset disabled={!isDraft || isPending} className="px-6 pt-6 pb-5">
+          <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
             Commission
           </legend>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -406,8 +392,8 @@ export function ContractEditor({
         </fieldset>
 
         {/* ── Fees ────────────────────────────────────────── */}
-        <fieldset disabled={!isDraft || isPending} className="px-6 py-5">
-          <legend className="mb-4 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
+        <fieldset disabled={!isDraft || isPending} className="px-6 pt-6 pb-5">
+          <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
             Fees &amp; Charges
           </legend>
 
@@ -499,8 +485,8 @@ export function ContractEditor({
         </fieldset>
 
         {/* ── Sale Terms ──────────────────────────────────── */}
-        <fieldset disabled={!isDraft || isPending} className="px-6 py-5">
-          <legend className="mb-4 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
+        <fieldset disabled={!isDraft || isPending} className="px-6 pt-6 pb-5">
+          <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
             Sale Terms
           </legend>
 
@@ -614,8 +600,8 @@ export function ContractEditor({
         </fieldset>
 
         {/* ── Payment & Cancellation ──────────────────────── */}
-        <fieldset disabled={!isDraft || isPending} className="px-6 py-5">
-          <legend className="mb-4 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
+        <fieldset disabled={!isDraft || isPending} className="px-6 pt-6 pb-5">
+          <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
             Payment &amp; Cancellation
           </legend>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -655,8 +641,8 @@ export function ContractEditor({
         </fieldset>
 
         {/* ── Special Terms ───────────────────────────────── */}
-        <fieldset disabled={!isDraft || isPending} className="px-6 py-5">
-          <legend className="mb-4 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
+        <fieldset disabled={!isDraft || isPending} className="px-6 pt-6 pb-5">
+          <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-zinc-400">
             Special Terms &amp; Notes
           </legend>
           <textarea
@@ -754,7 +740,6 @@ export function ContractEditor({
         </div>
       )}
     </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

@@ -35,6 +35,7 @@ import {
 } from "@/app/inventory/actions";
 import { QrCodeModal } from "@/app/inventory/_components/qr-code-modal";
 import { useCart } from "@/lib/cart-context";
+import { Modal } from "@/app/components/ui/modal";
 
 type BulkAction =
   | { kind: "delete" }
@@ -59,50 +60,27 @@ const bulkActionLabels: Record<string, string> = {
 };
 
 function BulkConfirmModal({
+  open,
   action,
   count,
   busy,
   onConfirm,
   onCancel,
 }: {
+  open: boolean;
   action: BulkAction;
   count: number;
   busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !busy) onCancel();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [busy, onCancel]);
-
   const label = action.kind === "delete"
     ? bulkActionLabels.delete
     : bulkActionLabels[action.status];
   const isDestructive = action.kind === "delete";
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={() => { if (!busy) onCancel(); }}
-      role="dialog"
-      aria-modal="true"
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal open={open} size="sm">
         <div className="flex items-start gap-3">
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
             isDestructive
@@ -151,8 +129,7 @@ function BulkConfirmModal({
             {isDestructive ? "Delete" : "Confirm"}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -1106,17 +1083,14 @@ export function InventoryList({ initialItems, pagination, userId, initialFilters
       )}
 
       {/* Bulk action confirmation modal */}
-      <AnimatePresence>
-        {pendingBulkAction && (
-          <BulkConfirmModal
-            action={pendingBulkAction}
-            count={selectedIds.size}
-            busy={bulkBusy}
-            onConfirm={handleConfirmBulkAction}
-            onCancel={() => setPendingBulkAction(null)}
-          />
-        )}
-      </AnimatePresence>
+      <BulkConfirmModal
+        open={!!pendingBulkAction}
+        action={pendingBulkAction ?? { kind: "delete" }}
+        count={selectedIds.size}
+        busy={bulkBusy}
+        onConfirm={handleConfirmBulkAction}
+        onCancel={() => setPendingBulkAction(null)}
+      />
     </>
   );
 }

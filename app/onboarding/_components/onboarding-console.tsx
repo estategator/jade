@@ -13,6 +13,7 @@ import {
   Link2,
   Mail,
   MapPin,
+  RefreshCw,
   Send,
   ShieldCheck,
   UserPlus,
@@ -27,7 +28,6 @@ import {
   createProjectShareLink,
   scheduleWalkthrough,
   createContractDraft,
-  createAndSendTemplateContract,
   sendClientPortalEmail,
   sendWelcomeEmail,
   updateOnboardingStepStatus,
@@ -238,12 +238,7 @@ export function OnboardingConsole({
     }
 
     startTransition(async () => {
-      // Template-backed contracts skip the editor and send immediately
-      const action =
-        selection?.kind === "template"
-          ? createAndSendTemplateContract
-          : createContractDraft;
-      const result = await action(formData);
+      const result = await createContractDraft(formData);
       if (result.error) {
         setActionError(result.error);
         return;
@@ -689,7 +684,7 @@ export function OnboardingConsole({
                           className="inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 transition hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
                         >
                           <FileSignature className="h-3.5 w-3.5" />
-                          Create contract
+                          Select contract
                         </button>
                         {contractSelectorFor === assignment.id && (
                           <AgreementTypeSelector
@@ -764,6 +759,30 @@ export function OnboardingConsole({
                                 : ""}
                             </p>
                           ) : null}
+                          {assignment.shareLink?.token && !shareResult && (
+                            <div className="mt-2">
+                              <p className="break-all text-xs text-stone-600 dark:text-zinc-400">
+                                {`${typeof window !== 'undefined' ? window.location.origin : ''}/client/${assignment.shareLink.token}`}
+                              </p>
+                              <div className="mt-2 flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(`${window.location.origin}/client/${assignment.shareLink!.token}`)}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                                >
+                                  <Copy className="h-3.5 w-3.5" /> Copy link
+                                </button>
+                                <a
+                                  href={`/client/${assignment.shareLink.token}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" /> Open portal
+                                </a>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <button
@@ -772,8 +791,11 @@ export function OnboardingConsole({
                           onClick={() => handleCreateShareLink(assignment.id)}
                           className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--color-brand-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <Link2 className="h-4 w-4" />
-                          Generate link
+                          {assignment.shareLink ? (
+                            <><RefreshCw className="h-4 w-4" /> Re-generate link</>
+                          ) : (
+                            <><Link2 className="h-4 w-4" /> Generate link</>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -814,7 +836,7 @@ export function OnboardingConsole({
                             </a>
                           </div>
                           <p className="mt-2 text-xs text-emerald-700/80 dark:text-emerald-300/80">
-                            Visible once here. Expires {shareResult.expiresAt ? new Date(shareResult.expiresAt).toLocaleString() : "automatically"}.
+                            Expires {shareResult.expiresAt ? new Date(shareResult.expiresAt).toLocaleString() : "automatically"}.
                           </p>
                         </div>
                       ) : null}

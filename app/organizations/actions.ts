@@ -1,8 +1,11 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { logProjectTransparencyEvent } from '@/lib/project-transparency';
 import { getMemberLimit } from '@/lib/tiers';
+import { ONBOARDING_STEP_BLUEPRINTS } from '@/lib/onboarding';
 import { requirePermission, auditLog, getUserPermissions as _getUserPermissions } from '@/lib/rbac';
 import type { Permission } from '@/lib/rbac-types';
 import { checkInviteAbuse, recordChurnSignal } from '@/lib/abuse-detection';
@@ -1159,6 +1162,24 @@ export async function getProjects(orgId: string) {
   }
 }
 
+export async function getOrgClients(orgId: string, userId: string) {
+  const check = await requirePermission(orgId, userId, 'projects:create');
+  if (!check.granted) return { error: check.error, data: [] };
+
+  const { data, error } = await supabase
+    .from('client_profiles')
+    .select('id, full_name, email')
+    .eq('org_id', orgId)
+    .order('full_name', { ascending: true });
+
+  if (error) {
+    console.error('Supabase error:', error);
+    return { error: 'Failed to load clients.', data: [] };
+  }
+
+  return { data: data ?? [] };
+}
+
 export async function getProject(id: string) {
   try {
     const { data, error } = await supabase
@@ -1186,9 +1207,24 @@ export async function createProject(formData: FormData) {
   const userId = formData.get('user_id') as string;
   const imageFile = formData.get('image') as File | null;
 
+  // Optional client fields
+  const clientMode = (formData.get('client_mode') as string | null) ?? 'none'; // 'none' | 'existing' | 'new'
+  const existingClientId = (formData.get('client_profile_id') as string | null)?.trim() || null;
+  const newClientName = (formData.get('client_full_name') as string | null)?.trim() || null;
+  const newClientEmail = (formData.get('client_email') as string | null)?.trim().toLowerCase() || null;
+  const newClientPhone = (formData.get('client_phone') as string | null)?.trim() || null;
+
   if (!name || !name.trim()) return { error: 'Project name is required.' };
   if (!orgId) return { error: 'Organization is required.' };
   if (!userId) return { error: 'User not authenticated.' };
+
+  if (clientMode === 'existing' && !existingClientId) {
+    return { error: 'Select a client to assign.' };
+  }
+  if (clientMode === 'new') {
+    if (!newClientName) return { error: 'Client name is required.' };
+    if (!newClientEmail) return { error: 'Client email is required.' };
+  }
 
   if (imageFile && imageFile.size > 0) {
     const imgErr = validateImageFile(imageFile);
@@ -1241,10 +1277,169 @@ export async function createProject(formData: FormData) {
     }
 
     await auditLog({ orgId, actorId: userId, action: 'project.created', targetType: 'project', targetId: data.id });
-    return { success: true, data: data as Project, warning: imageWarning };
+
+    // ── Client assignment (optional) ──────────────────────────
+    let clientWarning: string | undefined;
+    if (clientMode !== 'none') {
+      let clientProfileId = existingClientId;
+
+      // Create new client if requested
+      if (clientMode === 'new' && newClientName && newClientEmail) {
+        // Check for existing client with the same email first
+        const { data: existingClient } = await supabase
+          .from('client_profiles')
+          .select('id, full_name')
+          .eq('org_id', orgId)
+          .eq('email', newClientEmail)
+          .maybeSingle();
+
+        if (existingClient) {
+          // Use the existing client instead of creating a duplicate
+          clientProfileId = existingClient.id;
+        } else {
+          const insertPayload: Record<string, unknown> = {
+            org_id: orgId,
+            full_name: newClientName,
+            email: newClientEmail,
+            phone: newClientPhone || null,
+            notes: '',
+            created_by: userId,
+          };
+          const { data: newClient, error: clientError } = await supabase
+            .from('client_profiles')
+            .insert(insertPayload)
+            .select('id')
+            .single();
+
+          if (clientError) {
+            console.error('Supabase error:', clientError);
+            if (clientError.code === '23505') {
+              clientWarning = 'A client with that email already exists. You can assign them from the onboarding page.';
+            } else {
+              clientWarning = 'Project created but failed to create client. You can add the client later.';
+            }
+          } else if (newClient) {
+            clientProfileId = newClient.id;
+            await auditLog({ orgId, actorId: userId, action: 'onboarding.client_created', targetType: 'client_profile', metadata: { email: newClientEmail, fullName: newClientName } });
+          }
+        }
+      }
+
+      // Link client to project if we have a client ID
+      if (clientProfileId) {
+        const linkResult = await linkClientToProject(orgId, userId, clientProfileId, data.id, data.name);
+        if (linkResult.error) {
+          clientWarning = `Project created but ${linkResult.error.charAt(0).toLowerCase()}${linkResult.error.slice(1)}`;
+        }
+      }
+    }
+
+    const warning = [imageWarning, clientWarning].filter(Boolean).join(' ') || undefined;
+    revalidatePath('/onboarding', 'layout');
+    revalidatePath('/clients', 'layout');
+    revalidatePath('/dashboard', 'layout');
+    return { success: true, data: data as Project, warning };
   } catch (err) {
     console.error('Unexpected error:', err);
     return { error: 'An unexpected error occurred.' };
+  }
+}
+
+/**
+ * Internal helper: create assignment + onboarding workflow for a client→project link.
+ * Used by createProject when a client is selected/created inline.
+ */
+async function linkClientToProject(
+  orgId: string,
+  userId: string,
+  clientProfileId: string,
+  projectId: string,
+  projectName: string,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    // Clean up archived assignments for this project
+    await supabase
+      .from('client_project_assignments')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('project_id', projectId)
+      .eq('status', 'archived');
+
+    const { data: assignment, error: assignmentError } = await supabase
+      .from('client_project_assignments')
+      .insert({
+        org_id: orgId,
+        client_profile_id: clientProfileId,
+        project_id: projectId,
+        assigned_by: userId,
+      })
+      .select('id')
+      .single();
+
+    if (assignmentError || !assignment) {
+      console.error('Supabase error:', assignmentError);
+      if (assignmentError?.code === '23505') {
+        return { error: 'This project is already assigned to a client.' };
+      }
+      return { error: 'Failed to assign client to project.' };
+    }
+
+    const { data: workflow, error: workflowError } = await supabase
+      .from('onboarding_workflows')
+      .insert({ org_id: orgId, assignment_id: assignment.id })
+      .select('id')
+      .single();
+
+    if (workflowError || !workflow) {
+      console.error('Supabase error:', workflowError);
+      return { error: 'Failed to initialize onboarding workflow.' };
+    }
+
+    const stepRows = ONBOARDING_STEP_BLUEPRINTS.map((step, index) => ({
+      org_id: orgId,
+      workflow_id: workflow.id,
+      step_key: step.key,
+      title: step.title,
+      description: step.description,
+      sort_order: index,
+    }));
+
+    const { error: stepsError } = await supabase.from('onboarding_steps').insert(stepRows);
+    if (stepsError) {
+      console.error('Supabase error:', stepsError);
+      return { error: 'Failed to initialize onboarding steps.' };
+    }
+
+    const { data: client } = await supabase
+      .from('client_profiles')
+      .select('full_name')
+      .eq('id', clientProfileId)
+      .single();
+
+    await logProjectTransparencyEvent({
+      orgId,
+      projectId,
+      assignmentId: assignment.id,
+      actorId: userId,
+      eventType: 'client_assigned',
+      title: `Client assigned to ${projectName}`,
+      body: `${client?.full_name ?? 'Client'} is now linked to the project onboarding workflow.`,
+      payload: { client_profile_id: clientProfileId },
+    });
+
+    await auditLog({
+      orgId,
+      actorId: userId,
+      action: 'onboarding.project_assigned',
+      targetType: 'client_project_assignment',
+      targetId: assignment.id,
+      metadata: { clientProfileId, projectId },
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    return { error: 'An unexpected error occurred linking the client.' };
   }
 }
 

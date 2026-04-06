@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { PiXDuotone, PiCopyDuotone, PiCheckDuotone, PiArrowSquareOutDuotone, PiPrinterDuotone } from "react-icons/pi";
+import { Modal } from "@/app/components/ui/modal";
 
 type QrModalProps = Readonly<{
   itemId: string;
@@ -12,7 +13,6 @@ type QrModalProps = Readonly<{
 
 export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
   const [copied, setCopied] = useState(false);
-  const backdropRef = useRef<HTMLDivElement>(null);
 
   const url =
     typeof window !== "undefined"
@@ -25,18 +25,9 @@ export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function handleBackdropClick(e: React.MouseEvent) {
-    if (e.target === backdropRef.current) onClose();
-  }
-
   return (
-    <div
-      ref={backdropRef}
-      onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-    >
-      <div className="relative w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
-        {/* Close */}
+    <Modal open size="sm" panelClassName="dark:border-zinc-700">
+      {/* Close */}
         <button
           type="button"
           onClick={onClose}
@@ -95,7 +86,6 @@ export function QrCodeModal({ itemId, itemName, onClose }: QrModalProps) {
             <PiArrowSquareOutDuotone className="h-4 w-4" />
           </a>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

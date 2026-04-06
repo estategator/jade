@@ -13,6 +13,7 @@ import {
 } from "react-icons/pi";
 import { getInvoices, deleteInvoice, type InvoiceListItem } from "@/app/invoices/actions";
 import { statusConfig, formatCurrency, formatDate } from "@/app/invoices/_components/invoice-utils";
+import { Modal } from "@/app/components/ui/modal";
 
 type Props = {
   userId: string;
@@ -259,26 +260,9 @@ export function InvoiceList({ userId, orgId, initialInvoices, initialHasMore }: 
       )}
 
       {/* Delete confirmation modal */}
-      <AnimatePresence>
+      <Modal open={!!deleteTarget} size="sm">
         {deleteTarget && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            onClick={() => { if (!deleting) setDeleteTarget(null); }}
-            role="dialog"
-            aria-modal="true"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-              className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-              onClick={(e) => e.stopPropagation()}
-            >
+          <>
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
                   <PiWarningDuotone className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -309,10 +293,9 @@ export function InvoiceList({ userId, orgId, initialInvoices, initialHasMore }: 
                   Delete
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+          </>
         )}
-      </AnimatePresence>
+      </Modal>
     </div>
   );
 }

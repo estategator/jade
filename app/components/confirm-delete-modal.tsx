@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Loader2, X } from "lucide-react";
+import { Modal } from "@/app/components/ui/modal";
 
 type ConfirmDeleteModalProps = Readonly<{
   open: boolean;
@@ -39,14 +39,6 @@ export default function ConfirmDeleteModal({
     }
   }, [open]);
 
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && open && !deleting) onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open, deleting, onClose]);
-
   async function handleConfirm() {
     if (!matches || deleting) return;
     setDeleting(true);
@@ -58,27 +50,7 @@ export default function ConfirmDeleteModal({
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={() => { if (!deleting) onClose(); }}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${actionLabel} ${entityType}`}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
-            onClick={(e) => e.stopPropagation()}
-          >
+    <Modal open={open} size="md" ariaLabel={`${actionLabel} ${entityType}`}>
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -145,9 +117,6 @@ export default function ConfirmDeleteModal({
                 {actionLabel} {entityType}
               </button>
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </Modal>
   );
 }

@@ -1,10 +1,10 @@
 ---
-title: "Advanced Inventory Strategies: Scaling Multi-Booth Antique Mall Operations"
-description: "Learn how top operators scale from a single antique mall booth to a multi-location reselling business using repeatable sourcing pipelines and profit tracking."
-publishedAt: "2026-04-13"
-author: "Curator Team"
-tags: "antique malls, scaling, operations, sourcing"
-coverImage: "/blog/scaling-antique-mall.jpg"
+title: Advanced Inventory Strategies: Scaling Multi-Booth Antique Mall Operations
+description: Learn how top operators scale from a single antique mall booth to a multi-location reselling business using repeatable sourcing pipelines and profit tracking.
+publishedAt: 2026-04-13
+author: Curator Team
+tags: antique malls, scaling, operations, sourcing
+coverImage: /blog/scaling-antique-mall.jpg
 ---
 
 Operating a single antique mall booth is often a profitable hobby. Scaling to three, five, or ten booths across multiple locations is a complex logistics business. As you expand your square footage, the ad-hoc sourcing and memory-based inventory management that worked for one booth quickly breaks down, leading to disorganized spaces, lost margins, and supply chain bottlenecks.

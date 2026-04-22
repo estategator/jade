@@ -1,10 +1,10 @@
 ---
-title: "How to Price and Merchandise for Antique Malls: A Dealer's Complete Booth Setup Guide"
-description: "Maximize your per-square-foot revenue with data-driven pricing, strategic merchandising, and intentional booth layouts."
-publishedAt: "2026-04-06"
-author: "Curator Team"
-tags: "antique malls, pricing, merchandising, setup"
-coverImage: "/blog/antique-mall-booth.jpg"
+title: How to Price and Merchandise for Antique Malls: A Dealer's Complete Booth Setup Guide
+description: Maximize your per-square-foot revenue with data-driven pricing, strategic merchandising, and intentional booth layouts.
+publishedAt: 2026-04-06
+author: Curator Team
+tags: antique malls, pricing, merchandising, setup
+coverImage: /blog/antique-mall-booth.jpg
 ---
 
 The antique mall model offers a unique set of economics. Unlike a weekend estate sale, where urgency and a ticking clock drive velocity, an antique mall booth relies on steady foot traffic, impulse buys, and returning regulars. With monthly rent and mall commissions cutting into margins, your goal isn't just to sell items—it's to maximize revenue per square foot.

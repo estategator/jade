@@ -1,10 +1,10 @@
 ---
-title: "Consumer Psychology in Estate Sales: The Hidden Drivers of Buyer Conversion"
-description: "Learn how human behavior, from anchoring to decision fatigue, influences how much shoppers spend at your estate sales."
-publishedAt: "2026-04-20"
-author: "Curator Team"
-tags: "estate sales, psychology, conversion, sales tactics"
-coverImage: "/blog/buyer-psychology.jpg"
+title: Consumer Psychology in Estate Sales: The Hidden Drivers of Buyer Conversion
+description: Learn how human behavior, from anchoring to decision fatigue, influences how much shoppers spend at your estate sales.
+publishedAt: 2026-04-20
+author: Curator Team
+tags: estate sales, psychology, conversion, sales tactics
+coverImage: /blog/buyer-psychology.jpg
 ---
 
 Why does a buyer eagerly pay $50 for a vintage lamp at one estate sale, but haggle over a $20 price tag for the exact same lamp at another? 

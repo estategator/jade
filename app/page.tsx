@@ -865,7 +865,7 @@ const CTASection = () => {
             <div className="lg:col-span-2">
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 <div className="relative">
-                  <PiEnvelopeDuotone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" aria-hidden="true" />
+                  <PiEnvelopeDuotone className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 h-5 w-5 text-zinc-500" aria-hidden="true" />
                   <input
                     type="email"
                     required

@@ -114,7 +114,7 @@ export default async function BlogPostPage({
       </div>
 
       <div className="relative z-10">
-        <Navbar launchBadge="Launching Feb 2026" />
+        <Navbar launchBadge="Now in early access" />
         <main className="pt-24 pb-24 sm:pt-28 sm:pb-28 px-4 sm:px-6 lg:px-8">
           <article className="max-w-3xl mx-auto">
             {/* Breadcrumb JSON-LD */}

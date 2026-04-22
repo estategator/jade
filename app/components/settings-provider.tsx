@@ -165,8 +165,10 @@ export function SettingsProvider({
       if (cached && !cancelled) {
         const initialResolved = resolveSettings(cached, [], null);
         setResolved(initialResolved);
-        applyThemeToDOM(initialResolved.effective.theme);
-        applyCSSVars(initialResolved.effective);
+        if (userId) {
+          applyThemeToDOM(initialResolved.effective.theme);
+          applyCSSVars(initialResolved.effective);
+        }
       }
 
       // 2. Fetch from server as source of truth
@@ -203,11 +205,14 @@ export function SettingsProvider({
     return () => { cancelled = true; };
   }, [userId, activeOrgId]);
 
-  // Apply settings to DOM whenever they change
+  // Apply settings to DOM whenever they change — only when logged in.
+  // Public/marketing surfaces are managed by PublicThemeProvider so org/user
+  // settings don't leak into pre-login UI.
   useEffect(() => {
+    if (!userId) return;
     applyThemeToDOM(resolved.effective.theme);
     applyCSSVars(resolved.effective);
-  }, [resolved.effective]);
+  }, [resolved.effective, userId]);
 
   const setActiveOrg = useCallback(
     (orgId: string | null) => {

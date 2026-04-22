@@ -110,7 +110,7 @@ export default function PricingPage() {
       </div>
 
       <div className="relative z-10">
-        <Navbar launchBadge="Launching Feb 2026" />
+        <Navbar launchBadge="Now in early access" />
         <main>
           {/* ── Hero ─────────────────────────────────────── */}
           <section className="relative pt-28 pb-12 lg:pt-36 lg:pb-16">

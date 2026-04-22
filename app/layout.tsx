@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { SettingsProvider } from "@/app/components/settings-provider";
+import { PublicThemeProvider } from "@/app/components/public-theme-provider";
 import { DashboardLayoutWrapper } from "@/app/components/dashboard-layout-wrapper";
 import { SidebarServer } from "@/app/components/sidebar-server";
 import { createClient } from "@/utils/supabase/server";
@@ -76,45 +77,52 @@ export default async function RootLayout({
             __html: `
               (function() {
                 try {
-                  // 1. Get active org from cookie
                   var match = document.cookie.match(/(?:^|; )curator_active_org=([^;]*)/);
                   var orgId = match ? decodeURIComponent(match[1]) : null;
-                  
-                  // 2. Check localStorage for cached settings
-                  var cacheKey = 'curator_settings_' + (orgId || 'default');
-                  var cached = localStorage.getItem(cacheKey);
-                  
-                  if (cached) {
-                    try {
-                      var parsed = JSON.parse(cached);
-                      var theme = parsed.theme === 'dark' ? 'dark' : 'light';
-                      
-                      document.documentElement.setAttribute('data-theme', theme);
-                      if (theme === 'dark') {
-                        document.documentElement.classList.add('dark');
-                      } else {
-                        document.documentElement.classList.remove('dark');
+
+                  // Authenticated surface: use org-scoped cached settings.
+                  if (orgId) {
+                    var cacheKey = 'curator_settings_' + orgId;
+                    var cached = localStorage.getItem(cacheKey);
+                    if (cached) {
+                      try {
+                        var parsed = JSON.parse(cached);
+                        var theme = parsed.theme === 'dark' ? 'dark' : 'light';
+                        document.documentElement.setAttribute('data-theme', theme);
+                        if (theme === 'dark') {
+                          document.documentElement.classList.add('dark');
+                        } else {
+                          document.documentElement.classList.remove('dark');
+                        }
+                        if (parsed.fontSize) {
+                          document.documentElement.style.setProperty('--app-font-size', parsed.fontSize);
+                        }
+                        if (parsed.brandPrimary) {
+                          document.documentElement.style.setProperty('--brand-primary', parsed.brandPrimary);
+                        }
+                        if (parsed.brandAccent) {
+                          document.documentElement.style.setProperty('--brand-accent', parsed.brandAccent);
+                        }
+                        return;
+                      } catch (e) {
+                        // Invalid cache, fall through to public theme
                       }
-                      
-                      // Apply CSS variables
-                      if (parsed.fontSize) {
-                        document.documentElement.style.setProperty('--app-font-size', parsed.fontSize);
-                      }
-                      if (parsed.brandPrimary) {
-                        document.documentElement.style.setProperty('--brand-primary', parsed.brandPrimary);
-                      }
-                      if (parsed.brandAccent) {
-                        document.documentElement.style.setProperty('--brand-accent', parsed.brandAccent);
-                      }
-                      return;
-                    } catch (e) {
-                      // Invalid cache, fall through to default
                     }
                   }
-                  
-                  // 3. Fallback: light theme
-                  document.documentElement.setAttribute('data-theme', 'light');
-                  document.documentElement.classList.remove('dark');
+
+                  // Public/marketing surface: use public theme (localStorage or system).
+                  var publicTheme = localStorage.getItem('curator_public_theme');
+                  if (publicTheme !== 'dark' && publicTheme !== 'light') {
+                    publicTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                      ? 'dark'
+                      : 'light';
+                  }
+                  document.documentElement.setAttribute('data-theme', publicTheme);
+                  if (publicTheme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
                 } catch (e) {
                   // Silently fail; hydration will apply correct theme
                 }
@@ -132,11 +140,13 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
         />
         <SettingsProvider userId={user?.id ?? null}>
-          {isAuthenticated ? (
-            <DashboardLayoutWrapper sidebar={<SidebarServer />}>{children}</DashboardLayoutWrapper>
-          ) : (
-            children
-          )}
+          <PublicThemeProvider enabled={!isAuthenticated}>
+            {isAuthenticated ? (
+              <DashboardLayoutWrapper sidebar={<SidebarServer />}>{children}</DashboardLayoutWrapper>
+            ) : (
+              children
+            )}
+          </PublicThemeProvider>
         </SettingsProvider>
         <Toaster position="top-right" richColors closeButton />
         <Analytics />

@@ -39,7 +39,7 @@ export function BlogIndexClient({ posts }: Readonly<{ posts: BlogPostMeta[] }>) 
       </div>
 
       <div className="relative z-10">
-        <Navbar launchBadge="Launching Feb 2026" />
+        <Navbar launchBadge="Now in early access" />
 
         <main>
           {/* ── Hero ─────────────────────────────────────── */}

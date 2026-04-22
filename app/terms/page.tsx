@@ -225,7 +225,7 @@ const sections = [
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 font-sans selection:bg-stone-200 dark:selection:bg-zinc-800 font-body">
-      <Navbar launchBadge="Launching Feb 2026" />
+      <Navbar launchBadge="Now in early access" />
       <main>
         {/* Hero */}
         <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8">

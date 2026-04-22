@@ -4,15 +4,22 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Package, Building2, BarChart3, LogOut } from "lucide-react";
+import {
+  PiPackageDuotone,
+  PiBuildingsDuotone,
+  PiChartBarDuotone,
+  PiSignOutDuotone,
+} from "react-icons/pi";
 import { supabase } from "@/lib/supabase";
 import { useSettings } from "@/app/components/settings-provider";
 import { OrgSwitcher } from "@/app/components/org-switcher";
 import { ThemeToggle } from "@/app/components/theme-toggle";
+import { PublicThemeToggle } from "@/app/components/public-theme-toggle";
 
 type NavbarProps = {
   authenticated?: boolean;
   onSignOut?: () => void;
+  /** Deprecated: in-nav launch badge was removed to reduce visual noise. Accepted for backwards compat. */
   launchBadge?: string;
   /** Stronger glass blur/translucency treatment */
   glassEffect?: boolean;
@@ -20,7 +27,7 @@ type NavbarProps = {
   hideOnScroll?: boolean;
 };
 
-export function Navbar({ authenticated = false, onSignOut, launchBadge, glassEffect = false, hideOnScroll = false }: NavbarProps) {
+export function Navbar({ authenticated = false, onSignOut, glassEffect = false, hideOnScroll = false }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { settings } = useSettings();
@@ -79,14 +86,14 @@ export function Navbar({ authenticated = false, onSignOut, launchBadge, glassEff
   };
 
   const navItems = [
-    { label: "Dashboard", mobileLabel: "Dash", href: "/dashboard", icon: BarChart3 },
-    { label: "Inventory", mobileLabel: "Inv", href: "/inventory", icon: Package },
-    { label: "Organizations", mobileLabel: "Orgs", href: "/organizations", icon: Building2 },
+    { label: "Dashboard", mobileLabel: "Dash", href: "/dashboard", icon: PiChartBarDuotone },
+    { label: "Inventory", mobileLabel: "Inv", href: "/inventory", icon: PiPackageDuotone },
+    { label: "Organizations", mobileLabel: "Orgs", href: "/organizations", icon: PiBuildingsDuotone },
   ];
 
   const navBaseClass = glassEffect
-    ? "sticky top-0 left-0 right-0 z-40 border-b border-stone-200/30 bg-white/60 backdrop-blur-xl shadow-sm dark:border-zinc-700/30 dark:bg-zinc-950/50 dark:shadow-zinc-900/20"
-    : "sticky top-0 left-0 right-0 z-40 border-b border-stone-200/50 bg-stone-50/90 backdrop-blur-md dark:border-zinc-800/50 dark:bg-zinc-950/90";
+    ? "sticky top-0 left-0 right-0 z-40 border-b border-stone-200/60 bg-white/70 backdrop-blur-xl shadow-sm shadow-indigo-500/[0.02] dark:border-zinc-800/60 dark:bg-zinc-950/60 dark:shadow-black/20"
+    : "sticky top-0 left-0 right-0 z-40 border-b border-stone-200/70 bg-white/80 backdrop-blur-md dark:border-zinc-800/70 dark:bg-zinc-950/80";
 
   return (
     <nav
@@ -98,7 +105,7 @@ export function Navbar({ authenticated = false, onSignOut, launchBadge, glassEff
         <div className="flex h-14 items-center justify-between sm:h-16">
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href={authenticated ? "/dashboard" : "/"} className="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]">
-              {settings.logoUrl ? (
+              {authenticated && settings.logoUrl ? (
                 <Image
                   src={settings.logoUrl}
                   alt="Logo"
@@ -153,34 +160,34 @@ export function Navbar({ authenticated = false, onSignOut, launchBadge, glassEff
                   aria-label="Sign out"
                   className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 hover:bg-stone-50 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-white sm:gap-2 sm:px-3 sm:text-sm"
                 >
-                  <LogOut className="h-4 w-4 shrink-0" />
+                  <PiSignOutDuotone className="h-4 w-4 shrink-0" />
                   <span className="hidden sm:inline">Sign out</span>
                 </button>
               </div>
               </>
             ) : (
               <>
-                {launchBadge && (
-                  <span className="text-sm font-medium text-stone-500 font-body">{launchBadge}</span>
-                )}
                 <Link
                   href="/pricing"
-                  className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] font-body"
+                  className="hidden sm:inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] font-body"
                 >
                   Pricing
                 </Link>
                 <Link
                   href="/blog"
-                  className="inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] font-body"
+                  className="hidden sm:inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] font-body"
                 >
                   Blog
                 </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-xl text-white bg-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-focus-ring)] transition-all shadow-sm font-body"
-                >
-                  Log in
-                </Link>
+                <div className="ml-1 sm:ml-2 flex items-center gap-1.5 border-l border-stone-200/70 dark:border-zinc-800/70 pl-1.5 sm:pl-3">
+                  <PublicThemeToggle />
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center px-3.5 py-1.5 text-sm font-semibold rounded-lg text-white bg-stone-900 dark:bg-white dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-950 focus-visible:ring-stone-900 dark:focus-visible:ring-white transition-all font-body"
+                  >
+                    Log in
+                  </Link>
+                </div>
               </>
             )}
           </div>
